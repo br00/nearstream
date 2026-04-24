@@ -19,7 +19,15 @@ function EmailForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // TODO: wire to Buttondown API
+    try {
+      await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+    } catch {
+      // Still show confirmation — don't block UX on network errors
+    }
     setSubmitted(true);
   }
 
