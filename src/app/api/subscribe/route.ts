@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     await put(BLOB_NAME, JSON.stringify(subscribers, null, 2), {
       access: "public",
       addRandomSuffix: false,
+      allowOverwrite: true,
       contentType: "application/json",
     });
 
