@@ -1,4 +1,4 @@
-import { put, list } from "@vercel/blob";
+import { put, head, BlobNotFoundError } from "@vercel/blob";
 import { NextResponse } from "next/server";
 
 const BLOB_NAME = "subscribers.json";
@@ -8,20 +8,32 @@ interface Subscriber {
   timestamp: string;
 }
 
-async function getSubscribers(): Promise<{
-  subscribers: Subscriber[];
-  url: string | null;
-}> {
+async function getSubscribers(): Promise<Subscriber[]> {
+  let blob;
   try {
-    const { blobs } = await list({ prefix: BLOB_NAME });
-    if (blobs.length === 0) return { subscribers: [], url: null };
-
-    const response = await fetch(blobs[0].url, { cache: "no-store" });
-    const subscribers = await response.json();
-    return { subscribers, url: blobs[0].url };
-  } catch {
-    return { subscribers: [], url: null };
+    blob = await head(BLOB_NAME);
+  } catch (err) {
+    if (err instanceof BlobNotFoundError) {
+      return [];
+    }
+    throw err;
   }
+
+  const response = await fetch(blob.url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(
+      `Failed to read ${BLOB_NAME}: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  const data: unknown = await response.json();
+  if (!Array.isArray(data)) {
+    throw new Error(
+      `Unexpected ${BLOB_NAME} shape: expected array, got ${typeof data}`,
+    );
+  }
+
+  return data as Subscriber[];
 }
 
 export async function POST(request: Request) {
@@ -34,7 +46,7 @@ export async function POST(request: Request) {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const { subscribers } = await getSubscribers();
+    const subscribers = await getSubscribers();
 
     if (subscribers.some((s) => s.email === normalizedEmail)) {
       return NextResponse.json({ ok: true, message: "Already subscribed" });
@@ -57,7 +69,7 @@ export async function POST(request: Request) {
     console.error("Subscribe error:", err);
     return NextResponse.json(
       { error: "Something went wrong" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

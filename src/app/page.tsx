@@ -14,24 +14,33 @@ function EmailForm({
   className?: string;
 }) {
   const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [errorKey, setErrorKey] = useState<"errorInvalid" | "errorGeneric">(
+    "errorGeneric",
+  );
   const s = t[locale];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await fetch("/api/subscribe", {
+      const res = await fetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
+      if (res.ok) {
+        setStatus("success");
+        return;
+      }
+      setErrorKey(res.status === 400 ? "errorInvalid" : "errorGeneric");
+      setStatus("error");
     } catch {
-      // Still show confirmation — don't block UX on network errors
+      setErrorKey("errorGeneric");
+      setStatus("error");
     }
-    setSubmitted(true);
   }
 
-  if (submitted) {
+  if (status === "success") {
     return (
       <div
         className={`flex items-center gap-3 font-mono text-xs text-foreground ${className}`}
@@ -43,22 +52,30 @@ function EmailForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={`flex gap-3 ${className}`}>
-      <input
-        type="email"
-        required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder={s.inputPlaceholder}
-        className="flex-1 border-b border-border bg-transparent px-0 py-2 text-sm text-foreground placeholder:text-muted/30 outline-none focus:border-foreground transition-colors font-mono"
-      />
-      <button
-        type="submit"
-        className="border border-border px-4 py-2 text-[11px] font-mono uppercase tracking-[0.2em] text-muted transition-all hover:border-foreground hover:text-foreground hover:shadow-[0_0_12px_rgba(255,255,255,0.06)] cursor-pointer"
-      >
-        {s.send}
-      </button>
-    </form>
+    <div className={className}>
+      <form onSubmit={handleSubmit} className="flex gap-3">
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (status === "error") setStatus("idle");
+          }}
+          placeholder={s.inputPlaceholder}
+          className="flex-1 border-b border-border bg-transparent px-0 py-2 text-sm text-foreground placeholder:text-muted/30 outline-none focus:border-foreground transition-colors font-mono"
+        />
+        <button
+          type="submit"
+          className="border border-border px-4 py-2 text-[11px] font-mono uppercase tracking-[0.2em] text-muted transition-all hover:border-foreground hover:text-foreground hover:shadow-[0_0_12px_rgba(255,255,255,0.06)] cursor-pointer"
+        >
+          {s.send}
+        </button>
+      </form>
+      {status === "error" && (
+        <p className="mt-2 font-mono text-[11px] text-muted">{s[errorKey]}</p>
+      )}
+    </div>
   );
 }
 
