@@ -1,4 +1,5 @@
 import type { NewStreamEntry, StreamEntry } from "@/schemas/stream";
+import { R2Store } from "@/lib/r2-store";
 
 export interface Store {
   list(): Promise<StreamEntry[]>;
@@ -26,10 +27,25 @@ class InMemoryStore implements Store {
   }
 }
 
+function pickStore(): Store {
+  const {
+    R2_ACCOUNT_ID: accountId,
+    R2_ACCESS_KEY_ID: accessKeyId,
+    R2_SECRET_ACCESS_KEY: secretAccessKey,
+    R2_BUCKET: bucket,
+  } = process.env;
+
+  if (accountId && accessKeyId && secretAccessKey && bucket) {
+    console.log("[nearstream] store: R2");
+    return new R2Store({ accountId, accessKeyId, secretAccessKey, bucket });
+  }
+  console.log("[nearstream] store: in-memory (set R2_* env vars for R2)");
+  return new InMemoryStore();
+}
+
 const globalForStore = globalThis as unknown as { __nearstreamStore?: Store };
 
-export const store: Store =
-  globalForStore.__nearstreamStore ?? new InMemoryStore();
+export const store: Store = globalForStore.__nearstreamStore ?? pickStore();
 
 if (process.env.NODE_ENV !== "production") {
   globalForStore.__nearstreamStore = store;

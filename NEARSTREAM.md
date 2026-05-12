@@ -180,6 +180,8 @@ Terse list. Each entry: the decision, the reason, when.
 - **Ownership through exit, not infrastructure.** Each user owns their domain. Content is exportable at all times (MDX + media + OPML archive). Identity is the domain, not the instance. *Why: lets us run a hosted instance for adoption without compromising sovereignty — anyone can leave at any time and keep everything.* (2026-04-28)
 - **Scale by instance count, not user count per instance.** Nearstream scales like email: many small instances, all interoperating via the protocol. Each instance stays small (~10–80 friends). *Why: the friend-graph mechanic only works at small scale; the right unit of growth is the circle, not the user.* (2026-04-28)
 - **Alessandro's instance is for his close friends.** Growth is incidental, not a goal. Future hand-off (paid tier / co-op / non-profit) is a *future* decision, not a v1 commitment. *Why: locks the v1 scope to "small but durable," prevents premature SaaSification.* (2026-04-28)
+- **R2 keys are flat: `entries/{id}.json`.** No date prefix in v1. *Why: simplest layout that works; entry volume is small for a long time. Date partitioning is filed as a follow-up issue — revisit when list cost or pagination becomes real, not before.* (2026-05-12)
+- **R2 client is `aws4fetch`, not `@aws-sdk/client-s3`.** Single-file SigV4 signer over `fetch`. *Why: AWS SDK is ~1.6 MB / ~120 packages, mostly features we don't need. `aws4fetch` is edge-runtime compatible and aligns with §05 "Vercel is a deployment target, not a dependency" — same code will run on Fly.io.* (2026-05-12)
 
 ---
 
