@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { store } from "@/lib/store";
 import { isDisciplineTag } from "@/schemas/stream";
+import { getSession } from "@/lib/auth";
 
 export async function GET() {
   const entries = await store.list();
@@ -8,6 +9,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const contentType = request.headers.get("content-type") ?? "";
 
   let text: unknown;

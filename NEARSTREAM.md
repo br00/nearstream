@@ -3,7 +3,7 @@
 A shared journal between close friends.
 
 > **Status:** v0.3 — building
-> **Updated:** 2026-04-28
+> **Updated:** 2026-05-15
 > **Predecessors:** v0.2 (2026-04-27) · technical sketch v0.1 (April 2026)
 
 This document is the single source of truth for terms, decisions, and reasoning behind Nearstream. Update it as we decide things. The Decisions log (§05) is the most important section — code can be re-read, but the *reasons* behind picks rot fastest.
@@ -182,6 +182,11 @@ Terse list. Each entry: the decision, the reason, when.
 - **Alessandro's instance is for his close friends.** Growth is incidental, not a goal. Future hand-off (paid tier / co-op / non-profit) is a *future* decision, not a v1 commitment. *Why: locks the v1 scope to "small but durable," prevents premature SaaSification.* (2026-04-28)
 - **R2 keys are flat: `entries/{id}.json`.** No date prefix in v1. *Why: simplest layout that works; entry volume is small for a long time. Date partitioning is filed as a follow-up issue — revisit when list cost or pagination becomes real, not before.* (2026-05-12)
 - **R2 client is `aws4fetch`, not `@aws-sdk/client-s3`.** Single-file SigV4 signer over `fetch`. *Why: AWS SDK is ~1.6 MB / ~120 packages, mostly features we don't need. `aws4fetch` is edge-runtime compatible and aligns with §05 "Vercel is a deployment target, not a dependency" — same code will run on Fly.io.* (2026-05-12)
+- **Auth is HMAC over Web Crypto, not a JWT library.** Both magic-link tokens and session cookies are `base64url(payload).base64url(HMAC-SHA256(secret, payload))`. No `jose`, no `next-auth`, no Lucia. *Why: same reasoning as `aws4fetch` — this is auth for a handful of people, not enterprise. The whole signer is ~30 lines, has zero dependencies, and rotating `AUTH_SECRET` invalidates every session + magic link in one step. Standard auth libraries are designed for the multi-provider, refresh-token, RBAC case Nearstream will never have.* (2026-05-15)
+- **Allowlist is an env var, not a database.** `ALLOWED_EMAILS` is a comma-separated list in `.env`. Adding a friend = redeploy. *Why: friction by design (§04 anti-Squarespace). The login page never reveals whether an address is on the list — same response either way. A self-serve "invite" UI is the exact kind of feature this project shouldn't have.* (2026-05-15)
+- **Magic-link UX always shows the same response.** Whether the email is on the allowlist or not, the user sees "if that email is on the allowlist, a link is on its way." *Why: prevents the login page from being a free allowlist-enumeration oracle. Costs nothing.* (2026-05-15)
+- **Optimistic check in `proxy.ts`, real check at the route boundary.** Next 16 renamed Middleware → Proxy. The proxy only checks for the presence of the session cookie (no signature verification — that's an HMAC cost on every prefetch). `getSession()` in the page/route does the real verification. *Why: matches the Next 16 auth guide and keeps prefetches cheap. Defense-in-depth: even a stolen-but-tampered cookie passes the proxy but fails the route.* (2026-05-15)
+- **Resend over fetch, not the Resend SDK.** Same `aws4fetch` ethos. If `RESEND_API_KEY` or `RESEND_FROM` is missing, the magic link prints to the server console instead of being emailed — mirrors the R2 fallback in slice 2. *Why: lets the whole flow be tested without burning Resend quota or a real inbox round-trip, and keeps the dependency surface tiny.* (2026-05-15)
 
 ---
 

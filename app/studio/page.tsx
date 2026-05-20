@@ -1,22 +1,38 @@
+import { redirect } from "next/navigation";
 import { DISCIPLINE_TAGS } from "@/schemas/stream";
+import { getSession } from "@/lib/auth";
+import { SubmitButton } from "@/app/_components/submit-button";
 
 export const metadata = {
   title: "Studio · Nearstream",
 };
 
-export default function StudioPage() {
+export default async function StudioPage() {
+  const session = await getSession();
+  if (!session) redirect("/login");
+
   return (
     <div className="mx-auto w-full max-w-2xl px-6 py-16">
       <header className="mb-10 flex items-baseline justify-between">
         <h1 className="font-mono text-sm uppercase tracking-widest text-zinc-500">
           Studio
         </h1>
-        <a
-          href="/"
-          className="font-mono text-xs uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-        >
-          ← Stream
-        </a>
+        <div className="flex items-baseline gap-4">
+          <form action="/auth/logout" method="POST">
+            <button
+              type="submit"
+              className="font-mono text-xs uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
+              Sign out
+            </button>
+          </form>
+          <a
+            href="/"
+            className="font-mono text-xs uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+          >
+            ← Stream
+          </a>
+        </div>
       </header>
 
       <form
@@ -63,12 +79,12 @@ export default function StudioPage() {
           </div>
         </fieldset>
 
-        <button
-          type="submit"
-          className="self-start rounded-full bg-zinc-900 px-5 py-2 font-mono text-xs uppercase tracking-widest text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+        <SubmitButton
+          pendingLabel="Posting…"
+          className="self-start rounded-full bg-zinc-900 px-5 py-2 font-mono text-xs uppercase tracking-widest text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
         >
           Post
-        </button>
+        </SubmitButton>
       </form>
     </div>
   );
