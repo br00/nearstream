@@ -1,57 +1,79 @@
+import Link from "next/link";
 import { store } from "@/lib/store";
+import { PageShell } from "@/app/_components/page-shell";
+import { Kicker } from "@/app/_components/kicker";
+import { TagChip } from "@/app/_components/tag-chip";
 
 export const dynamic = "force-dynamic";
 
-function formatTimestamp(iso: string): string {
+function formatRelative(iso: string): string {
   const d = new Date(iso);
-  const date = d.toISOString().slice(0, 10);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
   const time = d.toTimeString().slice(0, 5);
-  return `${date} ${time}`;
+  if (sameDay) return `today · ${time}`;
+  const sameYear = d.getFullYear() === now.getFullYear();
+  const month = d.toLocaleString("en", { month: "short" });
+  const day = d.getDate();
+  const datePart = sameYear ? `${month} ${day}` : `${month} ${day}, ${d.getFullYear()}`;
+  return `${datePart} · ${time}`;
 }
 
 export default async function Home() {
   const entries = await store.list();
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-6 py-16">
-      <header className="mb-12 flex items-baseline justify-between">
-        <h1 className="font-mono text-sm uppercase tracking-widest text-zinc-500">
-          Stream
-        </h1>
-        <a
+    <PageShell
+      rightNav={
+        <Link
           href="/studio"
-          className="font-mono text-xs uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+          className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground"
         >
           Studio →
-        </a>
-      </header>
+        </Link>
+      }
+    >
+      <section className="flex flex-1 justify-center px-6">
+        <div className="w-full max-w-lg py-12">
+          <Kicker>Stream</Kicker>
+          <h1 className="mt-2 text-2xl font-normal tracking-tight text-foreground">
+            Alessandro Borelli
+          </h1>
 
-      {entries.length === 0 ? (
-        <p className="font-mono text-sm text-zinc-400">
-          No entries yet. Post one from the{" "}
-          <a href="/studio" className="underline hover:text-zinc-900 dark:hover:text-zinc-100">
-            studio
-          </a>
-          .
-        </p>
-      ) : (
-        <ol className="flex flex-col gap-10">
-          {entries.map((entry) => (
-            <li key={entry.id} className="flex flex-col gap-2">
-              <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-widest text-zinc-500">
-                <time dateTime={entry.publishedAt}>
-                  {formatTimestamp(entry.publishedAt)}
-                </time>
-                <span aria-hidden>·</span>
-                <span>{entry.tag}</span>
-              </div>
-              <p className="whitespace-pre-wrap text-base leading-relaxed text-zinc-900 dark:text-zinc-100">
-                {entry.text}
-              </p>
-            </li>
-          ))}
-        </ol>
-      )}
-    </div>
+          {entries.length === 0 ? (
+            <p className="mt-12 text-sm leading-relaxed text-muted">
+              No entries yet. Post one from the{" "}
+              <Link
+                href="/studio"
+                className="text-foreground underline-offset-4 hover:underline"
+              >
+                studio
+              </Link>
+              .
+            </p>
+          ) : (
+            <ul className="mt-12 space-y-8 border-l border-border pl-6">
+              {entries.map((entry) => (
+                <li key={entry.id} className="relative">
+                  <span className="absolute -left-[29px] top-2 inline-block h-1 w-1 rounded-full bg-foreground/70" />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <time
+                      dateTime={entry.publishedAt}
+                      className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted tabular-nums"
+                    >
+                      {formatRelative(entry.publishedAt)}
+                    </time>
+                    <TagChip>{entry.tag}</TagChip>
+                  </div>
+                  <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
+                    {entry.text}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+    </PageShell>
   );
 }

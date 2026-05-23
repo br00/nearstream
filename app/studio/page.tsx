@@ -1,7 +1,12 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DISCIPLINE_TAGS } from "@/schemas/stream";
 import { getSession } from "@/lib/auth";
 import { SubmitButton } from "@/app/_components/submit-button";
+import { PageShell } from "@/app/_components/page-shell";
+import { Textarea } from "@/app/_components/textarea";
+import { Kicker } from "@/app/_components/kicker";
+import { TagRadio } from "@/app/_components/tag-chip";
 
 export const metadata = {
   title: "Studio · Nearstream",
@@ -11,81 +16,67 @@ export default async function StudioPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
+  const navLinkClasses =
+    "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
+
   return (
-    <div className="mx-auto w-full max-w-2xl px-6 py-16">
-      <header className="mb-10 flex items-baseline justify-between">
-        <h1 className="font-mono text-sm uppercase tracking-widest text-zinc-500">
-          Studio
-        </h1>
-        <div className="flex items-baseline gap-4">
+    <PageShell
+      rightNav={
+        <>
+          <Link href="/" className={navLinkClasses}>
+            ← Stream
+          </Link>
           <form action="/auth/logout" method="POST">
-            <button
-              type="submit"
-              className="font-mono text-xs uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-            >
+            <button type="submit" className={navLinkClasses}>
               Sign out
             </button>
           </form>
-          <a
-            href="/"
-            className="font-mono text-xs uppercase tracking-widest text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-          >
-            ← Stream
-          </a>
+        </>
+      }
+    >
+      <section className="flex flex-1 justify-center px-6">
+        <div className="w-full max-w-lg py-12">
+          <Kicker>Studio</Kicker>
+          <h1 className="mt-2 text-2xl font-normal tracking-tight text-foreground">
+            New entry
+          </h1>
+
+          <form action="/api/stream" method="POST" className="mt-10 flex flex-col gap-8">
+            <label className="flex flex-col gap-2">
+              <Kicker>Entry</Kicker>
+              <Textarea
+                name="text"
+                required
+                rows={5}
+                placeholder="What are you doing right now?"
+              />
+            </label>
+
+            <fieldset className="flex flex-col gap-3">
+              <legend>
+                <Kicker>Discipline</Kicker>
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {DISCIPLINE_TAGS.map((tag, i) => (
+                  <TagRadio
+                    key={tag}
+                    name="tag"
+                    value={tag}
+                    defaultChecked={i === 0}
+                    required
+                  >
+                    {tag}
+                  </TagRadio>
+                ))}
+              </div>
+            </fieldset>
+
+            <SubmitButton pendingLabel="Posting…" className="self-start">
+              Post
+            </SubmitButton>
+          </form>
         </div>
-      </header>
-
-      <form
-        action="/api/stream"
-        method="POST"
-        className="flex flex-col gap-6"
-      >
-        <label className="flex flex-col gap-2">
-          <span className="font-mono text-xs uppercase tracking-widest text-zinc-500">
-            Entry
-          </span>
-          <textarea
-            name="text"
-            required
-            rows={5}
-            placeholder="What are you doing right now?"
-            className="resize-none rounded-md border border-zinc-200 bg-white p-3 text-base leading-relaxed text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
-          />
-        </label>
-
-        <fieldset className="flex flex-col gap-2">
-          <legend className="font-mono text-xs uppercase tracking-widest text-zinc-500">
-            Discipline
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {DISCIPLINE_TAGS.map((tag, i) => (
-              <label
-                key={tag}
-                className="cursor-pointer font-mono text-xs uppercase tracking-widest"
-              >
-                <input
-                  type="radio"
-                  name="tag"
-                  value={tag}
-                  defaultChecked={i === 0}
-                  required
-                  className="peer sr-only"
-                />
-                <span className="block rounded-full border border-zinc-200 px-3 py-1 text-zinc-500 peer-checked:border-zinc-900 peer-checked:bg-zinc-900 peer-checked:text-white dark:border-zinc-800 dark:peer-checked:border-zinc-100 dark:peer-checked:bg-zinc-100 dark:peer-checked:text-zinc-900">
-                  {tag}
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        <SubmitButton
-          pendingLabel="Posting…"
-          className="self-start rounded-full bg-zinc-900 px-5 py-2 font-mono text-xs uppercase tracking-widest text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-        >
-          Post
-        </SubmitButton>
-      </form>
-    </div>
+      </section>
+    </PageShell>
   );
 }

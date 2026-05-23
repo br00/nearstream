@@ -2,7 +2,7 @@
 
 How the code is laid out. Pairs with [`NEARSTREAM.md`](./NEARSTREAM.md), which holds philosophy + decisions. This file holds shape.
 
-> **Status:** Phase 1 · Slice 3 (magic-link auth) — durable R2 storage; `/studio` and `POST /api/stream` gated by Resend magic-link sign-in; reading stays public; no styling polish.
+> **Status:** Phase 1 · Slice 4 (Nearstream identity + design system) — durable R2 storage; magic-link auth on `/studio`; pure-mono Nearstream chrome (`#000` bg, constellation mark) ported from the deployed landing site; reusable components in `app/_components/`; `/design` page is the spec; reading stays public.
 
 ---
 
@@ -19,7 +19,8 @@ nearstream/
 │   │   ├── page.tsx       email entry form
 │   │   └── actions.ts     server action: send magic link
 │   ├── studio/            posting UI — gated, also calls getSession() itself
-│   ├── _components/       small client components (e.g. SubmitButton)
+│   ├── design/            /design — Nearstream chrome spec page (palette, type, components)
+│   ├── _components/       Nearstream chrome design system (see below)
 │   ├── page.tsx           public stream timeline (server component)
 │   └── layout.tsx         root layout, fonts, metadata
 ├── lib/
@@ -104,6 +105,28 @@ Sessions are signed cookies. There is no session store. Rotating `AUTH_SECRET` i
 
 5. **Public render is a server component.** `app/page.tsx` reads the store directly at request time. No client-side fetching, no API call from the browser. `/api/stream` exists for posting and for future readers / RSS.
 
+## Design system (Nearstream chrome layer)
+
+`app/_components/` is the **Nearstream chrome** layer — the platform identity that every Nearstream instance carries. NEARSTREAM.md §02 distinguishes the *reader* (Nearstream's territory) from the *site* (the user's territory). These components belong to the Nearstream side. User site templates (Phase 2) will live separately and may use their own palette + components.
+
+```
+app/_components/
+├── nearstream-mark.tsx    constellation logo (NearstreamMark) + lockup (NearstreamLockup)
+├── page-shell.tsx         top nav (lockup + optional right-nav) + footer ({year}_)
+├── kicker.tsx             small-caps mono label ("Stream", "Studio", form labels)
+├── button.tsx             outlined ghost button + buttonClasses helper
+├── submit-button.tsx      client-component variant that auto-disables on form submit
+├── input.tsx              bottom-border text input
+├── textarea.tsx           bordered textarea
+└── tag-chip.tsx           TagChip (display) + TagRadio (selectable)
+```
+
+The `/design` route is the live spec — color swatches, type scale, brand mark sizes, every component in every state. It is the single source of truth: pages compose components, `/design` shows components, components own their styles.
+
+**Tokens** (in `app/globals.css`):
+- `--background: #000` · `--foreground: #e4e4e7` · `--muted: #a1a1aa` · `--muted-soft: #71717a` · `--border: #27272a`
+- No accent color, no light mode. The palette is the deployed landing site at `nearstream-khaki.vercel.app` ported verbatim, with `muted` lightened one step (from `#71717a` to `#a1a1aa`) so app text reads at functional contrast — the landing-site whisper stays available as `muted-soft`.
+
 ## Why these choices
 
 - **No Sanity.** Studio is built into the app (NEARSTREAM.md §05: *"friends will not learn a second tool with a second login."*).
@@ -122,8 +145,8 @@ Sessions are signed cookies. There is no session store. Rotating `AUTH_SECRET` i
 |---|---|---|
 | 1 | skeleton end-to-end loop | `app/`, `lib/store.ts`, `schemas/stream.ts` |
 | 2 | Cloudflare R2 storage backend | `lib/r2-store.ts`, `.env.example`, store picker |
-| 3 (this) | Resend magic-link auth, gate `/studio` | `lib/auth.ts`, `lib/email.ts`, `app/login/`, `app/auth/`, `proxy.ts` |
-| 4 | Public site styling pass | `app/page.tsx`, `globals.css` |
+| 3 | Resend magic-link auth, gate `/studio` | `lib/auth.ts`, `lib/email.ts`, `app/login/`, `app/auth/`, `proxy.ts` |
+| 4 (this) | Nearstream identity + chrome design system | `app/_components/`, `app/design/`, `globals.css`, all three pages refactored |
 | 5 | RSS feed at `/rss.xml` | new `app/rss.xml/route.ts` |
 | 6 | Fly.io deploy | `Dockerfile`, `fly.toml`, `.github/workflows/deploy.yml` |
 

@@ -3,7 +3,7 @@
 A shared journal between close friends.
 
 > **Status:** v0.3 — building
-> **Updated:** 2026-05-15
+> **Updated:** 2026-05-23
 > **Predecessors:** v0.2 (2026-04-27) · technical sketch v0.1 (April 2026)
 
 This document is the single source of truth for terms, decisions, and reasoning behind Nearstream. Update it as we decide things. The Decisions log (§05) is the most important section — code can be re-read, but the *reasons* behind picks rot fastest.
@@ -187,6 +187,9 @@ Terse list. Each entry: the decision, the reason, when.
 - **Magic-link UX always shows the same response.** Whether the email is on the allowlist or not, the user sees "if that email is on the allowlist, a link is on its way." *Why: prevents the login page from being a free allowlist-enumeration oracle. Costs nothing.* (2026-05-15)
 - **Optimistic check in `proxy.ts`, real check at the route boundary.** Next 16 renamed Middleware → Proxy. The proxy only checks for the presence of the session cookie (no signature verification — that's an HMAC cost on every prefetch). `getSession()` in the page/route does the real verification. *Why: matches the Next 16 auth guide and keeps prefetches cheap. Defense-in-depth: even a stolen-but-tampered cookie passes the proxy but fails the route.* (2026-05-15)
 - **Resend over fetch, not the Resend SDK.** Same `aws4fetch` ethos. If `RESEND_API_KEY` or `RESEND_FROM` is missing, the magic link prints to the server console instead of being emailed — mirrors the R2 fallback in slice 2. *Why: lets the whole flow be tested without burning Resend quota or a real inbox round-trip, and keeps the dependency surface tiny.* (2026-05-15)
+- **Two-layer design system: Nearstream chrome vs user site.** Components in `app/_components/` are **Nearstream chrome** — the platform identity, same on every instance. Pages like `/login`, `/studio`, `/design` consume them. The user's site (their `/`) currently uses the same chrome as a stand-in, but Phase 2 will introduce **site templates** with their own palettes and components. *Why: matches §02's reader-vs-site distinction. Keeps the platform recognizable across instances while letting users own the look of their personal stream. Avoids the design-system trap of one global theme that has to please both.* (2026-05-23)
+- **Nearstream chrome palette is pure mono, no accent.** `#000` bg, `#e4e4e7` foreground, two greys (`#a1a1aa` muted + `#71717a` muted-soft), `#27272a` border. No light mode. Ported from the deployed landing site. *Why: the chrome should feel like a shared room — austerity makes it a backdrop, not a brand fighting for attention. The user's site (Phase 2) gets color. Earlier amber + multi-discipline-color experiments in slice 4 were undone because they were the chrome trying to be a site.* (2026-05-23)
+- **`/design` is the chrome spec, not a marketing page.** Lives in the app at `/design`, not linked from nav. Shows tokens, type scale, brand mark, every component in every state. *Why: single source of truth so the design doesn't drift across pages. Treating it as a build artifact (not docs in a separate repo) means it can never get out of sync with the code.* (2026-05-23)
 
 ---
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { buttonClasses } from "./button";
 
 interface SubmitButtonProps {
   children: React.ReactNode;
@@ -30,7 +31,7 @@ export function SubmitButton({
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className={className}
+      className={`${buttonClasses} ${className ?? ""}`}
     >
       {pending ? (pendingLabel ?? children) : children}
     </button>
