@@ -57,7 +57,8 @@ export async function GET() {
     <atom:link href="${escapeXml(SITE_URL)}/rss.xml" rel="self" type="application/rss+xml" />
 ${items}
   </channel>
-</rss>`;
+</rss>
+`;
 
   return new Response(xml, {
     headers: {
