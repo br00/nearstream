@@ -3,7 +3,7 @@
 A shared journal between close friends.
 
 > **Status:** v0.3 — building
-> **Updated:** 2026-05-23
+> **Updated:** 2026-05-29
 > **Predecessors:** v0.2 (2026-04-27) · technical sketch v0.1 (April 2026)
 
 This document is the single source of truth for terms, decisions, and reasoning behind Nearstream. Update it as we decide things. The Decisions log (§05) is the most important section — code can be re-read, but the *reasons* behind picks rot fastest.
@@ -190,6 +190,7 @@ Terse list. Each entry: the decision, the reason, when.
 - **Two-layer design system: Nearstream chrome vs user site.** Components in `app/_components/` are **Nearstream chrome** — the platform identity, same on every instance. Pages like `/login`, `/studio`, `/design` consume them. The user's site (their `/`) currently uses the same chrome as a stand-in, but Phase 2 will introduce **site templates** with their own palettes and components. *Why: matches §02's reader-vs-site distinction. Keeps the platform recognizable across instances while letting users own the look of their personal stream. Avoids the design-system trap of one global theme that has to please both.* (2026-05-23)
 - **Nearstream chrome palette is pure mono, no accent.** `#000` bg, `#e4e4e7` foreground, two greys (`#a1a1aa` muted + `#71717a` muted-soft), `#27272a` border. No light mode. Ported from the deployed landing site. *Why: the chrome should feel like a shared room — austerity makes it a backdrop, not a brand fighting for attention. The user's site (Phase 2) gets color. Earlier amber + multi-discipline-color experiments in slice 4 were undone because they were the chrome trying to be a site.* (2026-05-23)
 - **`/design` is the chrome spec, not a marketing page.** Lives in the app at `/design`, not linked from nav. Shows tokens, type scale, brand mark, every component in every state. *Why: single source of truth so the design doesn't drift across pages. Treating it as a build artifact (not docs in a separate repo) means it can never get out of sync with the code.* (2026-05-23)
+- **Phase 1 deploys to Vercel — interim, not architectural.** Earlier §05 rule ("Vercel is a deployment target, not a dependency") still stands as the spirit: Vercel is the host today, but the codebase avoids Vercel-specific APIs — no `next/image` via Vercel's CDN, no Edge Middleware / Edge Runtime, no Vercel KV / Cron / Analytics. *Why: solo Phase 1 ships ~2 hours faster, costs ~1–2 hrs/month less maintenance, and ~$50/year less than a Fly equivalent. Lock-in stays theoretical while we stay disciplined; migration to Fly remains a 2–3 hour task (write Dockerfile, push, repoint DNS). Revisit before Phase 3 (multi-tenant) or before writing a "deploy your own Nearstream" guide for friends — at those points manifesto portability becomes load-bearing rather than aesthetic.* (2026-05-27)
 
 ---
 
@@ -266,7 +267,8 @@ Unsolved. These are the bets.
 The whole stack is one Next.js app, deployed to a host of your choosing, with portable storage. **Vercel-free, Sanity-free.**
 
 - **Application:** single Next.js app (the *site* + *studio* + *reader* live together; routes are gated by auth where private). Open-source from day one.
-- **Compute:** **Fly.io** (or self-hosted Docker on a VPS — Hetzner ~$5/mo). Portable container, no vendor lock-in.
+- **Compute (current):** **Vercel** for Phase 1 — interim, codebase stays portable (no Vercel-specific APIs). See §05 decision dated 2026-05-27.
+- **Compute (manifesto target):** **Fly.io** (or self-hosted Docker on a VPS — Hetzner ~$5/mo). Same container runs anywhere. Switch when portability becomes load-bearing (Phase 3 multi-tenant, or when friends start running their own instances).
 - **Storage:** **Cloudflare R2** (S3-compatible object storage). Per-user prefix. MDX/JSON for content, blob for media. ~free at our scale.
 - **Auth:** email magic link via **Resend** (or similar). No passwords.
 - **Schemas:** TypeScript types — single source of truth for studio forms + site rendering + RSS export + reader cards.

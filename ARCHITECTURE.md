@@ -2,7 +2,7 @@
 
 How the code is laid out. Pairs with [`NEARSTREAM.md`](./NEARSTREAM.md), which holds philosophy + decisions. This file holds shape.
 
-> **Status:** Phase 1 · Slice 5 (RSS feed) — durable R2 storage; magic-link auth on `/studio`; pure-mono Nearstream chrome; reusable components in `app/_components/`; `/design` page is the spec; reading stays public; public RSS 2.0 feed at `/rss.xml` with feed-reader auto-discovery via `<link rel="alternate">` in the root layout.
+> **Status:** Phase 1 · Slice 6 (production deploy on Vercel) — Phase 1 is now end-to-end live: durable R2 storage; magic-link auth on `/studio`; pure-mono Nearstream chrome; `/design` is the spec; reading stays public; RSS 2.0 at `/rss.xml`; production deploy on Vercel (interim — see NEARSTREAM.md §05 dated 2026-05-27). The Vercel deploy is the host only; the codebase still avoids Vercel-specific APIs so it stays portable to Fly / Hetzner / anywhere.
 
 ---
 
@@ -150,10 +150,51 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 | 2 | Cloudflare R2 storage backend | `lib/r2-store.ts`, `.env.example`, store picker |
 | 3 | Resend magic-link auth, gate `/studio` | `lib/auth.ts`, `lib/email.ts`, `app/login/`, `app/auth/`, `proxy.ts` |
 | 4 | Nearstream identity + chrome design system | `app/_components/`, `app/design/`, `globals.css`, all three pages refactored |
-| 5 (this) | RSS feed at `/rss.xml` | new `app/rss.xml/route.ts`, `layout.tsx` (alternates + metadataBase), `page.tsx` (entry anchors), `.env.example` (`NEARSTREAM_SITE_URL`) |
-| 6 | Production deploy | host config + secrets + custom domain (target TBD per `project_deploy_decision_open` memo) |
+| 5 | RSS feed at `/rss.xml` | new `app/rss.xml/route.ts`, `layout.tsx` (alternates + metadataBase), `page.tsx` (entry anchors), `.env.example` (`NEARSTREAM_SITE_URL`) |
+| 6 (this) | Production deploy on Vercel | NEARSTREAM.md §05 + §10 updates, ARCHITECTURE.md deploy section, Vercel project + env vars + GitHub auto-deploy |
 
 Each slice is a PR. ARCHITECTURE.md updates with the slice. NEARSTREAM.md decisions log gets an entry only when a load-bearing choice is made.
+
+---
+
+## Deploy shape (slice 6)
+
+```
+  GitHub                  Vercel                     Cloudflare R2
+  ───────                 ──────                     ─────────────
+  br00/nearstream         (one project, linked       bucket: nearstream
+  push to main      ──▶   to the repo)         ──▶   entries/{id}.json
+                          auto-build, deploy
+                          on every main push
+                                  │
+                                  ▼
+                          *.vercel.app URL
+                          (+ custom domain later)
+                                  │
+                                  ▼
+                          Resend (magic-link
+                          email out)
+```
+
+**Env vars (set in Vercel project settings, mirrored in `.env.local` for dev):**
+
+| Var | Purpose | Source |
+|---|---|---|
+| `R2_ACCOUNT_ID` | Cloudflare account ID | Cloudflare → R2 → Overview |
+| `R2_ACCESS_KEY_ID` | R2 token (Object R/W on bucket) | Cloudflare → R2 → Manage R2 API Tokens |
+| `R2_SECRET_ACCESS_KEY` | matching secret | shown once on token creation |
+| `R2_BUCKET` | bucket name | the bucket we created in slice 2 |
+| `AUTH_SECRET` | HMAC key for sessions + magic links | `openssl rand -base64 32` |
+| `ALLOWED_EMAILS` | comma-separated allowlist | hand-curated |
+| `RESEND_API_KEY` | Resend token | resend.com → API Keys |
+| `RESEND_FROM` | sender address | `onboarding@resend.dev` (interim) or verified-domain address |
+| `NEARSTREAM_SITE_URL` | absolute origin for RSS + metadata | the prod URL (e.g. `https://nearstream-xxx.vercel.app` or custom domain) |
+
+**No `vercel.json`.** Default Next.js detection handles the build (`next build`) and output. Anything in `vercel.json` would be a Vercel-shaped configuration step we'd have to undo on Fly later.
+
+**Deploy on push.** Vercel watches `main` by default. Branches (slice/*) get preview deployments — useful for end-to-end smoke testing without merging.
+
+**Custom domain (deferred to a follow-up slice).** When ready: add the domain in Vercel → Domains, repoint DNS (Cloudflare Registrar / Namecheap) to Vercel's A/AAAA records, then update `NEARSTREAM_SITE_URL` env var. Also verify the same domain in Resend so magic-links send from `hello@<domain>` instead of `onboarding@resend.dev`.
 
 ---
 
