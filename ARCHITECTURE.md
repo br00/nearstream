@@ -2,7 +2,7 @@
 
 How the code is laid out. Pairs with [`NEARSTREAM.md`](./NEARSTREAM.md), which holds philosophy + decisions. This file holds shape.
 
-> **Status:** Phase 1 · Slice 4 (Nearstream identity + design system) — durable R2 storage; magic-link auth on `/studio`; pure-mono Nearstream chrome (`#000` bg, constellation mark) ported from the deployed landing site; reusable components in `app/_components/`; `/design` page is the spec; reading stays public.
+> **Status:** Phase 1 · Slice 5 (RSS feed) — durable R2 storage; magic-link auth on `/studio`; pure-mono Nearstream chrome; reusable components in `app/_components/`; `/design` page is the spec; reading stays public; public RSS 2.0 feed at `/rss.xml` with feed-reader auto-discovery via `<link rel="alternate">` in the root layout.
 
 ---
 
@@ -20,9 +20,10 @@ nearstream/
 │   │   └── actions.ts     server action: send magic link
 │   ├── studio/            posting UI — gated, also calls getSession() itself
 │   ├── design/            /design — Nearstream chrome spec page (palette, type, components)
+│   ├── rss.xml/route.ts   public RSS 2.0 feed of all stream entries
 │   ├── _components/       Nearstream chrome design system (see below)
-│   ├── page.tsx           public stream timeline (server component)
-│   └── layout.tsx         root layout, fonts, metadata
+│   ├── page.tsx           public stream timeline (server component) — entries carry id={`entry-${id}`}
+│   └── layout.tsx         root layout, fonts, metadata, RSS auto-discovery link
 ├── lib/
 │   ├── store.ts           Store interface + InMemoryStore + env-driven picker
 │   ├── r2-store.ts        Cloudflare R2 implementation (aws4fetch, S3 API)
@@ -137,7 +138,9 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 - **Magic-link login leaks nothing.** The login page always shows "if that email is on the allowlist, a link is on its way" — same response either way. No allowlist enumeration.
 - **Resend via `fetch`, not the SDK.** Dev mode (no `RESEND_API_KEY` / `RESEND_FROM`) prints the link to console — same fallback shape as the R2 picker in slice 2.
 - **Form posts, not client JS.** Login + studio both work with JS off.
-- **`force-dynamic` on `/`.** Prevents Next from caching the timeline at build. Slice 5 (RSS) will revisit caching properly.
+- **`force-dynamic` on `/` and `/rss.xml`.** Prevents Next from caching the timeline or feed at build. Caching is still an open question (see below).
+- **RSS via raw template string, no library.** Same ethos as auth and R2: a few well-escaped lines of XML beat a dependency. `escapeXml` covers attribute + text contexts; `<description>` uses `<![CDATA[…]]>` with a `]]>` splitter so entry text is passed through verbatim. Title is derived from the first line of `text`, truncated to 80 chars.
+- **Item links are anchors on `/`, not per-entry permalink pages.** Entries render with `id={`entry-${entry.id}`}` on the timeline; the feed's `<link>` is `${SITE_URL}/#entry-${entry.id}`. Real per-entry routes belong to a later slice (Phase 2 library primitives will introduce per-entry URLs).
 
 ## What's next per slice
 
@@ -146,9 +149,9 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 | 1 | skeleton end-to-end loop | `app/`, `lib/store.ts`, `schemas/stream.ts` |
 | 2 | Cloudflare R2 storage backend | `lib/r2-store.ts`, `.env.example`, store picker |
 | 3 | Resend magic-link auth, gate `/studio` | `lib/auth.ts`, `lib/email.ts`, `app/login/`, `app/auth/`, `proxy.ts` |
-| 4 (this) | Nearstream identity + chrome design system | `app/_components/`, `app/design/`, `globals.css`, all three pages refactored |
-| 5 | RSS feed at `/rss.xml` | new `app/rss.xml/route.ts` |
-| 6 | Fly.io deploy | `Dockerfile`, `fly.toml`, `.github/workflows/deploy.yml` |
+| 4 | Nearstream identity + chrome design system | `app/_components/`, `app/design/`, `globals.css`, all three pages refactored |
+| 5 (this) | RSS feed at `/rss.xml` | new `app/rss.xml/route.ts`, `layout.tsx` (alternates + metadataBase), `page.tsx` (entry anchors), `.env.example` (`NEARSTREAM_SITE_URL`) |
+| 6 | Production deploy | host config + secrets + custom domain (target TBD per `project_deploy_decision_open` memo) |
 
 Each slice is a PR. ARCHITECTURE.md updates with the slice. NEARSTREAM.md decisions log gets an entry only when a load-bearing choice is made.
 
@@ -156,11 +159,11 @@ Each slice is a PR. ARCHITECTURE.md updates with the slice. NEARSTREAM.md decisi
 
 ## Open architectural questions (carry forward)
 
-- **List cost / caching.** `store.list()` does one `ListObjectsV2` + N parallel GETs every page render. Fine for slice 1–3 volumes (tens of entries), but unbounded. Slice 4 or 5 should add a cached read path — likely an in-process LRU keyed on the bucket's `LastModified` of the entries prefix.
+- **List cost / caching.** `store.list()` does one `ListObjectsV2` + N parallel GETs every page render — *and* every `/rss.xml` request. Fine for slice 1–5 volumes (tens of entries), but unbounded. A later slice should add a cached read path — likely an in-process LRU keyed on the bucket's `LastModified` of the entries prefix, with `revalidatePath('/')` + `revalidatePath('/rss.xml')` from the POST route to bust it on new entries.
 - **R2 layout if entries grow.** Currently flat (`entries/{id}.json`). Tracked as a GitHub issue — likely move to `entries/YYYY/MM/{id}.json`.
 - **Tag set.** `Code / Photo / Music / Writing` is the slice 1 set. Adding `Reading`, `Travel`, `Cooking` is one-line in `schemas/stream.ts` — defer until needed.
-- **`StreamEntry.id`.** Currently `crypto.randomUUID()`. Slice 5 will need stable, sortable IDs for RSS — likely `ULID` or `${publishedAt}-${nanoid}`. If/when this changes, R2 keys change too.
-- **`force-dynamic`.** Pragmatic for slice 1. Slice 4 or 5 should swap to `revalidatePath` only (already wired) and let pages cache between posts.
+- **`StreamEntry.id`.** Currently `crypto.randomUUID()`. Slice 5 did not need to change this — the store already sorts by `publishedAt` and the feed `<guid>` is stable per entry regardless of ordering. Revisit when (a) pagination requires cursor IDs, or (b) we want lexicographically sortable R2 keys.
+- **`force-dynamic`.** Pragmatic for slice 1. A later slice should swap to `revalidatePath` only (already wired in `POST /api/stream`) and let `/` and `/rss.xml` cache between posts.
 - **Magic-link single-use.** Slice 3 tokens are time-bound (15 min) but technically replayable inside that window — verifying single-use would require persisted state (an R2 key with the token's nonce, deleted on use). For a 1–5-person allowlist this is acceptable risk; revisit if the allowlist grows or the threat model changes.
 - **CSRF on POST routes.** Right now `POST /api/stream` and `POST /auth/logout` are protected by the session cookie alone. Browsers default-block cross-site cookie sends with `SameSite=Lax`, so this is fine for form-posts initiated from same-origin pages. If a slice adds cross-origin posting (the reader posting back? an iOS shortcut?), revisit with a CSRF token or `SameSite=Strict`.
 - **Form idempotency.** The `SubmitButton` client component disables itself on submit, which prevents double-clicks *when JS is on*. With JS off, a fast user could still double-submit and create two entries. A real fix is server-side: hidden idempotency token in the form, server stores submitted tokens (e.g. in an `idempotency/{token}` R2 key) and rejects repeats. Deferred — not worth the plumbing for a 1-user app.

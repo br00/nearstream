@@ -54,7 +54,7 @@ export default async function Home() {
           ) : (
             <ul className="mt-12 space-y-8 border-l border-border pl-6">
               {entries.map((entry) => (
-                <li key={entry.id} className="relative">
+                <li key={entry.id} id={`entry-${entry.id}`} className="relative">
                   <span className="absolute -left-[29px] top-2 inline-block h-1 w-1 rounded-full bg-foreground/70" />
                   <div className="flex flex-wrap items-center gap-3">
                     <time

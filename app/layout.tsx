@@ -12,9 +12,19 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_URL = process.env.NEARSTREAM_SITE_URL ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Nearstream",
   description: "A shared journal between close friends.",
+  alternates: {
+    types: {
+      "application/rss+xml": [
+        { url: "/rss.xml", title: "Nearstream — Alessandro Borelli" },
+      ],
+    },
+  },
 };
 
 export default function RootLayout({
