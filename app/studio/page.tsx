@@ -13,9 +13,15 @@ export const metadata = {
   title: "Studio · Nearstream",
 };
 
-export default async function StudioPage() {
+type Props = {
+  searchParams: Promise<{ "essay-error"?: string }>;
+};
+
+export default async function StudioPage({ searchParams }: Props) {
   const session = await getSession();
   if (!session) redirect("/login");
+
+  const { "essay-error": essayError } = await searchParams;
 
   const navLinkClasses =
     "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
@@ -82,38 +88,50 @@ export default async function StudioPage() {
 
           <hr className="mt-20 border-border" />
 
-          <h2 className="mt-20 text-2xl font-normal tracking-tight text-foreground">
-            New essay
-          </h2>
-          <p className="mt-2 text-sm text-muted-soft">
-            Markdown. Lands at <code className="font-mono">/library/[slug]</code>.
-          </p>
+          <div id="essay-form" className="scroll-mt-6">
+            <h2 className="mt-20 text-2xl font-normal tracking-tight text-foreground">
+              New essay
+            </h2>
+            <p className="mt-2 text-sm text-muted-soft">
+              Markdown. Lands at <code className="font-mono">/library/[slug]</code>.
+            </p>
 
-          <form action="/api/essays" method="POST" className="mt-10 flex flex-col gap-8">
-            <label className="flex flex-col gap-2">
-              <Kicker>Title</Kicker>
-              <Input
-                name="title"
-                required
-                maxLength={200}
-                placeholder="The shape of a quieter web"
-              />
-            </label>
+            {essayError && (
+              <div
+                role="alert"
+                className="mt-8 border-l-2 border-foreground/50 pl-4 py-2"
+              >
+                <Kicker>Could not publish</Kicker>
+                <p className="mt-1 text-sm text-muted">{essayError}</p>
+              </div>
+            )}
 
-            <label className="flex flex-col gap-2">
-              <Kicker>Body</Kicker>
-              <Textarea
-                name="body"
-                required
-                rows={14}
-                placeholder="## A heading&#10;&#10;Markdown body. Links, *italics*, **bold**, lists, code, blockquotes — all supported."
-              />
-            </label>
+            <form action="/api/essays" method="POST" className="mt-10 flex flex-col gap-8">
+              <label className="flex flex-col gap-2">
+                <Kicker>Title</Kicker>
+                <Input
+                  name="title"
+                  required
+                  maxLength={200}
+                  placeholder="The shape of a quieter web"
+                />
+              </label>
 
-            <SubmitButton pendingLabel="Publishing…" className="self-start">
-              Publish
-            </SubmitButton>
-          </form>
+              <label className="flex flex-col gap-2">
+                <Kicker>Body</Kicker>
+                <Textarea
+                  name="body"
+                  required
+                  rows={14}
+                  placeholder="## A heading&#10;&#10;Markdown body. Links, *italics*, **bold**, lists, code, blockquotes — all supported."
+                />
+              </label>
+
+              <SubmitButton pendingLabel="Publishing…" className="self-start">
+                Publish
+              </SubmitButton>
+            </form>
+          </div>
         </div>
       </section>
     </PageShell>

@@ -13,16 +13,17 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await getSession();
-  if (!session) {
-    return Response.json({ error: "unauthorized" }, { status: 401 });
-  }
-
   const contentType = request.headers.get("content-type") ?? "";
+  const isJson = contentType.includes("application/json");
+
+  if (!session) {
+    return errorResponse(request, isJson, 401, "unauthorized");
+  }
 
   let title: unknown;
   let body: unknown;
 
-  if (contentType.includes("application/json")) {
+  if (isJson) {
     const json = await request.json();
     title = json?.title;
     body = json?.body;
@@ -33,37 +34,45 @@ export async function POST(request: Request) {
   }
 
   if (typeof title !== "string" || title.trim().length === 0) {
-    return Response.json({ error: "title is required" }, { status: 400 });
+    return errorResponse(request, isJson, 400, "title is required");
   }
   if (title.length > TITLE_MAX) {
-    return Response.json(
-      { error: `title must be ${TITLE_MAX} chars or fewer` },
-      { status: 400 },
+    return errorResponse(
+      request,
+      isJson,
+      400,
+      `title must be ${TITLE_MAX} characters or fewer`,
     );
   }
   if (typeof body !== "string" || body.trim().length === 0) {
-    return Response.json({ error: "body is required" }, { status: 400 });
+    return errorResponse(request, isJson, 400, "body is required");
   }
   if (body.length > BODY_MAX) {
-    return Response.json(
-      { error: `body must be ${BODY_MAX} chars or fewer` },
-      { status: 400 },
+    return errorResponse(
+      request,
+      isJson,
+      400,
+      `body must be ${BODY_MAX} characters or fewer`,
     );
   }
 
   const trimmedTitle = title.trim();
   const slug = slugify(trimmedTitle);
   if (slug.length === 0) {
-    return Response.json(
-      { error: "title must contain at least one letter or number" },
-      { status: 400 },
+    return errorResponse(
+      request,
+      isJson,
+      400,
+      "title must contain at least one letter or number",
     );
   }
   const existing = await essayStore.getBySlug(slug);
   if (existing) {
-    return Response.json(
-      { error: `an essay with the slug "${slug}" already exists — pick a different title` },
-      { status: 409 },
+    return errorResponse(
+      request,
+      isJson,
+      409,
+      `an essay with the slug "${slug}" already exists — pick a different title`,
     );
   }
 
@@ -74,9 +83,24 @@ export async function POST(request: Request) {
   revalidatePath("/library");
   revalidatePath(`/library/${essay.slug}`);
 
-  if (contentType.includes("application/json")) {
+  if (isJson) {
     return Response.json({ essay }, { status: 201 });
   }
 
   return Response.redirect(new URL(`/library/${essay.slug}`, request.url), 303);
+}
+
+function errorResponse(
+  request: Request,
+  isJson: boolean,
+  status: number,
+  message: string,
+): Response {
+  if (isJson) {
+    return Response.json({ error: message }, { status });
+  }
+  const url = new URL("/studio", request.url);
+  url.searchParams.set("essay-error", message);
+  url.hash = "essay-form";
+  return Response.redirect(url, 303);
 }
