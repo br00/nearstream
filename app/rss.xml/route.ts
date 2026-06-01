@@ -1,10 +1,18 @@
+import { marked } from "marked";
 import { store } from "@/lib/store";
+import { essayStore } from "@/lib/essay-store";
 
 export const dynamic = "force-dynamic";
 
 const SITE_URL = process.env.NEARSTREAM_SITE_URL ?? "http://localhost:3000";
 const FEED_TITLE = "Nearstream — Alessandro Borelli";
-const FEED_DESCRIPTION = "Stream entries from Alessandro Borelli.";
+const FEED_DESCRIPTION =
+  "Stream notes and Library essays from Alessandro Borelli.";
+
+type FeedItem = {
+  publishedAt: string;
+  toXml: () => string;
+};
 
 function escapeXml(value: string): string {
   return value
@@ -29,22 +37,48 @@ function deriveTitle(text: string): string {
 }
 
 export async function GET() {
-  const entries = await store.list();
-  const lastBuild = entries[0]?.publishedAt ?? new Date().toISOString();
+  const [entries, essays] = await Promise.all([
+    store.list(),
+    essayStore.list(),
+  ]);
 
-  const items = entries
-    .map((entry) => {
-      const link = `${SITE_URL}/#entry-${entry.id}`;
-      return `    <item>
+  const items: FeedItem[] = [];
+
+  for (const entry of entries) {
+    const link = `${SITE_URL}/#entry-${entry.id}`;
+    items.push({
+      publishedAt: entry.publishedAt,
+      toXml: () => `    <item>
       <title>${escapeXml(deriveTitle(entry.text))}</title>
       <link>${escapeXml(link)}</link>
       <guid isPermaLink="false">${escapeXml(entry.id)}</guid>
       <pubDate>${toRfc822(entry.publishedAt)}</pubDate>
+      <category>Stream</category>
       <category>${escapeXml(entry.tag)}</category>
       <description><![CDATA[${escapeCdata(entry.text)}]]></description>
-    </item>`;
-    })
-    .join("\n");
+    </item>`,
+    });
+  }
+
+  for (const essay of essays) {
+    const link = `${SITE_URL}/library/${essay.slug}`;
+    const html = await marked.parse(essay.body, { async: true });
+    items.push({
+      publishedAt: essay.publishedAt,
+      toXml: () => `    <item>
+      <title>${escapeXml(essay.title)}</title>
+      <link>${escapeXml(link)}</link>
+      <guid isPermaLink="true">${escapeXml(link)}</guid>
+      <pubDate>${toRfc822(essay.publishedAt)}</pubDate>
+      <category>Essay</category>
+      <description><![CDATA[${escapeCdata(html)}]]></description>
+    </item>`,
+    });
+  }
+
+  items.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+  const lastBuild = items[0]?.publishedAt ?? new Date().toISOString();
+  const itemsXml = items.map((it) => it.toXml()).join("\n");
 
   const xml = `<?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
@@ -55,7 +89,7 @@ export async function GET() {
     <language>en</language>
     <lastBuildDate>${toRfc822(lastBuild)}</lastBuildDate>
     <atom:link href="${escapeXml(SITE_URL)}/rss.xml" rel="self" type="application/rss+xml" />
-${items}
+${itemsXml}
   </channel>
 </rss>
 `;
