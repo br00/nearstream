@@ -4,6 +4,7 @@ import { DISCIPLINE_TAGS } from "@/schemas/stream";
 import { getSession } from "@/lib/auth";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { PageShell } from "@/app/_components/page-shell";
+import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
 import { TagRadio } from "@/app/_components/tag-chip";
@@ -25,6 +26,9 @@ export default async function StudioPage() {
         <>
           <Link href="/" className={navLinkClasses}>
             ← Stream
+          </Link>
+          <Link href="/library" className={navLinkClasses}>
+            Library
           </Link>
           <form action="/auth/logout" method="POST">
             <button type="submit" className={navLinkClasses}>
@@ -73,6 +77,41 @@ export default async function StudioPage() {
 
             <SubmitButton pendingLabel="Posting…" className="self-start">
               Post
+            </SubmitButton>
+          </form>
+
+          <hr className="mt-20 border-border" />
+
+          <h2 className="mt-20 text-2xl font-normal tracking-tight text-foreground">
+            New essay
+          </h2>
+          <p className="mt-2 text-sm text-muted-soft">
+            Markdown. Lands at <code className="font-mono">/library/[slug]</code>.
+          </p>
+
+          <form action="/api/essays" method="POST" className="mt-10 flex flex-col gap-8">
+            <label className="flex flex-col gap-2">
+              <Kicker>Title</Kicker>
+              <Input
+                name="title"
+                required
+                maxLength={200}
+                placeholder="The shape of a quieter web"
+              />
+            </label>
+
+            <label className="flex flex-col gap-2">
+              <Kicker>Body</Kicker>
+              <Textarea
+                name="body"
+                required
+                rows={14}
+                placeholder="## A heading&#10;&#10;Markdown body. Links, *italics*, **bold**, lists, code, blockquotes — all supported."
+              />
+            </label>
+
+            <SubmitButton pendingLabel="Publishing…" className="self-start">
+              Publish
             </SubmitButton>
           </form>
         </div>

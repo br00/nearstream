@@ -23,3 +23,83 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
+
+.prose-essay > * + * {
+  margin-top: 1.25em;
+}
+.prose-essay h2 {
+  font-size: 1.25rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  margin-top: 2.25em;
+  color: var(--foreground);
+}
+.prose-essay h3 {
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  margin-top: 1.75em;
+  color: var(--foreground);
+}
+.prose-essay a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--muted-soft);
+  transition: text-decoration-color 0.15s;
+}
+.prose-essay a:hover {
+  text-decoration-color: var(--foreground);
+}
+.prose-essay em {
+  font-style: italic;
+}
+.prose-essay strong {
+  color: var(--foreground);
+  font-weight: 500;
+}
+.prose-essay ul, .prose-essay ol {
+  padding-left: 1.5em;
+}
+.prose-essay ul {
+  list-style: disc;
+}
+.prose-essay ol {
+  list-style: decimal;
+}
+.prose-essay li + li {
+  margin-top: 0.5em;
+}
+.prose-essay blockquote {
+  border-left: 1px solid var(--border);
+  padding-left: 1em;
+  color: var(--muted);
+  font-style: italic;
+}
+.prose-essay code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.9em;
+  color: var(--foreground);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.1em 0.3em;
+  border-radius: 2px;
+}
+.prose-essay pre {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.85em;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 1em;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+.prose-essay pre code {
+  background: none;
+  padding: 0;
+  font-size: 1em;
+}
+.prose-essay hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5em 0;
+}
