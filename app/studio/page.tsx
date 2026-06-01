@@ -4,6 +4,7 @@ import { DISCIPLINE_TAGS } from "@/schemas/stream";
 import { getSession } from "@/lib/auth";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { PageShell } from "@/app/_components/page-shell";
+import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
 import { TagRadio } from "@/app/_components/tag-chip";
@@ -12,9 +13,15 @@ export const metadata = {
   title: "Studio · Nearstream",
 };
 
-export default async function StudioPage() {
+type Props = {
+  searchParams: Promise<{ "essay-error"?: string }>;
+};
+
+export default async function StudioPage({ searchParams }: Props) {
   const session = await getSession();
   if (!session) redirect("/login");
+
+  const { "essay-error": essayError } = await searchParams;
 
   const navLinkClasses =
     "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
@@ -25,6 +32,9 @@ export default async function StudioPage() {
         <>
           <Link href="/" className={navLinkClasses}>
             ← Stream
+          </Link>
+          <Link href="/library" className={navLinkClasses}>
+            Library
           </Link>
           <form action="/auth/logout" method="POST">
             <button type="submit" className={navLinkClasses}>
@@ -75,6 +85,53 @@ export default async function StudioPage() {
               Post
             </SubmitButton>
           </form>
+
+          <hr className="mt-20 border-border" />
+
+          <div id="essay-form" className="scroll-mt-6">
+            <h2 className="mt-20 text-2xl font-normal tracking-tight text-foreground">
+              New essay
+            </h2>
+            <p className="mt-2 text-sm text-muted-soft">
+              Markdown. Lands at <code className="font-mono">/library/[slug]</code>.
+            </p>
+
+            {essayError && (
+              <div
+                role="alert"
+                className="mt-8 border-l-2 border-foreground/50 pl-4 py-2"
+              >
+                <Kicker>Could not publish</Kicker>
+                <p className="mt-1 text-sm text-muted">{essayError}</p>
+              </div>
+            )}
+
+            <form action="/api/essays" method="POST" className="mt-10 flex flex-col gap-8">
+              <label className="flex flex-col gap-2">
+                <Kicker>Title</Kicker>
+                <Input
+                  name="title"
+                  required
+                  maxLength={200}
+                  placeholder="The shape of a quieter web"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <Kicker>Body</Kicker>
+                <Textarea
+                  name="body"
+                  required
+                  rows={14}
+                  placeholder="## A heading&#10;&#10;Markdown body. Links, *italics*, **bold**, lists, code, blockquotes — all supported."
+                />
+              </label>
+
+              <SubmitButton pendingLabel="Publishing…" className="self-start">
+                Publish
+              </SubmitButton>
+            </form>
+          </div>
         </div>
       </section>
     </PageShell>

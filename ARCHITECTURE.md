@@ -2,7 +2,7 @@
 
 How the code is laid out. Pairs with [`NEARSTREAM.md`](./NEARSTREAM.md), which holds philosophy + decisions. This file holds shape.
 
-> **Status:** Phase 1 · Slice 6 (production deploy on Vercel) — Phase 1 is now end-to-end live: durable R2 storage; magic-link auth on `/studio`; pure-mono Nearstream chrome; `/design` is the spec; reading stays public; RSS 2.0 at `/rss.xml`; production deploy on Vercel (interim — see NEARSTREAM.md §05 dated 2026-05-27). The Vercel deploy is the host only; the codebase still avoids Vercel-specific APIs so it stays portable to Fly / Hetzner / anywhere.
+> **Status:** Phase 2 · Slice 7 (Essay primitive — first Library entry type) — Phase 1 shipped end-to-end. Phase 2 begins by introducing the Library alongside the Stream: a typed `Essay` schema, a separate `essayStore` mirroring the stream store pattern, public archive at `/library`, public per-essay pages at `/library/[slug]` rendering markdown via `marked`, and a second form in `/studio` for posting essays. The Stream and Library are two parallel surfaces, both reading from R2 under distinct prefixes (`entries/` vs `library/essays/`).
 
 ---
 
@@ -11,26 +11,34 @@ How the code is laid out. Pairs with [`NEARSTREAM.md`](./NEARSTREAM.md), which h
 ```
 nearstream/
 ├── app/                   Next.js App Router routes
-│   ├── api/stream/        POST = add entry (gated) · GET = list entries (public)
+│   ├── api/
+│   │   ├── stream/        POST = add entry (gated) · GET = list entries (public)
+│   │   └── essays/        POST = publish essay (gated) · GET = list essays (public)
 │   ├── auth/
 │   │   ├── callback/      GET: verify magic-link token → set session → redirect
 │   │   └── logout/        POST: clear session cookie
 │   ├── login/
 │   │   ├── page.tsx       email entry form
 │   │   └── actions.ts     server action: send magic link
-│   ├── studio/            posting UI — gated, also calls getSession() itself
+│   ├── studio/            posting UI — gated, holds both Stream and Essay forms
 │   ├── design/            /design — Nearstream chrome spec page (palette, type, components)
+│   ├── library/
+│   │   ├── page.tsx       public Library archive — list of essays
+│   │   └── [slug]/page.tsx  public per-essay page — renders markdown body via `marked`
 │   ├── rss.xml/route.ts   public RSS 2.0 feed of all stream entries
 │   ├── _components/       Nearstream chrome design system (see below)
 │   ├── page.tsx           public stream timeline (server component) — entries carry id={`entry-${id}`}
+│   ├── globals.css        tokens + `.prose-essay` styles for rendered markdown
 │   └── layout.tsx         root layout, fonts, metadata, RSS auto-discovery link
 ├── lib/
-│   ├── store.ts           Store interface + InMemoryStore + env-driven picker
-│   ├── r2-store.ts        Cloudflare R2 implementation (aws4fetch, S3 API)
+│   ├── store.ts           Stream store: interface + InMemoryStore + env-driven picker
+│   ├── r2-store.ts        Stream Cloudflare R2 implementation (aws4fetch, S3 API)
+│   ├── essay-store.ts     Essay store: interface + InMemory + R2 (mirror of stream store, key prefix `library/essays/`)
 │   ├── auth.ts            HMAC token sign/verify, session cookie, allowlist
 │   └── email.ts           Resend send + dev console fallback
 ├── schemas/
-│   └── stream.ts          StreamEntry typed primitive
+│   ├── stream.ts          StreamEntry typed primitive
+│   └── essay.ts           Essay typed primitive + `slugify()` + `isValidSlug()`
 ├── proxy.ts               Next 16 Proxy: optimistic redirect on /studio/*
 ├── .env.example           R2 + auth + Resend templates
 ├── ARCHITECTURE.md        this file
@@ -141,6 +149,10 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 - **`force-dynamic` on `/` and `/rss.xml`.** Prevents Next from caching the timeline or feed at build. Caching is still an open question (see below).
 - **RSS via raw template string, no library.** Same ethos as auth and R2: a few well-escaped lines of XML beat a dependency. `escapeXml` covers attribute + text contexts; `<description>` uses `<![CDATA[…]]>` with a `]]>` splitter so entry text is passed through verbatim. Title is derived from the first line of `text`, truncated to 80 chars.
 - **Item links are anchors on `/`, not per-entry permalink pages.** Entries render with `id={`entry-${entry.id}`}` on the timeline; the feed's `<link>` is `${SITE_URL}/#entry-${entry.id}`. Real per-entry routes belong to a later slice (Phase 2 library primitives will introduce per-entry URLs).
+- **Two stores, not one generic store with a discriminator.** `lib/store.ts` (Stream) and `lib/essay-store.ts` (Essay) are sibling files, each owning their own interface + InMemory + R2 implementations + picker. They share the same R2 bucket but different prefixes (`entries/` vs `library/essays/`). Reasons: (1) primitives have different shapes — Essay has slug + body + getBySlug, Stream has tag + force-permalink-less. A generic `Store<T>` would either lose type-precision or grow ugly. (2) Each primitive's store can evolve independently (Essay may add `getBySlug` cache, Stream may add filtering by tag). (3) Mirrors the manifesto's "typed primitive" model — each primitive is its own thing with its own rendering, schema, and persistence.
+- **Markdown via `marked`, not MDX or `remark` + plugins.** Single package, no deps, no React-in-content complexity. `marked.parse(body, { async: true })` returns HTML, injected via `dangerouslySetInnerHTML` into a `.prose-essay` block with minimal styles in `globals.css`. Sanitization deferred — the only author is the allowlist user themselves, so XSS through self-authored content is irrelevant. If Phase 3 multi-tenant introduces friend-authored essays read by *you*, revisit (DOMPurify on server or `marked`'s sanitize hook).
+- **Slugs derived from title at write time, collision rejected.** `slugify(title)` strips diacritics, lowercases, kebab-cases, caps at 80 chars. If the resulting slug already exists in R2 the POST returns 409 and the user re-titles. No silent suffixing — the title is the URL is the identity. Renaming an essay would change the slug + URL, which we treat as out-of-scope for v1 (essays are append-only).
+- **`force-dynamic` on `/library` + `/library/[slug]`.** Same as `/` and `/rss.xml` — pragmatic for slice 7 volumes. Caching is the same open question.
 
 ## What's next per slice
 
@@ -151,7 +163,8 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 | 3 | Resend magic-link auth, gate `/studio` | `lib/auth.ts`, `lib/email.ts`, `app/login/`, `app/auth/`, `proxy.ts` |
 | 4 | Nearstream identity + chrome design system | `app/_components/`, `app/design/`, `globals.css`, all three pages refactored |
 | 5 | RSS feed at `/rss.xml` | new `app/rss.xml/route.ts`, `layout.tsx` (alternates + metadataBase), `page.tsx` (entry anchors), `.env.example` (`NEARSTREAM_SITE_URL`) |
-| 6 (this) | Production deploy on Vercel | NEARSTREAM.md §05 + §10 updates, ARCHITECTURE.md deploy section, Vercel project + env vars + GitHub auto-deploy |
+| 6 | Production deploy on Vercel | NEARSTREAM.md §05 + §10 updates, ARCHITECTURE.md deploy section, Vercel project + env vars + GitHub auto-deploy |
+| 7 (this) | **Phase 2 begins.** Essay primitive end-to-end | new `schemas/essay.ts` + `lib/essay-store.ts` + `app/api/essays/route.ts` + `app/library/page.tsx` + `app/library/[slug]/page.tsx`, `app/studio/page.tsx` extended with second form, `globals.css` `.prose-essay`, home + studio nav now links Library, `marked` dep |
 
 Each slice is a PR. ARCHITECTURE.md updates with the slice. NEARSTREAM.md decisions log gets an entry only when a load-bearing choice is made.
 
@@ -200,11 +213,13 @@ Each slice is a PR. ARCHITECTURE.md updates with the slice. NEARSTREAM.md decisi
 
 ## Open architectural questions (carry forward)
 
-- **List cost / caching.** `store.list()` does one `ListObjectsV2` + N parallel GETs every page render — *and* every `/rss.xml` request. Fine for slice 1–5 volumes (tens of entries), but unbounded. A later slice should add a cached read path — likely an in-process LRU keyed on the bucket's `LastModified` of the entries prefix, with `revalidatePath('/')` + `revalidatePath('/rss.xml')` from the POST route to bust it on new entries.
+- **List cost / caching.** Both `store.list()` and `essayStore.list()` do one `ListObjectsV2` + N parallel GETs every page render — and `/rss.xml` (stream) + `/library` (essays) request, plus `essayStore.getBySlug()` lists everything on every single-essay page. Fine for slice 1–7 volumes, but unbounded. A later slice should add a cached read path — likely an in-process LRU keyed on the bucket's `LastModified` of each prefix, with the relevant `revalidatePath` calls already wired from the POST routes.
 - **R2 layout if entries grow.** Currently flat (`entries/{id}.json`). Tracked as a GitHub issue — likely move to `entries/YYYY/MM/{id}.json`.
 - **Tag set.** `Code / Photo / Music / Writing` is the slice 1 set. Adding `Reading`, `Travel`, `Cooking` is one-line in `schemas/stream.ts` — defer until needed.
 - **`StreamEntry.id`.** Currently `crypto.randomUUID()`. Slice 5 did not need to change this — the store already sorts by `publishedAt` and the feed `<guid>` is stable per entry regardless of ordering. Revisit when (a) pagination requires cursor IDs, or (b) we want lexicographically sortable R2 keys.
-- **`force-dynamic`.** Pragmatic for slice 1. A later slice should swap to `revalidatePath` only (already wired in `POST /api/stream`) and let `/` and `/rss.xml` cache between posts.
+- **`force-dynamic`.** Pragmatic for slice 1. A later slice should swap to `revalidatePath` only (already wired in `POST /api/stream` and `POST /api/essays`) and let `/`, `/rss.xml`, `/library`, and `/library/[slug]` cache between posts.
+- **Essays in RSS.** Slice 7 keeps RSS stream-only. Slice 8 should extend `/rss.xml` to include Library essays — likely with `<category>Essay</category>` + the full body in `<description>` CDATA so feed readers can render the whole thing inline. Open question: one combined feed, or two feeds (`/rss.xml` stream, `/library/rss.xml` library)? The manifesto's "shared journal" model suggests one feed for friends, so combined feed first.
+- **Per-essay edit/delete.** Slice 7 ships append-only. Editing requires either rotating the slug (URL breakage) or accepting a stale slug (URL/content mismatch). Deferred until either becomes a real pain.
 - **Magic-link single-use.** Slice 3 tokens are time-bound (15 min) but technically replayable inside that window — verifying single-use would require persisted state (an R2 key with the token's nonce, deleted on use). For a 1–5-person allowlist this is acceptable risk; revisit if the allowlist grows or the threat model changes.
 - **CSRF on POST routes.** Right now `POST /api/stream` and `POST /auth/logout` are protected by the session cookie alone. Browsers default-block cross-site cookie sends with `SameSite=Lax`, so this is fine for form-posts initiated from same-origin pages. If a slice adds cross-origin posting (the reader posting back? an iOS shortcut?), revisit with a CSRF token or `SameSite=Strict`.
 - **Form idempotency.** The `SubmitButton` client component disables itself on submit, which prevents double-clicks *when JS is on*. With JS off, a fast user could still double-submit and create two entries. A real fix is server-side: hidden idempotency token in the form, server stores submitted tokens (e.g. in an `idempotency/{token}` R2 key) and rejects repeats. Deferred — not worth the plumbing for a 1-user app.

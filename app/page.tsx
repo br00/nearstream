@@ -25,12 +25,20 @@ export default async function Home() {
   return (
     <PageShell
       rightNav={
-        <Link
-          href="/studio"
-          className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground"
-        >
-          Studio →
-        </Link>
+        <>
+          <Link
+            href="/library"
+            className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground"
+          >
+            Library
+          </Link>
+          <Link
+            href="/studio"
+            className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground"
+          >
+            Studio →
+          </Link>
+        </>
       }
     >
       <section className="flex flex-1 justify-center px-6">
