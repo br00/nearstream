@@ -192,7 +192,7 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 
 - **No Sanity.** Studio is built into the app (NEARSTREAM.md §05: *"friends will not learn a second tool with a second login."*).
 - **No Vercel-specific APIs.** Standard Next features only — `revalidatePath`, route handlers, server components, Proxy. Same code will run on Fly.io / Hetzner.
-- **R2 via `aws4fetch`.** Single-file SigV4 signer + `fetch`. AWS SDK is ~1.6 MB of features we don't need.
+- **R2 via `aws4fetch`, wrapped in `R2Client`.** `lib/r2-client.ts` wraps `AwsClient` with **retry-once on transient TLS errors** (`ERR_SSL_SSLV3_ALERT_HANDSHAKE_FAILURE` + a few related signals). Vercel functions go cold between requests; Node's HTTPS occasionally hits a handshake hiccup on the first call to R2 from a warming function. Without the wrapper, that cold-start hiccup surfaces as a 500 to the user. With it, the second attempt almost always succeeds and the user sees nothing. All four R2-using stores (Stream, Essay, Inventory, Media) construct `R2Client` instead of bare `AwsClient`, so the retry is centralized. AWS SDK is ~1.6 MB of features we don't need.
 - **Auth via raw HMAC, not `jose` / `next-auth` / Lucia.** Same ethos. ~30 lines of Web Crypto. Standard auth libraries assume a multi-provider, refresh-token, RBAC world Nearstream will never have.
 - **Allowlist in env var.** Adding a friend = redeploy. Friction by design.
 - **Magic-link login leaks nothing.** The login page always shows "if that email is on the allowlist, a link is on its way" — same response either way. No allowlist enumeration.

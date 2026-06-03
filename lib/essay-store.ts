@@ -1,4 +1,4 @@
-import { AwsClient } from "aws4fetch";
+import { R2Client } from "@/lib/r2-client";
 import type { Essay, NewEssay } from "@/schemas/essay";
 import { slugify } from "@/schemas/essay";
 
@@ -42,15 +42,13 @@ type R2Config = {
 };
 
 class R2EssayStore implements EssayStore {
-  private client: AwsClient;
+  private client: R2Client;
   private base: string;
 
   constructor(config: R2Config) {
-    this.client = new AwsClient({
+    this.client = new R2Client({
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
-      service: "s3",
-      region: "auto",
     });
     this.base = `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}`;
   }
