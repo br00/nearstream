@@ -18,6 +18,9 @@ export type InventoryImage = {
   key: string;
   contentType: string;
   sizeBytes: number;
+  thumbKey?: string;
+  width?: number;
+  height?: number;
 };
 
 export type InventoryItem = {

@@ -26,9 +26,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const { uploadUrl, key, expiresInSeconds } = await mediaStore.getUploadUrl(
-    contentType,
-  );
+  const [original, thumb] = await Promise.all([
+    mediaStore.getUploadUrl(contentType),
+    mediaStore.getUploadUrl("image/jpeg"),
+  ]);
 
-  return Response.json({ uploadUrl, key, expiresInSeconds });
+  return Response.json({
+    upload: { uploadUrl: original.uploadUrl, key: original.key },
+    thumb: { uploadUrl: thumb.uploadUrl, key: thumb.key },
+    expiresInSeconds: original.expiresInSeconds,
+  });
 }

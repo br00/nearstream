@@ -137,7 +137,9 @@ export async function POST(request: Request) {
 
 function validateImage(value: unknown): InventoryImage | string {
   if (!value || typeof value !== "object") return "image is required";
-  const { key, contentType, sizeBytes } = value as Record<string, unknown>;
+  const { key, contentType, sizeBytes, thumbKey, width, height } =
+    value as Record<string, unknown>;
+
   if (
     typeof key !== "string" ||
     key.length === 0 ||
@@ -156,5 +158,41 @@ function validateImage(value: unknown): InventoryImage | string {
   ) {
     return "image.sizeBytes is invalid";
   }
-  return { key, contentType, sizeBytes };
+
+  const result: InventoryImage = { key, contentType, sizeBytes };
+
+  if (thumbKey !== undefined && thumbKey !== null) {
+    if (
+      typeof thumbKey !== "string" ||
+      thumbKey.length === 0 ||
+      thumbKey.includes("/") ||
+      thumbKey.includes("..")
+    ) {
+      return "image.thumbKey is invalid";
+    }
+    result.thumbKey = thumbKey;
+  }
+
+  if (width !== undefined && width !== null) {
+    if (
+      typeof width !== "number" ||
+      width <= 0 ||
+      !Number.isFinite(width)
+    ) {
+      return "image.width is invalid";
+    }
+    result.width = Math.round(width);
+  }
+  if (height !== undefined && height !== null) {
+    if (
+      typeof height !== "number" ||
+      height <= 0 ||
+      !Number.isFinite(height)
+    ) {
+      return "image.height is invalid";
+    }
+    result.height = Math.round(height);
+  }
+
+  return result;
 }

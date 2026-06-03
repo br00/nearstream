@@ -58,7 +58,7 @@ export default async function InventoryArchivePage() {
                       className="aspect-square w-full overflow-hidden border border-border bg-foreground/5"
                     >
                       <img
-                        src={`/api/media/${item.image.key}`}
+                        src={`/api/media/${item.image.thumbKey ?? item.image.key}`}
                         alt={item.title}
                         className="h-full w-full object-cover transition-opacity group-hover:opacity-90"
                         loading="lazy"

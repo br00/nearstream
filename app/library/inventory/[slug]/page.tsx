@@ -64,6 +64,9 @@ export default async function InventoryItemPage({ params }: Props) {
               src={`/api/media/${item.image.key}`}
               alt={item.title}
               className="block w-full"
+              {...(item.image.width && item.image.height
+                ? { width: item.image.width, height: item.image.height }
+                : {})}
             />
           </div>
 

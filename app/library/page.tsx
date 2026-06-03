@@ -59,7 +59,7 @@ export default async function LibraryPage() {
         title: i.title,
         href: `/library/inventory/${i.slug}`,
         publishedAt: i.publishedAt,
-        imageKey: i.image.key,
+        imageKey: i.image.thumbKey ?? i.image.key,
       }),
     ),
   ].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));

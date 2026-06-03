@@ -8,8 +8,10 @@ import { buttonClasses } from "@/app/_components/button";
 import { INVENTORY_STATUSES } from "@/schemas/inventory";
 
 const ACCEPTED_MIME = "image/jpeg,image/png,image/webp,image/gif";
+const THUMB_MAX_DIM = 600;
+const THUMB_QUALITY = 0.85;
 
-type FlowState = "idle" | "uploading" | "saving";
+type FlowState = "idle" | "thumbnailing" | "uploading" | "saving";
 
 export function InventoryUploadForm() {
   const [file, setFile] = useState<File | null>(null);
@@ -46,9 +48,12 @@ export function InventoryUploadForm() {
 
     setError(null);
     setProgress(0);
-    setState("uploading");
 
     try {
+      setState("thumbnailing");
+      const { thumb, width, height } = await generateThumbnail(file);
+
+      setState("uploading");
       const urlRes = await fetch("/api/inventory/upload-url", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -58,14 +63,41 @@ export function InventoryUploadForm() {
         const err = await urlRes.json().catch(() => ({ error: "upload-url failed" }));
         throw new Error(err.error ?? "upload-url failed");
       }
-      const { uploadUrl, key } = (await urlRes.json()) as {
-        uploadUrl: string;
-        key: string;
+      const urls = (await urlRes.json()) as {
+        upload: { uploadUrl: string; key: string };
+        thumb: { uploadUrl: string; key: string };
       };
 
-      await putWithProgress(uploadUrl, file, (loaded, total) => {
-        setProgress(total > 0 ? Math.round((loaded / total) * 100) : 0);
-      });
+      const totalBytes = file.size + thumb.size;
+      let originalLoaded = 0;
+      let thumbLoaded = 0;
+      const updateProgress = () => {
+        const loaded = originalLoaded + thumbLoaded;
+        setProgress(
+          totalBytes > 0 ? Math.round((loaded / totalBytes) * 100) : 0,
+        );
+      };
+
+      await Promise.all([
+        putWithProgress(
+          urls.upload.uploadUrl,
+          file,
+          file.type,
+          (loaded) => {
+            originalLoaded = loaded;
+            updateProgress();
+          },
+        ),
+        putWithProgress(
+          urls.thumb.uploadUrl,
+          thumb,
+          "image/jpeg",
+          (loaded) => {
+            thumbLoaded = loaded;
+            updateProgress();
+          },
+        ),
+      ]);
 
       setState("saving");
 
@@ -74,7 +106,14 @@ export function InventoryUploadForm() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
-          image: { key, contentType: file.type, sizeBytes: file.size },
+          image: {
+            key: urls.upload.key,
+            thumbKey: urls.thumb.key,
+            contentType: file.type,
+            sizeBytes: file.size,
+            width,
+            height,
+          },
           description: description.trim() || undefined,
           dimensions: dimensions.trim() || undefined,
           materials: materials.trim() || undefined,
@@ -221,6 +260,11 @@ export function InventoryUploadForm() {
         </div>
       )}
 
+      {state === "thumbnailing" && (
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          Generating thumbnail…
+        </div>
+      )}
       {state === "uploading" && (
         <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
           Uploading… {progress}%
@@ -237,7 +281,13 @@ export function InventoryUploadForm() {
         disabled={disabled || !file || title.trim().length === 0}
         className={`${buttonClasses} self-start disabled:opacity-50 disabled:cursor-not-allowed`}
       >
-        {state === "idle" ? "Publish" : state === "uploading" ? "Uploading…" : "Saving…"}
+        {state === "idle"
+          ? "Publish"
+          : state === "thumbnailing"
+            ? "Preparing…"
+            : state === "uploading"
+              ? "Uploading…"
+              : "Saving…"}
       </button>
     </form>
   );
@@ -255,21 +305,79 @@ function isOnCellular(): boolean {
   return eff === "2g" || eff === "3g" || eff === "4g" || eff === "slow-2g";
 }
 
+async function generateThumbnail(
+  file: File,
+): Promise<{ thumb: Blob; width: number; height: number }> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch (err) {
+    throw new Error(
+      `could not decode image for thumbnailing (browser may not support this format): ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+
+  const fullWidth = bitmap.width;
+  const fullHeight = bitmap.height;
+  const ratio = Math.min(
+    THUMB_MAX_DIM / fullWidth,
+    THUMB_MAX_DIM / fullHeight,
+    1,
+  );
+  const w = Math.max(1, Math.round(fullWidth * ratio));
+  const h = Math.max(1, Math.round(fullHeight * ratio));
+
+  let blob: Blob;
+
+  if (typeof OffscreenCanvas !== "undefined") {
+    const canvas = new OffscreenCanvas(w, h);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("could not get 2d context for thumbnail");
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    blob = await canvas.convertToBlob({
+      type: "image/jpeg",
+      quality: THUMB_QUALITY,
+    });
+  } else {
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("could not get 2d context for thumbnail");
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (b) =>
+          b ? resolve(b) : reject(new Error("canvas toBlob returned null")),
+        "image/jpeg",
+        THUMB_QUALITY,
+      );
+    });
+  }
+
+  bitmap.close?.();
+
+  return { thumb: blob, width: fullWidth, height: fullHeight };
+}
+
 function putWithProgress(
   url: string,
-  file: File,
-  onProgress: (loaded: number, total: number) => void,
+  body: Blob,
+  contentType: string,
+  onProgress: (loaded: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
-    xhr.setRequestHeader("content-type", file.type);
+    xhr.setRequestHeader("content-type", contentType);
     xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable) onProgress(e.loaded, e.total);
+      if (e.lengthComputable) onProgress(e.loaded);
     });
     xhr.addEventListener("load", () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress(file.size, file.size);
+        onProgress(body.size);
         resolve();
       } else {
         reject(new Error(`R2 PUT failed: ${xhr.status} ${xhr.statusText}`));
@@ -281,6 +389,6 @@ function putWithProgress(
     xhr.addEventListener("abort", () =>
       reject(new Error("upload aborted")),
     );
-    xhr.send(file);
+    xhr.send(body);
   });
 }
