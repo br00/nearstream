@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { store } from "@/lib/store";
+import { getSession } from "@/lib/auth";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { TagChip } from "@/app/_components/tag-chip";
+import { DeleteButton } from "@/app/_components/delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +22,8 @@ function formatRelative(iso: string): string {
 }
 
 export default async function Home() {
-  const entries = await store.list();
+  const [entries, session] = await Promise.all([store.list(), getSession()]);
+  const isSignedIn = !!session;
 
   return (
     <PageShell
@@ -72,6 +75,12 @@ export default async function Home() {
                       {formatRelative(entry.publishedAt)}
                     </time>
                     <TagChip>{entry.tag}</TagChip>
+                    {isSignedIn && (
+                      <DeleteButton
+                        action={`/api/stream/${entry.id}/delete`}
+                        confirmMessage={`Delete this stream entry?\n\n"${entry.text.slice(0, 60)}${entry.text.length > 60 ? "…" : ""}"`}
+                      />
+                    )}
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
                     {entry.text}

@@ -8,6 +8,7 @@ import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
 import { TagRadio } from "@/app/_components/tag-chip";
+import { InventoryUploadForm } from "@/app/_components/inventory-upload-form";
 
 export const metadata = {
   title: "Studio · Nearstream",
@@ -131,6 +132,20 @@ export default async function StudioPage({ searchParams }: Props) {
                 Publish
               </SubmitButton>
             </form>
+          </div>
+
+          <hr className="mt-20 border-border" />
+
+          <div id="inventory-form" className="scroll-mt-6">
+            <h2 className="mt-20 text-2xl font-normal tracking-tight text-foreground">
+              New inventory item
+            </h2>
+            <p className="mt-2 text-sm text-muted-soft">
+              An image with optional metadata. Lands at{" "}
+              <code className="font-mono">/library/inventory/[slug]</code>.
+            </p>
+
+            <InventoryUploadForm />
           </div>
         </div>
       </section>

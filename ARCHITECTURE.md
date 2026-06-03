@@ -2,7 +2,7 @@
 
 How the code is laid out. Pairs with [`NEARSTREAM.md`](./NEARSTREAM.md), which holds philosophy + decisions. This file holds shape.
 
-> **Status:** Phase 2 · Slice 8 (Essays in RSS) — Phase 2's Library primitive (Essay, slice 7) is now reachable via the public feed. `/rss.xml` merges Stream entries and Library essays into one chronological feed sorted by `publishedAt`. Items differentiate via `<category>Stream</category>` (plus the discipline tag) vs `<category>Essay</category>`. Essay bodies are markdown rendered to HTML by `marked` and shipped in `<![CDATA[...]]>` so feed readers display the full essay inline.
+> **Status:** Phase 2 · Slice 9 (Inventory primitive — first image-bearing Library entry type) — Phase 2 now has two primitives. Slice 9 introduces images: a new `media-store` layer that issues **presigned R2 PUT URLs** so the browser uploads images directly to Cloudflare R2 (no Vercel 4 MB function-body cap), plus a server-proxied read route at `/api/media/{key}` that streams images out of R2. `lib/inventory-store.ts` mirrors `essay-store` (different R2 prefix, different schema). The studio gets its first client component (`InventoryUploadForm`) — required for the three-step JS upload flow. Public surfaces (archive grid at `/library/inventory`, single page at `/library/inventory/[slug]`) stay server-rendered. The Library hub (`/library`) now shows essays + inventory mixed by date.
 
 ---
 
@@ -12,21 +12,28 @@ How the code is laid out. Pairs with [`NEARSTREAM.md`](./NEARSTREAM.md), which h
 nearstream/
 ├── app/                   Next.js App Router routes
 │   ├── api/
-│   │   ├── stream/        POST = add entry (gated) · GET = list entries (public)
-│   │   └── essays/        POST = publish essay (gated) · GET = list essays (public)
+│   │   ├── stream/                POST = add entry (gated) · GET = list entries (public)
+│   │   ├── essays/                POST = publish essay (gated) · GET = list essays (public)
+│   │   ├── inventory/
+│   │   │   ├── route.ts           POST = save inventory metadata (gated, JSON) · GET = list items (public)
+│   │   │   └── upload-url/route.ts POST = mint a presigned R2 PUT URL for the browser (gated)
+│   │   └── media/[key]/route.ts   GET = server-proxy stream of an image from R2 (public, immutable-cache)
 │   ├── auth/
 │   │   ├── callback/      GET: verify magic-link token → set session → redirect
 │   │   └── logout/        POST: clear session cookie
 │   ├── login/
 │   │   ├── page.tsx       email entry form
 │   │   └── actions.ts     server action: send magic link
-│   ├── studio/            posting UI — gated, holds both Stream and Essay forms
+│   ├── studio/            posting UI — gated, holds Stream + Essay + Inventory forms
 │   ├── design/            /design — Nearstream chrome spec page (palette, type, components)
 │   ├── library/
-│   │   ├── page.tsx       public Library archive — list of essays
-│   │   └── [slug]/page.tsx  public per-essay page — renders markdown body via `marked`
-│   ├── rss.xml/route.ts   public RSS 2.0 feed of all stream entries
-│   ├── _components/       Nearstream chrome design system (see below)
+│   │   ├── page.tsx                       public Library hub — essays + inventory mixed by date
+│   │   ├── [slug]/page.tsx                public per-essay page — renders markdown body via `marked`
+│   │   └── inventory/
+│   │       ├── page.tsx                   public Inventory archive — grid of items with thumbnails
+│   │       └── [slug]/page.tsx            public per-item page — full image + metadata
+│   ├── rss.xml/route.ts   public RSS 2.0 feed of all stream entries + essays
+│   ├── _components/       Nearstream chrome design system (see below) + `InventoryUploadForm` (client)
 │   ├── page.tsx           public stream timeline (server component) — entries carry id={`entry-${id}`}
 │   ├── globals.css        tokens + `.prose-essay` styles for rendered markdown
 │   └── layout.tsx         root layout, fonts, metadata, RSS auto-discovery link
@@ -34,11 +41,15 @@ nearstream/
 │   ├── store.ts           Stream store: interface + InMemoryStore + env-driven picker
 │   ├── r2-store.ts        Stream Cloudflare R2 implementation (aws4fetch, S3 API)
 │   ├── essay-store.ts     Essay store: interface + InMemory + R2 (mirror of stream store, key prefix `library/essays/`)
+│   ├── inventory-store.ts Inventory store: interface + InMemory + R2 (prefix `library/inventory/`)
+│   ├── media-store.ts     Media (image) store: presigned R2 PUT URLs for upload, server-proxy stream for read (prefix `media/`)
+│   ├── slug.ts            shared `slugify()` + `isValidSlug()` used by essay + inventory schemas
 │   ├── auth.ts            HMAC token sign/verify, session cookie, allowlist
 │   └── email.ts           Resend send + dev console fallback
 ├── schemas/
 │   ├── stream.ts          StreamEntry typed primitive
-│   └── essay.ts           Essay typed primitive + `slugify()` + `isValidSlug()`
+│   ├── essay.ts           Essay typed primitive (re-exports slug helpers from `lib/slug.ts`)
+│   └── inventory.ts       InventoryItem typed primitive + `INVENTORY_STATUSES` + `isInventoryStatus()`
 ├── proxy.ts               Next 16 Proxy: optimistic redirect on /studio/*
 ├── .env.example           R2 + auth + Resend templates
 ├── ARCHITECTURE.md        this file
@@ -102,6 +113,47 @@ Sessions are signed cookies. There is no session store. Rotating `AUTH_SECRET` i
                                           └──────────────────┘
 ```
 
+## The image upload flow (slice 9)
+
+```
+  /studio (browser)                /api/inventory/upload-url       R2 bucket
+  ─────────────────                ─────────────────────────       ─────────
+  user picks file                  (gated, JSON)                   (Cloudflare,
+   │                                  │                             CORS enabled)
+   ├── 1. POST { contentType, size }──▶
+   │                                  │
+   │                                  ├── mediaStore.getUploadUrl()
+   │                                  │   validates contentType (allowlist)
+   │                                  │   generates UUID key
+   │                                  │   aws4fetch sign({ signQuery: true })
+   │                                  │   → presigned URL valid 5 min
+   │   { uploadUrl, key } ◀──────────┤
+   │                                                                 │
+   ├── 2. PUT file directly (XMLHttpRequest, progress events) ──▶ media/{key}
+   │                                                                 │
+   │                                  /api/inventory                 │
+   │                                  ──────────────                 │
+   │                                  (gated, JSON)                  │
+   ├── 3. POST { title, image: { key, contentType, size }, … } ──▶  │
+   │                                  │                              │
+   │                                  ├── inventoryStore.add()       │
+   │                                  │   PUT library/inventory/{id}.json
+   │                                  │   revalidatePath /library, /library/inventory
+   │   redirect /library/inventory/{slug} ◀────────┤
+   │
+   /library/inventory/{slug} (browser)              /api/media/{key}              R2 bucket
+   ──────────────────────────────────              ────────────────              ─────────
+   server-rendered, includes <img                  (public, server-proxy)
+     src="/api/media/{key}">                          │
+                                                      ├── mediaStore.getImage()
+                                                      │   GET media/{key} via aws4fetch
+                                                      │   Cache-Control: immutable, 1yr
+                                                      │   stream body back
+                                          image ◀─────┤
+```
+
+The upload path bypasses Vercel's 4.5 MB function body limit because the bytes go *directly browser ⇄ R2*. The read path uses a server-proxy so the bucket can stay private (no public R2 domain needed).
+
 ## Rules followed
 
 1. **Schemas are the single source of truth.** `schemas/stream.ts` exports the `StreamEntry` type *and* `DISCIPLINE_TAGS` *and* `isDisciplineTag()`. One file feeds the form, the route handler, and the public render. ("schema-as-code" — NEARSTREAM.md §05.)
@@ -140,7 +192,8 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 
 - **No Sanity.** Studio is built into the app (NEARSTREAM.md §05: *"friends will not learn a second tool with a second login."*).
 - **No Vercel-specific APIs.** Standard Next features only — `revalidatePath`, route handlers, server components, Proxy. Same code will run on Fly.io / Hetzner.
-- **R2 via `aws4fetch`.** Single-file SigV4 signer + `fetch`. AWS SDK is ~1.6 MB of features we don't need.
+- **Delete is signed-in-only, inline on the public list/detail pages, via tiny POST forms.** No "manage" dashboard, no API DELETE method (HTML forms can't issue it). `DeleteButton` is a 20-line client component that wraps a `<form action method="POST">` and adds `confirm()` so an accidental click doesn't nuke an entry. Server routes (`/api/stream/[id]/delete`, `/api/essays/[slug]/delete`, `/api/inventory/[slug]/delete`) all check `getSession()`, run the store's delete method, call `revalidatePath` on the affected routes, then redirect back to the parent list. Inventory delete cascades: the store fetches the metadata first, deletes the original image + thumbnail via `mediaStore.deleteImage()`, then deletes the metadata JSON. Cascade failures are logged but don't block metadata delete — better an orphaned image in R2 than an undeletable item in the UI.
+- **R2 via `aws4fetch`, wrapped in `R2Client`.** `lib/r2-client.ts` wraps `AwsClient` with **retry-once on transient TLS errors** (`ERR_SSL_SSLV3_ALERT_HANDSHAKE_FAILURE` + a few related signals). Vercel functions go cold between requests; Node's HTTPS occasionally hits a handshake hiccup on the first call to R2 from a warming function. Without the wrapper, that cold-start hiccup surfaces as a 500 to the user. With it, the second attempt almost always succeeds and the user sees nothing. All four R2-using stores (Stream, Essay, Inventory, Media) construct `R2Client` instead of bare `AwsClient`, so the retry is centralized. AWS SDK is ~1.6 MB of features we don't need.
 - **Auth via raw HMAC, not `jose` / `next-auth` / Lucia.** Same ethos. ~30 lines of Web Crypto. Standard auth libraries assume a multi-provider, refresh-token, RBAC world Nearstream will never have.
 - **Allowlist in env var.** Adding a friend = redeploy. Friction by design.
 - **Magic-link login leaks nothing.** The login page always shows "if that email is on the allowlist, a link is on its way" — same response either way. No allowlist enumeration.
@@ -154,8 +207,16 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 - **Item links are anchors on `/`, not per-entry permalink pages.** Entries render with `id={`entry-${entry.id}`}` on the timeline; the feed's `<link>` is `${SITE_URL}/#entry-${entry.id}`. Real per-entry routes belong to a later slice (Phase 2 library primitives will introduce per-entry URLs).
 - **Two stores, not one generic store with a discriminator.** `lib/store.ts` (Stream) and `lib/essay-store.ts` (Essay) are sibling files, each owning their own interface + InMemory + R2 implementations + picker. They share the same R2 bucket but different prefixes (`entries/` vs `library/essays/`). Reasons: (1) primitives have different shapes — Essay has slug + body + getBySlug, Stream has tag + force-permalink-less. A generic `Store<T>` would either lose type-precision or grow ugly. (2) Each primitive's store can evolve independently (Essay may add `getBySlug` cache, Stream may add filtering by tag). (3) Mirrors the manifesto's "typed primitive" model — each primitive is its own thing with its own rendering, schema, and persistence.
 - **Markdown via `marked`, not MDX or `remark` + plugins.** Single package, no deps, no React-in-content complexity. `marked.parse(body, { async: true })` returns HTML, injected via `dangerouslySetInnerHTML` into a `.prose-essay` block with minimal styles in `globals.css`. Sanitization deferred — the only author is the allowlist user themselves, so XSS through self-authored content is irrelevant. If Phase 3 multi-tenant introduces friend-authored essays read by *you*, revisit (DOMPurify on server or `marked`'s sanitize hook).
-- **Slugs derived from title at write time, collision rejected.** `slugify(title)` strips diacritics, lowercases, kebab-cases, caps at 80 chars. If the resulting slug already exists in R2 the POST returns 409 and the user re-titles. No silent suffixing — the title is the URL is the identity. Renaming an essay would change the slug + URL, which we treat as out-of-scope for v1 (essays are append-only).
+- **Slugs derived from title at write time, collision rejected.** `slugify(title)` strips diacritics, lowercases, kebab-cases, caps at 80 chars. If the resulting slug already exists in R2 the POST returns 409 and the user re-titles. No silent suffixing — the title is the URL is the identity. Renaming an entry would change the slug + URL; the workaround is delete + republish (delete shipped in slice 9 follow-up).
 - **`force-dynamic` on `/library` + `/library/[slug]`.** Same as `/` and `/rss.xml` — pragmatic for slice 7 volumes. Caching is the same open question.
+- **Images upload direct from the browser to R2 via presigned URLs, NOT via Vercel function body.** Vercel functions cap incoming request bodies at 4.5 MB — too small for full-quality phone photos. Instead, the studio runs a three-step flow: (1) browser POSTs to `/api/inventory/upload-url` asking for a temporary signed URL; (2) Vercel function uses aws4fetch's `signQuery: true` mode to generate a 5-minute presigned PUT URL bound to a specific `content-type` and key, returns it; (3) browser PUTs the file *directly to R2* via the signed URL — Vercel never sees the bytes. After the PUT succeeds, the browser POSTs metadata to `/api/inventory` with the image key. Result: **no upload size limit short of R2's 5 GB per-object cap**, no paid services, identical code on Fly / Hetzner (where there's no body-cap quirk at all). Same pattern Dropbox / Notion / Figma use for the same reason.
+- **Read images via server-proxy at `/api/media/{key}`, NOT a public R2 bucket.** Keeps the R2 bucket private (one set of credentials, one configuration). Browser fetches `/api/media/abc.jpg`; the Vercel function GETs from R2 and streams the body back with `Cache-Control: public, max-age=31536000, immutable` so browsers cache aggressively (R2 keys never change — UUIDs). Bandwidth flows through Vercel (100 GB/mo Hobby tier). For a personal site visited by ~10 close friends, that's ~33,000 image views/month before approaching the cap — not a constraint at Nearstream scale. Migration to a public R2 custom domain is a ~30-min change later if it ever matters.
+- **Thumbnails are generated in the browser at upload time, not on the server.** The studio uses `createImageBitmap` + `OffscreenCanvas` (with a regular-canvas fallback for older Safari) to make a 600 px max-dimension JPEG (~80 KB for a 14 MB original) before the upload step. `/api/inventory/upload-url` returns **two** presigned R2 PUT URLs (original + thumbnail), the browser uploads both in parallel, and `InventoryImage.thumbKey` carries the thumbnail's R2 key alongside `image.key`. Archive grid (`/library/inventory`, `/library` hub) uses `thumbKey`; detail page (`/library/inventory/[slug]`) uses the full `key`. Result: an archive of 30 inventory items loads ~2.4 MB total (30 × 80 KB thumbs) instead of ~400 MB (30 × ~14 MB originals). **No server-side image library** (no `sharp`, no Vercel image optimizer, no Cloudflare Images, no paid service, no Vercel lock-in). The cost is one extra browser-side step (~1–2 s on a 14 MB photo). The fallback if `thumbKey` is missing (older items, decode failures) is to use the full `key` — graceful degradation. `image.width` and `image.height` are also captured during thumbnail generation and stored in metadata so detail pages can declare intrinsic dimensions on `<img>` and avoid layout shift.
+- **`InventoryUploadForm` is a client component — the one place studio breaks "no client JS".** Three-step upload (get URL → PUT → POST metadata) plus upload progress + cellular-data warning + file picker can't be done without JS. Studio's other forms (Stream, Essay) remain plain server-rendered forms that submit without JS. The trade is acceptable because: (a) public reading paths are still server-rendered (the JS exception is gated behind auth), (b) file uploads have always been a JS-era thing, and (c) the alternative (multipart through Vercel) means the 4 MB cap for everyone.
+- **CORS on the R2 bucket is required.** The browser is making cross-origin PUT requests to `*.r2.cloudflarestorage.com`. Without CORS configured on the bucket, the PUT preflight fails. Config is one-time per bucket via Cloudflare dashboard — see the Deploy section below.
+- **Slug uniqueness is per-primitive, not global.** An essay can have slug `garden` (URL `/library/garden`); an inventory item can also have slug `garden` (URL `/library/inventory/garden`). Different URLs, no collision. The one edge case: an essay titled "Inventory" would slug to `inventory` and shadow the inventory archive at `/library/inventory`. Next.js prefers static routes over dynamic ones, so the inventory archive wins; the essay would 404 at its expected URL. We accept this as theoretical (extremely unlikely essay title) until either (a) someone hits it or (b) a future slice moves essays to `/library/essays/[slug]`. Tracked in open questions.
+- **Inventory metadata fields are mostly optional.** Title + image required; description / dimensions / materials / edition / status / price all optional. Lets the same primitive serve casual photo posting (just title + image) and structured object inventory (everything filled). The detail page renders only the fields that have values — empty fields don't show as "Dimensions: —".
+- **Allowed image types: jpeg, png, webp, gif.** No HEIC (iPhone's default — browsers can't display it; would need server-side conversion via `libheif` or similar). iPhones export JPEG when sharing through most apps, so this is rarely a problem in practice. Listed allowlist gated at both the presign step and the metadata-save step (defense in depth — a malicious client could request a different content type at PUT time, but the metadata save would reject it).
 
 ## What's next per slice
 
@@ -168,7 +229,8 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 | 5 | RSS feed at `/rss.xml` | new `app/rss.xml/route.ts`, `layout.tsx` (alternates + metadataBase), `page.tsx` (entry anchors), `.env.example` (`NEARSTREAM_SITE_URL`) |
 | 6 | Production deploy on Vercel | NEARSTREAM.md §05 + §10 updates, ARCHITECTURE.md deploy section, Vercel project + env vars + GitHub auto-deploy |
 | 7 | **Phase 2 begins.** Essay primitive end-to-end | new `schemas/essay.ts` + `lib/essay-store.ts` + `app/api/essays/route.ts` + `app/library/page.tsx` + `app/library/[slug]/page.tsx`, `app/studio/page.tsx` extended with second form, `globals.css` `.prose-essay`, home + studio nav now links Library, `marked` dep |
-| 8 (this) | Essays in RSS | `app/rss.xml/route.ts` pulls both stores in parallel, merges by `publishedAt`, renders Essay items with markdown→HTML body in CDATA, `<category>Stream\|Essay</category>` discriminator |
+| 8 | Essays in RSS | `app/rss.xml/route.ts` pulls both stores in parallel, merges by `publishedAt`, renders Essay items with markdown→HTML body in CDATA, `<category>Stream\|Essay</category>` discriminator |
+| 9 (this) | Inventory primitive + image upload | new `schemas/inventory.ts`, `lib/inventory-store.ts`, `lib/media-store.ts` (presigned R2 PUT URLs + server-proxy read), `lib/slug.ts` (extracted from essay schema for reuse), `app/api/inventory/route.ts` + `app/api/inventory/upload-url/route.ts` + `app/api/media/[key]/route.ts`, `app/library/inventory/` + `[slug]/page.tsx`, `app/library/page.tsx` becomes mixed hub, `app/_components/inventory-upload-form.tsx` (client), `app/studio/page.tsx` extended with third form. **Requires R2 CORS config** (see Deploy section). |
 
 Each slice is a PR. ARCHITECTURE.md updates with the slice. NEARSTREAM.md decisions log gets an entry only when a load-bearing choice is made.
 
@@ -213,17 +275,43 @@ Each slice is a PR. ARCHITECTURE.md updates with the slice. NEARSTREAM.md decisi
 
 **Custom domain (deferred to a follow-up slice).** When ready: add the domain in Vercel → Domains, repoint DNS (Cloudflare Registrar / Namecheap) to Vercel's A/AAAA records, then update `NEARSTREAM_SITE_URL` env var. Also verify the same domain in Resend so magic-links send from `hello@<domain>` instead of `onboarding@resend.dev`.
 
+**R2 CORS (required since slice 9).** The browser PUTs images directly to R2 via presigned URLs. Without CORS configured, the preflight `OPTIONS` request fails and the upload never happens. Configure once per bucket via Cloudflare → R2 → bucket → **Settings** → **CORS Policy**:
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://alessandroborelli.it",
+      "https://nearstream-indol.vercel.app",
+      "https://*.vercel.app",
+      "http://localhost:3000"
+    ],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedHeaders": ["content-type"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+`AllowedOrigins` should include: your production domain(s), the Vercel auto-subdomain, the `*.vercel.app` wildcard so preview deploys work too, and `localhost:3000` for dev. Adjust to your domains.
+
 ---
 
 ## Open architectural questions (carry forward)
 
-- **List cost / caching.** Both `store.list()` and `essayStore.list()` do one `ListObjectsV2` + N parallel GETs every page render — and `/rss.xml` (stream) + `/library` (essays) request, plus `essayStore.getBySlug()` lists everything on every single-essay page. Fine for slice 1–7 volumes, but unbounded. A later slice should add a cached read path — likely an in-process LRU keyed on the bucket's `LastModified` of each prefix, with the relevant `revalidatePath` calls already wired from the POST routes.
+- **List cost / caching.** `store.list()`, `essayStore.list()`, and now `inventoryStore.list()` each do one `ListObjectsV2` + N parallel GETs every page render. The Library hub `/library` calls two of them in parallel; `/rss.xml` calls two; getBySlug calls list internally on each single page. Fine for slice 1–9 volumes, but unbounded. A later slice should add a cached read path — likely an in-process LRU keyed on the bucket's `LastModified` of each prefix, with the relevant `revalidatePath` calls already wired from the POST routes.
 - **R2 layout if entries grow.** Currently flat (`entries/{id}.json`). Tracked as a GitHub issue — likely move to `entries/YYYY/MM/{id}.json`.
 - **Tag set.** `Code / Photo / Music / Writing` is the slice 1 set. Adding `Reading`, `Travel`, `Cooking` is one-line in `schemas/stream.ts` — defer until needed.
 - **`StreamEntry.id`.** Currently `crypto.randomUUID()`. Slice 5 did not need to change this — the store already sorts by `publishedAt` and the feed `<guid>` is stable per entry regardless of ordering. Revisit when (a) pagination requires cursor IDs, or (b) we want lexicographically sortable R2 keys.
 - **`force-dynamic`.** Pragmatic for slice 1. A later slice should swap to `revalidatePath` only (already wired in `POST /api/stream` and `POST /api/essays`) and let `/`, `/rss.xml`, `/library`, and `/library/[slug]` cache between posts.
-- **Per-essay edit/delete.** Slice 7 ships append-only. Editing requires either rotating the slug (URL breakage) or accepting a stale slug (URL/content mismatch). Deferred until either becomes a real pain.
+- **Delete shipped in slice 9 follow-up.** Every primitive (Stream / Essay / Inventory) has a signed-in `delete` affordance on every public list and detail page. POSTs to `/api/{primitive}/{id|slug}/delete`, server checks session, store handles cascade (inventory removes its image + thumbnail from R2 too). Edit is still deferred — same rationale as before (slug rotation breaks URLs; rewriting in place leaves URL/content mismatch). Delete + republish is the workaround when you need to revise.
 - **Combined feed only.** Slice 8 ships one `/rss.xml` for both Stream and Library. If a reader wants only-essays or only-stream, that's filtering on the `<category>` tag client-side. A real per-primitive feed (`/library/rss.xml`) waits for a real ask.
 - **Magic-link single-use.** Slice 3 tokens are time-bound (15 min) but technically replayable inside that window — verifying single-use would require persisted state (an R2 key with the token's nonce, deleted on use). For a 1–5-person allowlist this is acceptable risk; revisit if the allowlist grows or the threat model changes.
 - **CSRF on POST routes.** Right now `POST /api/stream` and `POST /auth/logout` are protected by the session cookie alone. Browsers default-block cross-site cookie sends with `SameSite=Lax`, so this is fine for form-posts initiated from same-origin pages. If a slice adds cross-origin posting (the reader posting back? an iOS shortcut?), revisit with a CSRF token or `SameSite=Strict`.
 - **Form idempotency.** The `SubmitButton` client component disables itself on submit, which prevents double-clicks *when JS is on*. With JS off, a fast user could still double-submit and create two entries. A real fix is server-side: hidden idempotency token in the form, server stores submitted tokens (e.g. in an `idempotency/{token}` R2 key) and rejects repeats. Deferred — not worth the plumbing for a 1-user app.
+- **Essay slug `inventory` collides with the inventory archive route.** `/library/inventory` is a static route (inventory archive). If someone publishes an essay titled "Inventory", its slug becomes `inventory`, and the essay route `/library/[slug]` would resolve to `/library/inventory` — but Next.js prefers static routes, so the inventory archive wins and the essay 404s. Same issue exists for any future static sub-route at `/library/{name}`. A clean fix: move essays to `/library/essays/[slug]` (with a redirect from the old `/library/{slug}` for back-compat against URLs already in the RSS feed). Deferred until either it bites someone or we ship a third primitive that would force the refactor anyway.
+- **Thumbnails landed in slice 9 follow-up — done.** Browser-side `createImageBitmap` + `OffscreenCanvas` at upload time. No server-side `sharp` needed. See the "Why" note above.
+- **Direct-to-R2 upload from non-JS clients.** The slice 9 upload path requires JavaScript. If the architecture ever needs to support a `<form enctype="multipart/form-data">` upload — e.g., an iOS Shortcut posting to a URL — we'd need a parallel server-proxy path with the 4 MB Vercel limit, or migrate compute off Vercel. Mark when/if it becomes real.
+- **HEIC support.** iPhone's default photo format isn't displayable by browsers. Server-side conversion via `libheif` is heavy. Workaround for now: tell users iPhone Photos converts to JPEG when sharing through most apps. Revisit only if a real friend hits this.
+- **Image dimensions landed alongside thumbnails — done.** `image.width` and `image.height` are captured during browser-side thumbnail generation (the `ImageBitmap` exposes them) and stored in the inventory metadata. Detail page sets `width`/`height` on `<img>` for layout-shift-free loads.

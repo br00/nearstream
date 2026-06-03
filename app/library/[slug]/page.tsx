@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { marked } from "marked";
 import { essayStore } from "@/lib/essay-store";
+import { getSession } from "@/lib/auth";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
+import { DeleteButton } from "@/app/_components/delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +32,12 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function EssayPage({ params }: Props) {
   const { slug } = await params;
-  const essay = await essayStore.getBySlug(slug);
+  const [essay, session] = await Promise.all([
+    essayStore.getBySlug(slug),
+    getSession(),
+  ]);
   if (!essay) notFound();
+  const isSignedIn = !!session;
 
   const html = await marked.parse(essay.body, { async: true });
 
@@ -41,9 +47,17 @@ export default async function EssayPage({ params }: Props) {
   return (
     <PageShell
       rightNav={
-        <Link href="/library" className={navLinkClasses}>
-          ← Library
-        </Link>
+        <>
+          <Link href="/library" className={navLinkClasses}>
+            ← Library
+          </Link>
+          {isSignedIn && (
+            <DeleteButton
+              action={`/api/essays/${essay.slug}/delete`}
+              confirmMessage={`Delete essay "${essay.title}"? This is permanent.`}
+            />
+          )}
+        </>
       }
     >
       <section className="flex flex-1 justify-center px-6">

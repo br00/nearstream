@@ -4,6 +4,7 @@ import { R2Store } from "@/lib/r2-store";
 export interface Store {
   list(): Promise<StreamEntry[]>;
   add(input: NewStreamEntry): Promise<StreamEntry>;
+  delete(id: string): Promise<boolean>;
 }
 
 class InMemoryStore implements Store {
@@ -24,6 +25,13 @@ class InMemoryStore implements Store {
     };
     this.entries.push(entry);
     return entry;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const i = this.entries.findIndex((e) => e.id === id);
+    if (i === -1) return false;
+    this.entries.splice(i, 1);
+    return true;
   }
 }
 

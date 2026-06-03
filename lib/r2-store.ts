@@ -1,4 +1,4 @@
-import { AwsClient } from "aws4fetch";
+import { R2Client } from "@/lib/r2-client";
 import type { NewStreamEntry, StreamEntry } from "@/schemas/stream";
 import type { Store } from "@/lib/store";
 
@@ -10,15 +10,13 @@ export type R2Config = {
 };
 
 export class R2Store implements Store {
-  private client: AwsClient;
+  private client: R2Client;
   private base: string;
 
   constructor(config: R2Config) {
-    this.client = new AwsClient({
+    this.client = new R2Client({
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
-      service: "s3",
-      region: "auto",
     });
     this.base = `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}`;
   }
@@ -73,6 +71,18 @@ export class R2Store implements Store {
 
     return entries.sort((a, b) =>
       b.publishedAt.localeCompare(a.publishedAt),
+    );
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
+      method: "DELETE",
+    });
+    // R2 returns 204 on success, 404 if missing
+    if (res.status === 204) return true;
+    if (res.status === 404) return false;
+    throw new Error(
+      `R2 DELETE failed (${res.status} ${res.statusText}): ${await res.text()}`,
     );
   }
 }
