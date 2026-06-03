@@ -6,6 +6,7 @@ export interface EssayStore {
   list(): Promise<Essay[]>;
   add(input: NewEssay): Promise<Essay>;
   getBySlug(slug: string): Promise<Essay | null>;
+  deleteBySlug(slug: string): Promise<boolean>;
 }
 
 class InMemoryEssayStore implements EssayStore {
@@ -31,6 +32,13 @@ class InMemoryEssayStore implements EssayStore {
 
   async getBySlug(slug: string): Promise<Essay | null> {
     return this.essays.find((e) => e.slug === slug) ?? null;
+  }
+
+  async deleteBySlug(slug: string): Promise<boolean> {
+    const i = this.essays.findIndex((e) => e.slug === slug);
+    if (i === -1) return false;
+    this.essays.splice(i, 1);
+    return true;
   }
 }
 
@@ -109,6 +117,19 @@ class R2EssayStore implements EssayStore {
   async getBySlug(slug: string): Promise<Essay | null> {
     const all = await this.list();
     return all.find((e) => e.slug === slug) ?? null;
+  }
+
+  async deleteBySlug(slug: string): Promise<boolean> {
+    const target = await this.getBySlug(slug);
+    if (!target) return false;
+    const res = await this.client.fetch(`${this.base}/${this.key(target.id)}`, {
+      method: "DELETE",
+    });
+    if (res.status === 204) return true;
+    if (res.status === 404) return false;
+    throw new Error(
+      `R2 DELETE failed (${res.status} ${res.statusText}): ${await res.text()}`,
+    );
   }
 }
 

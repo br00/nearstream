@@ -1,11 +1,13 @@
 import { R2Client } from "@/lib/r2-client";
 import type { InventoryItem, NewInventoryItem } from "@/schemas/inventory";
 import { slugify } from "@/schemas/inventory";
+import { mediaStore } from "@/lib/media-store";
 
 export interface InventoryStore {
   list(): Promise<InventoryItem[]>;
   add(input: NewInventoryItem): Promise<InventoryItem>;
   getBySlug(slug: string): Promise<InventoryItem | null>;
+  deleteBySlug(slug: string): Promise<boolean>;
 }
 
 class InMemoryInventoryStore implements InventoryStore {
@@ -30,6 +32,13 @@ class InMemoryInventoryStore implements InventoryStore {
 
   async getBySlug(slug: string): Promise<InventoryItem | null> {
     return this.items.find((i) => i.slug === slug) ?? null;
+  }
+
+  async deleteBySlug(slug: string): Promise<boolean> {
+    const i = this.items.findIndex((it) => it.slug === slug);
+    if (i === -1) return false;
+    this.items.splice(i, 1);
+    return true;
   }
 }
 
@@ -107,6 +116,36 @@ class R2InventoryStore implements InventoryStore {
   async getBySlug(slug: string): Promise<InventoryItem | null> {
     const all = await this.list();
     return all.find((i) => i.slug === slug) ?? null;
+  }
+
+  async deleteBySlug(slug: string): Promise<boolean> {
+    const target = await this.getBySlug(slug);
+    if (!target) return false;
+
+    // Cascade-delete the image files first (best-effort — if these fail, we
+    // still try to delete the metadata so the item disappears from the UI).
+    if (mediaStore) {
+      try {
+        await mediaStore.deleteImage(target.image.key);
+        if (target.image.thumbKey) {
+          await mediaStore.deleteImage(target.image.thumbKey);
+        }
+      } catch (err) {
+        console.warn(
+          "[nearstream] inventory cascade delete: media delete failed (continuing):",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
+    const res = await this.client.fetch(`${this.base}/${this.key(target.id)}`, {
+      method: "DELETE",
+    });
+    if (res.status === 204) return true;
+    if (res.status === 404) return false;
+    throw new Error(
+      `R2 DELETE failed (${res.status} ${res.statusText}): ${await res.text()}`,
+    );
   }
 }
 

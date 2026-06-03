@@ -73,6 +73,18 @@ export class R2Store implements Store {
       b.publishedAt.localeCompare(a.publishedAt),
     );
   }
+
+  async delete(id: string): Promise<boolean> {
+    const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
+      method: "DELETE",
+    });
+    // R2 returns 204 on success, 404 if missing
+    if (res.status === 204) return true;
+    if (res.status === 404) return false;
+    throw new Error(
+      `R2 DELETE failed (${res.status} ${res.statusText}): ${await res.text()}`,
+    );
+  }
 }
 
 // ListObjectsV2 returns XML. We only need <Key>...</Key> values; a regex is

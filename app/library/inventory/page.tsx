@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { inventoryStore } from "@/lib/inventory-store";
+import { getSession } from "@/lib/auth";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
+import { DeleteButton } from "@/app/_components/delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +12,11 @@ export const metadata = {
 };
 
 export default async function InventoryArchivePage() {
-  const items = await inventoryStore.list();
+  const [items, session] = await Promise.all([
+    inventoryStore.list(),
+    getSession(),
+  ]);
+  const isSignedIn = !!session;
 
   const navLinkClasses =
     "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
@@ -73,6 +79,14 @@ export default async function InventoryArchivePage() {
                       </p>
                     )}
                   </Link>
+                  {isSignedIn && (
+                    <div className="mt-2">
+                      <DeleteButton
+                        action={`/api/inventory/${item.slug}/delete`}
+                        confirmMessage={`Delete "${item.title}"? This removes both the metadata and the image files. Permanent.`}
+                      />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

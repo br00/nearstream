@@ -35,6 +35,7 @@ export interface MediaStore {
     contentType: string,
   ): Promise<{ uploadUrl: string; key: string; expiresInSeconds: number }>;
   getImage(key: string): Promise<Response>;
+  deleteImage(key: string): Promise<boolean>;
 }
 
 type R2Config = {
@@ -93,6 +94,20 @@ class R2MediaStore implements MediaStore {
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     });
+  }
+
+  async deleteImage(key: string): Promise<boolean> {
+    if (key.includes("/") || key.includes("..") || key.length === 0) {
+      return false;
+    }
+    const res = await this.client.fetch(`${this.base}/${R2_PREFIX}${key}`, {
+      method: "DELETE",
+    });
+    if (res.status === 204) return true;
+    if (res.status === 404) return false;
+    throw new Error(
+      `R2 DELETE failed (${res.status} ${res.statusText}): ${await res.text()}`,
+    );
   }
 }
 

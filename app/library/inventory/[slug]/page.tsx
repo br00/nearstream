@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { marked } from "marked";
 import { inventoryStore } from "@/lib/inventory-store";
+import { getSession } from "@/lib/auth";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
+import { DeleteButton } from "@/app/_components/delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +32,12 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function InventoryItemPage({ params }: Props) {
   const { slug } = await params;
-  const item = await inventoryStore.getBySlug(slug);
+  const [item, session] = await Promise.all([
+    inventoryStore.getBySlug(slug),
+    getSession(),
+  ]);
   if (!item) notFound();
+  const isSignedIn = !!session;
 
   const html = item.description
     ? await marked.parse(item.description, { async: true })
@@ -50,9 +56,17 @@ export default async function InventoryItemPage({ params }: Props) {
   return (
     <PageShell
       rightNav={
-        <Link href="/library/inventory" className={navLinkClasses}>
-          ← Inventory
-        </Link>
+        <>
+          <Link href="/library/inventory" className={navLinkClasses}>
+            ← Inventory
+          </Link>
+          {isSignedIn && (
+            <DeleteButton
+              action={`/api/inventory/${item.slug}/delete`}
+              confirmMessage={`Delete "${item.title}"? This removes both the metadata and the image files. Permanent.`}
+            />
+          )}
+        </>
       }
     >
       <section className="flex flex-1 justify-center px-6">

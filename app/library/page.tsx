@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
+import { getSession } from "@/lib/auth";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
+import { DeleteButton } from "@/app/_components/delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,7 @@ type LibraryEntry =
   | {
       type: "essay";
       id: string;
+      slug: string;
       title: string;
       href: string;
       publishedAt: string;
@@ -21,6 +24,7 @@ type LibraryEntry =
   | {
       type: "inventory";
       id: string;
+      slug: string;
       title: string;
       href: string;
       publishedAt: string;
@@ -37,16 +41,19 @@ function formatDate(iso: string): string {
 }
 
 export default async function LibraryPage() {
-  const [essays, items] = await Promise.all([
+  const [essays, items, session] = await Promise.all([
     essayStore.list(),
     inventoryStore.list(),
+    getSession(),
   ]);
+  const isSignedIn = !!session;
 
   const entries: LibraryEntry[] = [
     ...essays.map(
       (e): LibraryEntry => ({
         type: "essay",
         id: e.id,
+        slug: e.slug,
         title: e.title,
         href: `/library/${e.slug}`,
         publishedAt: e.publishedAt,
@@ -56,6 +63,7 @@ export default async function LibraryPage() {
       (i): LibraryEntry => ({
         type: "inventory",
         id: i.id,
+        slug: i.slug,
         title: i.title,
         href: `/library/inventory/${i.slug}`,
         publishedAt: i.publishedAt,
@@ -104,8 +112,8 @@ export default async function LibraryPage() {
           ) : (
             <ul className="mt-12 space-y-8">
               {entries.map((entry) => (
-                <li key={`${entry.type}-${entry.id}`}>
-                  <Link href={entry.href} className="group flex items-start gap-4">
+                <li key={`${entry.type}-${entry.id}`} className="flex items-start gap-4">
+                  <Link href={entry.href} className="group flex flex-1 items-start gap-4">
                     {entry.type === "inventory" ? (
                       <div className="h-16 w-16 flex-shrink-0 overflow-hidden border border-border bg-foreground/5">
                         <img
@@ -135,6 +143,18 @@ export default async function LibraryPage() {
                       </h2>
                     </div>
                   </Link>
+                  {isSignedIn && (
+                    <div className="pt-1">
+                      <DeleteButton
+                        action={
+                          entry.type === "essay"
+                            ? `/api/essays/${entry.slug}/delete`
+                            : `/api/inventory/${entry.slug}/delete`
+                        }
+                        confirmMessage={`Delete ${entry.type} "${entry.title}"? This is permanent.`}
+                      />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
