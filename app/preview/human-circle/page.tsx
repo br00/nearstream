@@ -12,6 +12,11 @@ export const metadata = {
 
 const VARIANTS: { name: HumanCircleVariant; label: string; note: string }[] = [
   {
+    name: "movingpoints",
+    label: "Moving points (port)",
+    note: "Faithful port of the original Processing sketch. ~350 small pencil-brush blobs scattered along a noise-perturbed circle; the noise z-axis drifts so the shape morphs slowly over time. Each brush mark is its own noisy closed shape. Default.",
+  },
+  {
     name: "charcoal",
     label: "Charcoal",
     note: "Single thick stroke, clear between attempts. Lowest contrast, most ink-like.",
