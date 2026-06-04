@@ -2,6 +2,7 @@ import { marked } from "marked";
 import { store } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
+import { linkHref, type LibraryLink } from "@/schemas/stream";
 import type { InventoryItem } from "@/schemas/inventory";
 
 export const dynamic = "force-dynamic";
@@ -89,10 +90,24 @@ export async function GET() {
     inventoryStore.list(),
   ]);
 
+  const essayTitles = new Map(essays.map((e) => [e.slug, e.title]));
+  const inventoryTitles = new Map(items.map((i) => [i.slug, i.title]));
+
+  function lookupLinkTitle(link: LibraryLink): string | null {
+    return (link.type === "essay" ? essayTitles : inventoryTitles).get(link.slug) ?? null;
+  }
+
   const feedItems: FeedItem[] = [];
 
   for (const entry of entries) {
     const link = `${SITE_URL}/#entry-${entry.id}`;
+    let body = entry.text;
+    if (entry.link) {
+      const title = lookupLinkTitle(entry.link);
+      if (title) {
+        body += `\n\n→ ${title}: ${SITE_URL}${linkHref(entry.link)}`;
+      }
+    }
     feedItems.push({
       publishedAt: entry.publishedAt,
       toXml: () => `    <item>
@@ -102,7 +117,7 @@ export async function GET() {
       <pubDate>${toRfc822(entry.publishedAt)}</pubDate>
       <category>Stream</category>
       <category>${escapeXml(entry.tag)}</category>
-      <description><![CDATA[${escapeCdata(entry.text)}]]></description>
+      <description><![CDATA[${escapeCdata(body)}]]></description>
     </item>`,
     });
   }

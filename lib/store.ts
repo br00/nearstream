@@ -22,6 +22,7 @@ class InMemoryStore implements Store {
       text: input.text,
       tag: input.tag,
       publishedAt: new Date().toISOString(),
+      ...(input.link ? { link: input.link } : {}),
     };
     this.entries.push(entry);
     return entry;
