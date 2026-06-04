@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { store } from "@/lib/store";
+import { essayStore } from "@/lib/essay-store";
+import { inventoryStore } from "@/lib/inventory-store";
 import { getSession } from "@/lib/auth";
+import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { TagChip } from "@/app/_components/tag-chip";
@@ -22,8 +25,20 @@ function formatRelative(iso: string): string {
 }
 
 export default async function Home() {
-  const [entries, session] = await Promise.all([store.list(), getSession()]);
+  const [entries, essays, inventoryItems, session] = await Promise.all([
+    store.list(),
+    essayStore.list(),
+    inventoryStore.list(),
+    getSession(),
+  ]);
   const isSignedIn = !!session;
+
+  const essayTitles = new Map(essays.map((e) => [e.slug, e.title]));
+  const inventoryTitles = new Map(inventoryItems.map((i) => [i.slug, i.title]));
+
+  function lookupLinkTitle(link: LibraryLink): string | null {
+    return (link.type === "essay" ? essayTitles : inventoryTitles).get(link.slug) ?? null;
+  }
 
   return (
     <PageShell
@@ -84,6 +99,22 @@ export default async function Home() {
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
                     {entry.text}
+                    {entry.link &&
+                      (() => {
+                        const title = lookupLinkTitle(entry.link);
+                        if (!title) return null;
+                        return (
+                          <>
+                            {" "}
+                            <Link
+                              href={linkHref(entry.link)}
+                              className="inline text-foreground underline-offset-4 hover:underline"
+                            >
+                              {title} →
+                            </Link>
+                          </>
+                        );
+                      })()}
                   </p>
                 </li>
               ))}

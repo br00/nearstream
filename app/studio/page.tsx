@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DISCIPLINE_TAGS } from "@/schemas/stream";
+import { essayStore } from "@/lib/essay-store";
+import { inventoryStore } from "@/lib/inventory-store";
 import { getSession } from "@/lib/auth";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { PageShell } from "@/app/_components/page-shell";
@@ -23,6 +25,11 @@ export default async function StudioPage({ searchParams }: Props) {
   if (!session) redirect("/login");
 
   const { "essay-error": essayError } = await searchParams;
+
+  const [essays, inventoryItems] = await Promise.all([
+    essayStore.list(),
+    inventoryStore.list(),
+  ]);
 
   const navLinkClasses =
     "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
@@ -81,6 +88,43 @@ export default async function StudioPage({ searchParams }: Props) {
                 ))}
               </div>
             </fieldset>
+
+            {(essays.length > 0 || inventoryItems.length > 0) && (
+              <label className="flex flex-col gap-2">
+                <Kicker>Link to library (optional)</Kicker>
+                <select
+                  name="link"
+                  defaultValue=""
+                  className="border-b border-border bg-transparent px-0 py-2 font-sans text-sm text-foreground outline-none focus:border-foreground"
+                >
+                  <option value="">— no link —</option>
+                  {essays.length > 0 && (
+                    <optgroup label="Essays">
+                      {essays.map((e) => (
+                        <option key={`essay-${e.id}`} value={`essay::${e.slug}`}>
+                          {e.title}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {inventoryItems.length > 0 && (
+                    <optgroup label="Inventory">
+                      {inventoryItems.map((i) => (
+                        <option
+                          key={`inventory-${i.id}`}
+                          value={`inventory::${i.slug}`}
+                        >
+                          {i.title}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
+                  Announces a library entry with a → arrow.
+                </span>
+              </label>
+            )}
 
             <SubmitButton pendingLabel="Posting…" className="self-start">
               Post

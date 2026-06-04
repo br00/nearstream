@@ -31,6 +31,7 @@ export class R2Store implements Store {
       text: input.text,
       tag: input.tag,
       publishedAt: new Date().toISOString(),
+      ...(input.link ? { link: input.link } : {}),
     };
     const body = JSON.stringify(entry);
     const res = await this.client.fetch(`${this.base}/${this.key(entry.id)}`, {
