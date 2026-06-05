@@ -2,7 +2,7 @@
 
 How the code is laid out. Pairs with [`NEARSTREAM.md`](./NEARSTREAM.md), which holds philosophy + decisions. This file holds shape.
 
-> **Status:** Phase 2 · Slice 13 (Daily Human Circle PNG) — A small server-rendered generative image endpoint at `/api/circle/daily.png`. Returns a deterministic PNG of Alessandro's "Human circle" piece for the current date (or `?date=YYYY-MM-DD`). Sized for an Inkplate 10 e-ink display by default (1200×825) with optional `?w=` / `?h=` and `?theme=light|dark`. Same date → same bytes. Intended both as a fun standalone URL and as the source for a wall-mounted e-ink frame that fetches once per day. The algorithm is a port of Alessandro's Processing sketch; the noise z-axis is derived from the day-since-epoch so consecutive days look related but distinct.
+> **Status:** Phase 2 · Slice 11 (Stream → Library bridge) — The manifesto's *"Soft Iron is out →"* pattern. A Stream entry can optionally link to one Library entry (essay or inventory). Studio renders a single dropdown listing all current essays + inventory items. Public timeline appends `→ {linked entry title}` to the entry text, hyperlinked to the entry's canonical URL. RSS feed includes the link in the stream item description. Lookup is render-time (no cached title) so deleting the linked entry silently removes the arrow rather than leaving a broken link.
 
 ---
 
@@ -17,8 +17,7 @@ nearstream/
 │   │   ├── inventory/
 │   │   │   ├── route.ts           POST = save inventory metadata (gated, JSON) · GET = list items (public)
 │   │   │   └── upload-url/route.ts POST = mint a presigned R2 PUT URL for the browser (gated)
-│   │   ├── media/[key]/route.ts   GET = server-proxy stream of an image from R2 (public, immutable-cache)
-│   │   └── circle/daily.png/route.ts  GET = server-rendered PNG of the daily Human Circle (deterministic from date)
+│   │   └── media/[key]/route.ts   GET = server-proxy stream of an image from R2 (public, immutable-cache)
 │   ├── auth/
 │   │   ├── callback/      GET: verify magic-link token → set session → redirect
 │   │   └── logout/        POST: clear session cookie
@@ -191,7 +190,6 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 
 ## Why these choices
 
-- **Daily Human Circle is a self-contained Node-canvas route, deterministic from date.** `/api/circle/daily.png` inlines a 3D Perlin noise + port of Alessandro's Processing `pencilBrush` algorithm; nothing browser-specific. Noise z = `floor(Date.now() / 86_400_000) * 0.3`, so the image only changes when the UTC day changes. Same `?date=` always returns identical bytes (verified by md5). Today's image is `Cache-Control: max-age=300, s-maxage=86400, stale-while-revalidate=86400` (CDN-cacheable for a day); historical/future date previews are `immutable`. The renderer is `@napi-rs/canvas` (prebuilt napi native bindings — works on Vercel functions without compilation). The package ships a native `.node` binding that Turbopack can't bundle, so it's listed in `serverExternalPackages` in `next.config.ts` to be required at runtime instead. Default size is 1200×825 (Inkplate 10 native panel), optional `?w=&h=` up to 6000×6000 for print. Optional `?theme=light|dark` — `light` is dark marks on near-white paper (e-ink friendly, matches the original Processing sketch's `background(245)` line); `dark` matches the on-screen v1 site.
 - **No Sanity.** Studio is built into the app (NEARSTREAM.md §05: *"friends will not learn a second tool with a second login."*).
 - **No Vercel-specific APIs.** Standard Next features only — `revalidatePath`, route handlers, server components, Proxy. Same code will run on Fly.io / Hetzner.
 - **Delete is signed-in-only, inline on the public list/detail pages, via tiny POST forms.** No "manage" dashboard, no API DELETE method (HTML forms can't issue it). `DeleteButton` is a 20-line client component that wraps a `<form action method="POST">` and adds `confirm()` so an accidental click doesn't nuke an entry. Server routes (`/api/stream/[id]/delete`, `/api/essays/[slug]/delete`, `/api/inventory/[slug]/delete`) all check `getSession()`, run the store's delete method, call `revalidatePath` on the affected routes, then redirect back to the parent list. Inventory delete cascades: the store fetches the metadata first, deletes the original image + thumbnail via `mediaStore.deleteImage()`, then deletes the metadata JSON. Cascade failures are logged but don't block metadata delete — better an orphaned image in R2 than an undeletable item in the UI.
@@ -237,7 +235,6 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 | 9 | Inventory primitive + image upload | new `schemas/inventory.ts`, `lib/inventory-store.ts`, `lib/media-store.ts` (presigned R2 PUT URLs + server-proxy read), `lib/slug.ts` (extracted from essay schema for reuse), `app/api/inventory/route.ts` + `app/api/inventory/upload-url/route.ts` + `app/api/media/[key]/route.ts`, `app/library/inventory/` + `[slug]/page.tsx`, `app/library/page.tsx` becomes mixed hub, `app/_components/inventory-upload-form.tsx` (client), `app/studio/page.tsx` extended with third form. Follow-up commits: `lib/r2-client.ts` (retry-once on transient TLS errors), browser-side thumbnail generation, delete for all three primitives. **Requires R2 CORS config** (see Deploy section). |
 | 10 | Inventory in RSS | `app/rss.xml/route.ts` pulls all three stores in parallel, renders inventory items with `<enclosure>` (full image) + `<description>` containing `<img>` tag, markdown description, and a `<dl>` of optional metadata fields |
 | 11 | Stream → Library bridge | `schemas/stream.ts` gains `LibraryLink` + `linkHref()` helper, `StreamEntry.link?` optional. `lib/store.ts` + `lib/r2-store.ts` spread `input.link` on add. `app/api/stream/route.ts` accepts + validates `link` (form `type::slug` or JSON object). `app/studio/page.tsx` fetches essays + inventory, renders an optgroup dropdown. `app/page.tsx` builds slug→title maps from all three stores, renders ` → Title` arrow inline at the end of an entry's text. `app/rss.xml/route.ts` appends `→ Title: URL` to the stream item description CDATA. |
-| 13 (this) | Daily Human Circle PNG | new `app/api/circle/daily.png/route.ts` with inline 3D Perlin noise + port of Alessandro's Processing brush algorithm. `@napi-rs/canvas` dep, `serverExternalPackages` added to `next.config.ts`. Deterministic from date; `?theme=light|dark`, `?w=&h=`, `?date=YYYY-MM-DD`. Intended target: an Inkplate 10 e-ink frame that wakes once per day and fetches this URL. |
 
 Each slice is a PR. ARCHITECTURE.md updates with the slice. NEARSTREAM.md decisions log gets an entry only when a load-bearing choice is made.
 

@@ -1,3 +1,12 @@
+// User-territory route — NOT a Nearstream platform feature.
+//
+// This is Alessandro's personal art piece (a port of his "Human circle"
+// Processing sketch). It lives in this codebase for now because there's
+// only one user; when multi-tenancy lands in Phase 3 it would move into
+// a per-user template directory. Anyone forking Nearstream to run their
+// own instance should feel free to delete this route — nothing else in
+// the platform depends on it.
+
 import { createCanvas, type SKRSContext2D } from "@napi-rs/canvas";
 
 export const dynamic = "force-dynamic";
