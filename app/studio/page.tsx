@@ -7,6 +7,7 @@ import { letterStore } from "@/lib/letter-store";
 import { getSession } from "@/lib/auth";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { PageShell } from "@/app/_components/page-shell";
+import { NearstreamLockup } from "@/app/_components/nearstream-mark";
 import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
@@ -42,6 +43,7 @@ export default async function StudioPage({ searchParams }: Props) {
 
   return (
     <PageShell
+      leftNav={<NearstreamLockup size={24} className="text-foreground" />}
       rightNav={
         <>
           <Link href="/" className={navLinkClasses}>
