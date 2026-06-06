@@ -49,14 +49,9 @@ export default async function StreamArchive() {
   return (
     <PageShell
       rightNav={
-        <>
-          <Link href="/" className={navLinkClasses}>
-            ← Home
-          </Link>
-          <Link href="/library" className={navLinkClasses}>
-            Library
-          </Link>
-        </>
+        <Link href="/" className={navLinkClasses}>
+          ← Home
+        </Link>
       }
     >
       <section className="flex flex-1 justify-center px-6">

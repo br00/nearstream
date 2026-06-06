@@ -50,11 +50,6 @@ export default async function StudioPage({ searchParams }: Props) {
           <Link href="/library" className={navLinkClasses}>
             Library
           </Link>
-          <form action="/auth/logout" method="POST">
-            <button type="submit" className={navLinkClasses}>
-              Sign out
-            </button>
-          </form>
         </>
       }
     >
@@ -247,6 +242,17 @@ export default async function StudioPage({ searchParams }: Props) {
 
             <InventoryUploadForm />
           </div>
+
+          <hr className="mt-20 border-border" />
+
+          <form action="/auth/logout" method="POST" className="mt-12">
+            <button
+              type="submit"
+              className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
+            >
+              Sign out
+            </button>
+          </form>
         </div>
       </section>
     </PageShell>
