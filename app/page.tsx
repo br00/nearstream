@@ -41,6 +41,14 @@ function formatShort(iso: string): string {
   return `${month} ${d.getDate()}`;
 }
 
+// "June 6" — CSS uppercases it to "JUNE 6". Full month name reads better at
+// the masthead size than the abbreviated form used elsewhere on the page.
+function formatLetterDate(iso: string): string {
+  const d = new Date(iso);
+  const month = d.toLocaleString("en", { month: "long" });
+  return `${month} ${d.getDate()}`;
+}
+
 export default async function Home() {
   const [letter, entries, essays, inventoryItems] = await Promise.all([
     letterStore.get(),
@@ -82,11 +90,11 @@ export default async function Home() {
             </h1>
           </div>
 
-          {/* Letter — dated, signed dispatch */}
+          {/* Letter — dated (auto from updatedAt), signed dispatch */}
           {letter ? (
             <div className="mt-10">
               <div className="mb-6 font-mono text-[10px] uppercase tracking-[0.3em] text-muted-soft">
-                {letter.date} ─
+                {formatLetterDate(letter.updatedAt)} ─
               </div>
               <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground">
                 {letter.body}

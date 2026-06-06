@@ -87,17 +87,6 @@ export default async function StudioPage({ searchParams }: Props) {
               className="mt-10 flex flex-col gap-8"
             >
               <label className="flex flex-col gap-2">
-                <Kicker>Date</Kicker>
-                <Input
-                  name="date"
-                  required
-                  maxLength={50}
-                  defaultValue={letter?.date ?? ""}
-                  placeholder="June 6"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2">
                 <Kicker>Body</Kicker>
                 <Textarea
                   name="body"
@@ -107,6 +96,10 @@ export default async function StudioPage({ searchParams }: Props) {
                   placeholder="Working on Soft Iron and a piece for an upcoming show. Writing about the shape of a quieter web."
                 />
               </label>
+
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
+                The date appears automatically — today's date is set when you update.
+              </p>
 
               <SubmitButton pendingLabel="Updating…" className="self-start">
                 Update letter

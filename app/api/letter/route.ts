@@ -2,7 +2,6 @@ import { revalidatePath } from "next/cache";
 import { letterStore } from "@/lib/letter-store";
 import { getSession } from "@/lib/auth";
 
-const DATE_MAX = 50;
 const BODY_MAX = 2000;
 
 export async function GET() {
@@ -19,30 +18,16 @@ export async function POST(request: Request) {
     return errorResponse(request, isJson, 401, "unauthorized");
   }
 
-  let date: unknown;
   let body: unknown;
 
   if (isJson) {
     const json = await request.json();
-    date = json?.date;
     body = json?.body;
   } else {
     const form = await request.formData();
-    date = form.get("date");
     body = form.get("body");
   }
 
-  if (typeof date !== "string" || date.trim().length === 0) {
-    return errorResponse(request, isJson, 400, "date is required");
-  }
-  if (date.length > DATE_MAX) {
-    return errorResponse(
-      request,
-      isJson,
-      400,
-      `date must be ${DATE_MAX} characters or fewer`,
-    );
-  }
   if (typeof body !== "string" || body.trim().length === 0) {
     return errorResponse(request, isJson, 400, "body is required");
   }
@@ -55,10 +40,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const letter = await letterStore.set({
-    date: date.trim(),
-    body: body.trim(),
-  });
+  const letter = await letterStore.set({ body: body.trim() });
   revalidatePath("/");
 
   if (isJson) {
