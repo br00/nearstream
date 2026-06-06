@@ -2,7 +2,7 @@
 
 How the code is laid out. Pairs with [`NEARSTREAM.md`](./NEARSTREAM.md), which holds philosophy + decisions. This file holds shape.
 
-> **Status:** Phase 2 · Slice 11 (Stream → Library bridge) — The manifesto's *"Soft Iron is out →"* pattern. A Stream entry can optionally link to one Library entry (essay or inventory). Studio renders a single dropdown listing all current essays + inventory items. Public timeline appends `→ {linked entry title}` to the entry text, hyperlinked to the entry's canonical URL. RSS feed includes the link in the stream item description. Lookup is render-time (no cached title) so deleting the linked entry silently removes the arrow rather than leaving a broken link.
+> **Status:** Phase 2 · Slice 14 (Notebook home + Letter primitive — first site template) — `alessandroborelli.it` stops looking like a generic personal-publishing demo and becomes *Alessandro's site*. The home is now a one-column quiet page in the shape of a personal homepage from before social media: animated Human Circle masthead, a **Letter** block (dated, signed, prose body — editable from `/studio`), then Stream + Pictures + Essays + Elsewhere as four short text-shaped sections. The Letter is a new single-record primitive (`site/letter.json` in R2) — the highest-leverage editorial slot on the site, so it lives at the top of the studio too. The Stream timeline moves to `/stream` (the home no longer is the feed).
 
 ---
 
@@ -17,14 +17,15 @@ nearstream/
 │   │   ├── inventory/
 │   │   │   ├── route.ts           POST = save inventory metadata (gated, JSON) · GET = list items (public)
 │   │   │   └── upload-url/route.ts POST = mint a presigned R2 PUT URL for the browser (gated)
-│   │   └── media/[key]/route.ts   GET = server-proxy stream of an image from R2 (public, immutable-cache)
+│   │   ├── media/[key]/route.ts   GET = server-proxy stream of an image from R2 (public, immutable-cache)
+│   │   └── letter/route.ts        POST = update the home-page Letter (gated, form or JSON) · GET = current Letter (public)
 │   ├── auth/
 │   │   ├── callback/      GET: verify magic-link token → set session → redirect
 │   │   └── logout/        POST: clear session cookie
 │   ├── login/
 │   │   ├── page.tsx       email entry form
 │   │   └── actions.ts     server action: send magic link
-│   ├── studio/            posting UI — gated, holds Stream + Essay + Inventory forms
+│   ├── studio/            posting UI — gated, holds Letter + Stream + Essay + Inventory forms (Letter first)
 │   ├── design/            /design — Nearstream chrome spec page (palette, type, components)
 │   ├── library/
 │   │   ├── page.tsx                       public Library hub — essays + inventory mixed by date
@@ -32,24 +33,32 @@ nearstream/
 │   │   └── inventory/
 │   │       ├── page.tsx                   public Inventory archive — grid of items with thumbnails
 │   │       └── [slug]/page.tsx            public per-item page — full image + metadata
-│   ├── rss.xml/route.ts   public RSS 2.0 feed of all stream entries + essays
-│   ├── _components/       Nearstream chrome design system (see below) + `InventoryUploadForm` (client)
-│   ├── page.tsx           public stream timeline (server component) — entries carry id={`entry-${id}`}
+│   ├── stream/page.tsx    public Stream archive (the full timeline lives here; the home shows only the most recent 4)
+│   ├── rss.xml/route.ts   public RSS 2.0 feed of all stream entries + essays + inventory
+│   ├── _components/
+│   │   ├── (chrome bits) Nearstream platform identity — PageShell, Kicker, TagChip, etc. (see "Design system" below)
+│   │   ├── inventory-upload-form.tsx  client component for the presigned-URL upload flow
+│   │   └── site/
+│   │       └── human-circle.tsx       Alessandro's "moving.points" port — client component, inline Perlin 3D noise (no deps). USER-TERRITORY: lives under `_components/site/` to separate from platform chrome.
+│   ├── page.tsx           public Notebook home — Human Circle masthead, Letter, then Stream/Pictures/Essays/Elsewhere as quiet sections
 │   ├── globals.css        tokens + `.prose-essay` styles for rendered markdown
 │   └── layout.tsx         root layout, fonts, metadata, RSS auto-discovery link
 ├── lib/
 │   ├── store.ts           Stream store: interface + InMemoryStore + env-driven picker
 │   ├── r2-store.ts        Stream Cloudflare R2 implementation (aws4fetch, S3 API)
+│   ├── r2-client.ts       Shared aws4fetch wrapper with retry-once on transient TLS errors
 │   ├── essay-store.ts     Essay store: interface + InMemory + R2 (mirror of stream store, key prefix `library/essays/`)
 │   ├── inventory-store.ts Inventory store: interface + InMemory + R2 (prefix `library/inventory/`)
 │   ├── media-store.ts     Media (image) store: presigned R2 PUT URLs for upload, server-proxy stream for read (prefix `media/`)
+│   ├── letter-store.ts    Single-record Letter store. R2 key: `site/letter.json`. `get()` returns null if not set yet; `set()` overwrites with a fresh `updatedAt`.
 │   ├── slug.ts            shared `slugify()` + `isValidSlug()` used by essay + inventory schemas
 │   ├── auth.ts            HMAC token sign/verify, session cookie, allowlist
 │   └── email.ts           Resend send + dev console fallback
 ├── schemas/
 │   ├── stream.ts          StreamEntry typed primitive
 │   ├── essay.ts           Essay typed primitive (re-exports slug helpers from `lib/slug.ts`)
-│   └── inventory.ts       InventoryItem typed primitive + `INVENTORY_STATUSES` + `isInventoryStatus()`
+│   ├── inventory.ts       InventoryItem typed primitive + `INVENTORY_STATUSES` + `isInventoryStatus()`
+│   └── letter.ts          Letter typed primitive — `{ date, body, updatedAt }`. Free-form date string so the host can be expressive ("today", "midsummer").
 ├── proxy.ts               Next 16 Proxy: optimistic redirect on /studio/*
 ├── .env.example           R2 + auth + Resend templates
 ├── ARCHITECTURE.md        this file
@@ -166,9 +175,11 @@ The upload path bypasses Vercel's 4.5 MB function body limit because the bytes g
 
 5. **Public render is a server component.** `app/page.tsx` reads the store directly at request time. No client-side fetching, no API call from the browser. `/api/stream` exists for posting and for future readers / RSS.
 
-## Design system (Nearstream chrome layer)
+## Design system (Nearstream chrome layer) + site templates
 
-`app/_components/` is the **Nearstream chrome** layer — the platform identity that every Nearstream instance carries. NEARSTREAM.md §02 distinguishes the *reader* (Nearstream's territory) from the *site* (the user's territory). These components belong to the Nearstream side. User site templates (Phase 2) will live separately and may use their own palette + components.
+`app/_components/` is the **Nearstream chrome** layer — the platform identity that every Nearstream instance carries. NEARSTREAM.md §02 distinguishes the *reader* (Nearstream's territory) from the *site* (the user's territory). These components belong to the Nearstream side.
+
+**Site-template components** live in `app/_components/site/` — currently Alessandro's only (the `HumanCircle` port of his moving.points sketch). When Phase 3 introduces multi-tenancy, per-user templates can move into per-user directories or a registry. Site components inherit the global palette tokens so they compose with chrome without color clashes.
 
 ```
 app/_components/
@@ -190,6 +201,9 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 
 ## Why these choices
 
+- **The home page is a *site template*, not a feed.** `/` reads as a personal homepage from before social media: animated Human Circle + name, then a dated/signed Letter, then four quiet sections (Stream / Pictures / Essays / Elsewhere) with at most 4–6 items each. Each section label is a `<Link>` to the full archive (`/stream`, `/library/inventory`, `/library`). The home cannot doom-scroll — it ends. The full Stream timeline moved to `/stream`. This layout shape is the result of converging on "what would I want my site to feel like" through ~12 prototypes against three tests: not Twitter (Mixed-feed failed Gosia's "can't stay more than 1 min"), not Squarespace (snap-paginated codex failed because polish + control reads as marketing), and not naveen.com purity (text-only loses the photographer-as-host first impression). The result: text-shaped lists with photos *available* (via small thumbnail rows) but not *displayed* on the home.
+- **The Letter is the highest-leverage editorial slot.** A dated, signed prose block at the top of the home. Editable from `/studio` (first form, before Stream/Essay/Inventory) because it changes most often — when Alessandro's focus changes, he edits the Letter. Single-record store (`site/letter.json`) — there is only ever one current letter. The `updatedAt` is set by the store; the displayed date is a free-form string the host can write expressively ("today", "midsummer", or a real date). The home renders nothing for an unset Letter — graceful empty state.
+- **Site templates live in `app/_components/site/`.** Distinct from `app/_components/` (Nearstream chrome). `HumanCircle` is the only one so far — Alessandro's port of his moving.points sketch. Phase 3 multi-tenancy may move per-user templates into per-user directories. For now, single-user, single template, lives next to chrome but logically separate.
 - **No Sanity.** Studio is built into the app (NEARSTREAM.md §05: *"friends will not learn a second tool with a second login."*).
 - **No Vercel-specific APIs.** Standard Next features only — `revalidatePath`, route handlers, server components, Proxy. Same code will run on Fly.io / Hetzner.
 - **Delete is signed-in-only, inline on the public list/detail pages, via tiny POST forms.** No "manage" dashboard, no API DELETE method (HTML forms can't issue it). `DeleteButton` is a 20-line client component that wraps a `<form action method="POST">` and adds `confirm()` so an accidental click doesn't nuke an entry. Server routes (`/api/stream/[id]/delete`, `/api/essays/[slug]/delete`, `/api/inventory/[slug]/delete`) all check `getSession()`, run the store's delete method, call `revalidatePath` on the affected routes, then redirect back to the parent list. Inventory delete cascades: the store fetches the metadata first, deletes the original image + thumbnail via `mediaStore.deleteImage()`, then deletes the metadata JSON. Cascade failures are logged but don't block metadata delete — better an orphaned image in R2 than an undeletable item in the UI.
@@ -234,7 +248,8 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 | 8 | Essays in RSS | `app/rss.xml/route.ts` pulls both stores in parallel, merges by `publishedAt`, renders Essay items with markdown→HTML body in CDATA, `<category>Stream\|Essay</category>` discriminator |
 | 9 | Inventory primitive + image upload | new `schemas/inventory.ts`, `lib/inventory-store.ts`, `lib/media-store.ts` (presigned R2 PUT URLs + server-proxy read), `lib/slug.ts` (extracted from essay schema for reuse), `app/api/inventory/route.ts` + `app/api/inventory/upload-url/route.ts` + `app/api/media/[key]/route.ts`, `app/library/inventory/` + `[slug]/page.tsx`, `app/library/page.tsx` becomes mixed hub, `app/_components/inventory-upload-form.tsx` (client), `app/studio/page.tsx` extended with third form. Follow-up commits: `lib/r2-client.ts` (retry-once on transient TLS errors), browser-side thumbnail generation, delete for all three primitives. **Requires R2 CORS config** (see Deploy section). |
 | 10 | Inventory in RSS | `app/rss.xml/route.ts` pulls all three stores in parallel, renders inventory items with `<enclosure>` (full image) + `<description>` containing `<img>` tag, markdown description, and a `<dl>` of optional metadata fields |
-| 11 (this) | Stream → Library bridge | `schemas/stream.ts` gains `LibraryLink` + `linkHref()` helper, `StreamEntry.link?` optional. `lib/store.ts` + `lib/r2-store.ts` spread `input.link` on add. `app/api/stream/route.ts` accepts + validates `link` (form `type::slug` or JSON object). `app/studio/page.tsx` fetches essays + inventory, renders an optgroup dropdown. `app/page.tsx` builds slug→title maps from all three stores, renders ` → Title` arrow inline at the end of an entry's text. `app/rss.xml/route.ts` appends `→ Title: URL` to the stream item description CDATA. |
+| 11 | Stream → Library bridge | `schemas/stream.ts` gains `LibraryLink` + `linkHref()` helper, `StreamEntry.link?` optional. `lib/store.ts` + `lib/r2-store.ts` spread `input.link` on add. `app/api/stream/route.ts` accepts + validates `link` (form `type::slug` or JSON object). `app/studio/page.tsx` fetches essays + inventory, renders an optgroup dropdown. `app/page.tsx` builds slug→title maps from all three stores, renders ` → Title` arrow inline at the end of an entry's text. `app/rss.xml/route.ts` appends `→ Title: URL` to the stream item description CDATA. |
+| 14 (this) | Notebook home + Letter primitive (first site template) | new `schemas/letter.ts` + `lib/letter-store.ts` (single-record, `site/letter.json`) + `app/api/letter/route.ts`. `app/_components/site/human-circle.tsx` — Alessandro's moving.points port, inline Perlin 3D noise, client component. `app/page.tsx` rewritten as the **Notebook**: Human Circle masthead + Letter + Stream/Pictures/Essays/Elsewhere sections. `app/stream/page.tsx` — the full stream timeline lives here now (was at `/`). `app/studio/page.tsx` extended with a Letter form at the top (highest-leverage editorial slot). |
 
 Each slice is a PR. ARCHITECTURE.md updates with the slice. NEARSTREAM.md decisions log gets an entry only when a load-bearing choice is made.
 
