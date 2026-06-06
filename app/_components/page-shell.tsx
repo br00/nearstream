@@ -1,15 +1,14 @@
-import { NearstreamLockup } from "./nearstream-mark";
-
 interface PageShellProps {
+  leftNav?: React.ReactNode;
   rightNav?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function PageShell({ rightNav, children }: PageShellProps) {
+export function PageShell({ leftNav, rightNav, children }: PageShellProps) {
   return (
     <div className="flex min-h-svh flex-col">
       <nav className="flex w-full items-center justify-between px-6 py-6">
-        <NearstreamLockup size={24} className="text-foreground" />
+        <div>{leftNav}</div>
         {rightNav ? (
           <div className="flex items-center gap-5 font-mono text-[11px] uppercase tracking-[0.2em]">
             {rightNav}

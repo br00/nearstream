@@ -80,10 +80,7 @@ export default async function LibraryPage() {
       rightNav={
         <>
           <Link href="/" className={navLinkClasses}>
-            ← Stream
-          </Link>
-          <Link href="/library/inventory" className={navLinkClasses}>
-            Inventory
+            ← Home
           </Link>
           <Link href="/studio" className={navLinkClasses}>
             Studio →

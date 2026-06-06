@@ -1,6 +1,7 @@
 import { requestMagicLink } from "./actions";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { PageShell } from "@/app/_components/page-shell";
+import { NearstreamLockup } from "@/app/_components/nearstream-mark";
 import { Input } from "@/app/_components/input";
 import { Kicker } from "@/app/_components/kicker";
 
@@ -23,7 +24,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const errorMessage = params.error ? ERROR_MESSAGES[params.error] : undefined;
 
   return (
-    <PageShell>
+    <PageShell leftNav={<NearstreamLockup size={24} className="text-foreground" />}>
       <section className="flex flex-1 items-center justify-center px-6">
         <div className="w-full max-w-sm py-12">
           <h1 className="text-2xl font-normal tracking-tight text-foreground">
