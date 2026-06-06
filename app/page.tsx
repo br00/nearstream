@@ -75,9 +75,14 @@ export default async function Home() {
   return (
     <PageShell
       rightNav={
-        <Link href="/studio" className={navLinkClasses}>
-          Studio →
-        </Link>
+        <>
+          <Link href="/library" className={navLinkClasses}>
+            Library
+          </Link>
+          <Link href="/studio" className={navLinkClasses}>
+            Studio →
+          </Link>
+        </>
       }
     >
       <section className="flex flex-1 justify-center px-6">
