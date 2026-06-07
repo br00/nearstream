@@ -101,7 +101,7 @@ export default async function StudioPage({ searchParams }: Props) {
               </label>
 
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
-                The date appears automatically — today's date is set when you update.
+                The date appears automatically — today&rsquo;s date is set when you update.
               </p>
 
               <SubmitButton pendingLabel="Updating…" className="self-start">
@@ -314,32 +314,73 @@ export default async function StudioPage({ searchParams }: Props) {
             </form>
 
             {sources.length > 0 && (
-              <ul className="mt-12 flex flex-col gap-4">
-                {sources.map((source) => (
-                  <li
-                    key={source.id}
-                    className="flex items-start justify-between gap-4 border-t border-border pt-4"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm text-foreground">{source.name}</div>
-                      <div className="mt-1 truncate font-mono text-[11px] text-muted-soft">
-                        {source.feedUrl}
-                      </div>
-                    </div>
-                    <form
-                      action={`/api/sources/${source.id}/delete`}
-                      method="POST"
+              <>
+                <div className="mt-12 flex items-center justify-between">
+                  <Kicker>Following</Kicker>
+                  <form action="/api/sources/refresh" method="POST">
+                    <button
+                      type="submit"
+                      className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
                     >
-                      <button
-                        type="submit"
-                        className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
-                      >
-                        Remove
-                      </button>
-                    </form>
-                  </li>
-                ))}
-              </ul>
+                      Refresh all
+                    </button>
+                  </form>
+                </div>
+
+                <ul className="mt-4 flex flex-col gap-4">
+                  {sources.map((source) => (
+                    <li
+                      key={source.id}
+                      className="flex items-start justify-between gap-4 border-t border-border pt-4"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-foreground">{source.name}</div>
+                        <div className="mt-1 truncate font-mono text-[11px] text-muted-soft">
+                          {source.feedUrl}
+                        </div>
+                        {source.lastError ? (
+                          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground/80">
+                            Error: {source.lastError}
+                          </div>
+                        ) : source.lastFetchedAt ? (
+                          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
+                            Last fetched{" "}
+                            {new Date(source.lastFetchedAt).toLocaleString()}
+                          </div>
+                        ) : (
+                          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
+                            Not yet fetched
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <form
+                          action={`/api/sources/${source.id}/refresh`}
+                          method="POST"
+                        >
+                          <button
+                            type="submit"
+                            className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
+                          >
+                            Refresh
+                          </button>
+                        </form>
+                        <form
+                          action={`/api/sources/${source.id}/delete`}
+                          method="POST"
+                        >
+                          <button
+                            type="submit"
+                            className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
+                          >
+                            Remove
+                          </button>
+                        </form>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </div>
 
