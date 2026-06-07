@@ -2,20 +2,21 @@ import { R2Client } from "@/lib/r2-client";
 import type { Letter, NewLetter } from "@/schemas/letter";
 
 export interface LetterStore {
-  get(): Promise<Letter | null>;
-  set(input: NewLetter): Promise<Letter>;
+  get(userId: string): Promise<Letter | null>;
+  set(userId: string, input: NewLetter): Promise<Letter>;
 }
 
 class InMemoryLetterStore implements LetterStore {
-  private letter: Letter | null = null;
+  private letters = new Map<string, Letter>();
 
-  async get(): Promise<Letter | null> {
-    return this.letter;
+  async get(userId: string): Promise<Letter | null> {
+    return this.letters.get(userId) ?? null;
   }
 
-  async set(input: NewLetter): Promise<Letter> {
-    this.letter = { ...input, updatedAt: new Date().toISOString() };
-    return this.letter;
+  async set(userId: string, input: NewLetter): Promise<Letter> {
+    const letter: Letter = { ...input, updatedAt: new Date().toISOString() };
+    this.letters.set(userId, letter);
+    return letter;
   }
 }
 
@@ -38,14 +39,12 @@ class R2LetterStore implements LetterStore {
     this.base = `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}`;
   }
 
-  private key() {
-    // Site-config namespace (vs. content primitive prefixes like
-    // `entries/`, `library/essays/`, etc.). One record only.
-    return "site/letter.json";
+  private key(userId: string) {
+    return `users/${userId}/site/letter.json`;
   }
 
-  async get(): Promise<Letter | null> {
-    const res = await this.client.fetch(`${this.base}/${this.key()}`);
+  async get(userId: string): Promise<Letter | null> {
+    const res = await this.client.fetch(`${this.base}/${this.key(userId)}`);
     if (res.status === 404) return null;
     if (!res.ok) {
       throw new Error(
@@ -55,9 +54,9 @@ class R2LetterStore implements LetterStore {
     return (await res.json()) as Letter;
   }
 
-  async set(input: NewLetter): Promise<Letter> {
+  async set(userId: string, input: NewLetter): Promise<Letter> {
     const letter: Letter = { ...input, updatedAt: new Date().toISOString() };
-    const res = await this.client.fetch(`${this.base}/${this.key()}`, {
+    const res = await this.client.fetch(`${this.base}/${this.key(userId)}`, {
       method: "PUT",
       body: JSON.stringify(letter),
       headers: { "content-type": "application/json" },

@@ -6,11 +6,20 @@ const MAGIC_LINK_TTL_SECONDS = 15 * 60;
 
 type TokenPurpose = "magic" | "session";
 
-interface TokenPayload {
+interface MagicTokenPayload {
   email: string;
   exp: number;
-  purpose: TokenPurpose;
+  purpose: "magic";
 }
+
+interface SessionTokenPayload {
+  email: string;
+  userId: string;
+  exp: number;
+  purpose: "session";
+}
+
+type TokenPayload = MagicTokenPayload | SessionTokenPayload;
 
 function getSecret(): string {
   const secret = process.env.AUTH_SECRET;
@@ -68,10 +77,10 @@ async function signToken(payload: TokenPayload): Promise<string> {
   return `${body}.${sig}`;
 }
 
-async function verifyToken(
+async function verifyToken<T extends TokenPurpose>(
   token: string,
-  purpose: TokenPurpose,
-): Promise<TokenPayload | null> {
+  purpose: T,
+): Promise<(T extends "magic" ? MagicTokenPayload : SessionTokenPayload) | null> {
   const dot = token.indexOf(".");
   if (dot === -1) return null;
   const body = token.slice(0, dot);
@@ -96,8 +105,12 @@ async function verifyToken(
   if (payload.purpose !== purpose) return null;
   if (typeof payload.exp !== "number" || payload.exp < nowSeconds()) return null;
   if (typeof payload.email !== "string" || payload.email.length === 0) return null;
+  if (purpose === "session" && typeof (payload as SessionTokenPayload).userId !== "string") {
+    return null;
+  }
 
-  return payload;
+  // Type assertion is safe — purpose narrowing handled above.
+  return payload as T extends "magic" ? MagicTokenPayload : SessionTokenPayload;
 }
 
 function nowSeconds(): number {
@@ -116,6 +129,13 @@ export function isEmailAllowed(email: string): boolean {
   return list.includes(normalizeEmail(email));
 }
 
+/** True if the given email matches the configured instance host. */
+export function isHostEmail(email: string): boolean {
+  const host = process.env.HOST_USER_EMAIL;
+  if (!host) return false;
+  return normalizeEmail(host) === normalizeEmail(email);
+}
+
 export async function createMagicLinkToken(email: string): Promise<string> {
   return signToken({
     email: normalizeEmail(email),
@@ -131,8 +151,12 @@ export async function consumeMagicLinkToken(
   return payload?.email ?? null;
 }
 
-export async function createSession(email: string): Promise<void> {
+export async function createSession(
+  userId: string,
+  email: string,
+): Promise<void> {
   const token = await signToken({
+    userId,
     email: normalizeEmail(email),
     exp: nowSeconds() + SESSION_TTL_SECONDS,
     purpose: "session",
@@ -152,12 +176,14 @@ export async function destroySession(): Promise<void> {
   jar.delete(SESSION_COOKIE);
 }
 
-export async function getSession(): Promise<{ email: string } | null> {
+export type Session = { userId: string; email: string };
+
+export async function getSession(): Promise<Session | null> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const payload = await verifyToken(token, "session");
-  return payload ? { email: payload.email } : null;
+  return payload ? { userId: payload.userId, email: payload.email } : null;
 }
 
 export const SESSION_COOKIE_NAME = SESSION_COOKIE;

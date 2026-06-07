@@ -21,11 +21,15 @@ export class R2Store implements Store {
     this.base = `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}`;
   }
 
-  private key(id: string) {
-    return `entries/${id}.json`;
+  private prefix(userId: string) {
+    return `users/${userId}/entries/`;
   }
 
-  async add(input: NewStreamEntry): Promise<StreamEntry> {
+  private key(userId: string, id: string) {
+    return `${this.prefix(userId)}${id}.json`;
+  }
+
+  async add(userId: string, input: NewStreamEntry): Promise<StreamEntry> {
     const entry: StreamEntry = {
       id: crypto.randomUUID(),
       text: input.text,
@@ -34,11 +38,14 @@ export class R2Store implements Store {
       ...(input.link ? { link: input.link } : {}),
     };
     const body = JSON.stringify(entry);
-    const res = await this.client.fetch(`${this.base}/${this.key(entry.id)}`, {
-      method: "PUT",
-      body,
-      headers: { "content-type": "application/json" },
-    });
+    const res = await this.client.fetch(
+      `${this.base}/${this.key(userId, entry.id)}`,
+      {
+        method: "PUT",
+        body,
+        headers: { "content-type": "application/json" },
+      },
+    );
     if (!res.ok) {
       throw new Error(
         `R2 PUT failed (${res.status} ${res.statusText}): ${await res.text()}`,
@@ -47,8 +54,8 @@ export class R2Store implements Store {
     return entry;
   }
 
-  async list(): Promise<StreamEntry[]> {
-    const url = `${this.base}/?list-type=2&prefix=${encodeURIComponent("entries/")}`;
+  async list(userId: string): Promise<StreamEntry[]> {
+    const url = `${this.base}/?list-type=2&prefix=${encodeURIComponent(this.prefix(userId))}`;
     const listRes = await this.client.fetch(url);
     if (!listRes.ok) {
       throw new Error(
@@ -75,11 +82,10 @@ export class R2Store implements Store {
     );
   }
 
-  async delete(id: string): Promise<boolean> {
-    const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
+  async delete(userId: string, id: string): Promise<boolean> {
+    const res = await this.client.fetch(`${this.base}/${this.key(userId, id)}`, {
       method: "DELETE",
     });
-    // R2 returns 204 on success, 404 if missing
     if (res.status === 204) return true;
     if (res.status === 404) return false;
     throw new Error(
@@ -88,8 +94,6 @@ export class R2Store implements Store {
   }
 }
 
-// ListObjectsV2 returns XML. We only need <Key>...</Key> values; a regex is
-// enough — keys are URL-safe and never contain `<`.
 function parseListKeys(xml: string): string[] {
   const out: string[] = [];
   const re = /<Key>([^<]+)<\/Key>/g;

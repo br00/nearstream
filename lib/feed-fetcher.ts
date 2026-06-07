@@ -6,7 +6,8 @@
 // back onto the Source row.
 //
 // All persistence side-effects (entry upsert, Source mutation) happen here so
-// the caller (a route handler or future cron) just calls `refreshSource(id)`.
+// the caller (a route handler or future cron) just calls
+// `refreshSource(userId, sourceId)`.
 
 import { sourceStore } from "@/lib/source-store";
 import { feedEntryStore } from "@/lib/feed-entry-store";
@@ -19,13 +20,19 @@ export type RefreshResult =
   | { status: "not-modified"; sourceId: string; notModified: true; added: 0 }
   | { status: "error"; sourceId: string; error: string };
 
-export async function refreshSource(id: string): Promise<RefreshResult> {
-  const source = await sourceStore.get(id);
-  if (!source) return { status: "error", sourceId: id, error: "source not found" };
+export async function refreshSource(
+  userId: string,
+  id: string,
+): Promise<RefreshResult> {
+  const source = await sourceStore.get(userId, id);
+  if (!source) {
+    return { status: "error", sourceId: id, error: "source not found" };
+  }
 
   const headers: Record<string, string> = {
     "user-agent": USER_AGENT,
-    accept: "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5",
+    accept:
+      "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5",
   };
   if (source.etag) headers["if-none-match"] = source.etag;
   if (source.lastModified) headers["if-modified-since"] = source.lastModified;
@@ -35,7 +42,7 @@ export async function refreshSource(id: string): Promise<RefreshResult> {
     res = await fetch(source.feedUrl, { headers });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await sourceStore.update(id, {
+    await sourceStore.update(userId, id, {
       lastFetchedAt: new Date().toISOString(),
       lastError: `fetch failed: ${message}`,
     });
@@ -43,7 +50,7 @@ export async function refreshSource(id: string): Promise<RefreshResult> {
   }
 
   if (res.status === 304) {
-    await sourceStore.update(id, {
+    await sourceStore.update(userId, id, {
       lastFetchedAt: new Date().toISOString(),
       lastError: undefined,
     });
@@ -52,7 +59,7 @@ export async function refreshSource(id: string): Promise<RefreshResult> {
 
   if (!res.ok) {
     const message = `HTTP ${res.status} ${res.statusText}`;
-    await sourceStore.update(id, {
+    await sourceStore.update(userId, id, {
       lastFetchedAt: new Date().toISOString(),
       lastError: message,
     });
@@ -65,7 +72,7 @@ export async function refreshSource(id: string): Promise<RefreshResult> {
     parsed = parseFeed(xml, source.id);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await sourceStore.update(id, {
+    await sourceStore.update(userId, id, {
       lastFetchedAt: new Date().toISOString(),
       lastError: `parse failed: ${message}`,
     });
@@ -74,17 +81,17 @@ export async function refreshSource(id: string): Promise<RefreshResult> {
 
   let added: number;
   try {
-    added = await feedEntryStore.upsertMany(parsed.entries);
+    added = await feedEntryStore.upsertMany(userId, parsed.entries);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await sourceStore.update(id, {
+    await sourceStore.update(userId, id, {
       lastFetchedAt: new Date().toISOString(),
       lastError: `store failed: ${message}`,
     });
     return { status: "error", sourceId: id, error: `store failed: ${message}` };
   }
 
-  await sourceStore.update(id, {
+  await sourceStore.update(userId, id, {
     lastFetchedAt: new Date().toISOString(),
     etag: res.headers.get("etag") ?? undefined,
     lastModified: res.headers.get("last-modified") ?? undefined,
@@ -94,18 +101,16 @@ export async function refreshSource(id: string): Promise<RefreshResult> {
   return { status: "ok", sourceId: id, added, notModified: false };
 }
 
-export async function refreshAllSources(): Promise<RefreshResult[]> {
-  const sources = await sourceStore.list();
+export async function refreshAllSources(userId: string): Promise<RefreshResult[]> {
+  const sources = await sourceStore.list(userId);
   // Sequential rather than parallel: friend feeds are unlikely to live behind
   // CDNs sized for our burst, and 5 simultaneous TLS handshakes on a cold
-  // function eats wall time without buying much. Slice 19's scheduled refresh
-  // can revisit if N becomes large.
+  // function eats wall time without buying much.
   const results: RefreshResult[] = [];
   for (const s of sources) {
     try {
-      results.push(await refreshSource(s.id));
+      results.push(await refreshSource(userId, s.id));
     } catch (err) {
-      // One broken source must not break the whole batch.
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[refreshAllSources] ${s.id} threw`, err);
       results.push({ status: "error", sourceId: s.id, error: message });
