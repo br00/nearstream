@@ -2,7 +2,7 @@
 
 How the code is laid out. Pairs with [`NEARSTREAM.md`](./NEARSTREAM.md), which holds philosophy + decisions. This file holds shape.
 
-> **Status:** Phase 2 · Slice 14 (Notebook home + Letter primitive — first site template) — `alessandroborelli.it` stops looking like a generic personal-publishing demo and becomes *Alessandro's site*. The home is now a one-column quiet page in the shape of a personal homepage from before social media: animated Human Circle masthead, a **Letter** block (dated, signed, prose body — editable from `/studio`), then Stream + Pictures + Essays + Elsewhere as four short text-shaped sections. The Letter is a new single-record primitive (`site/letter.json` in R2) — the highest-leverage editorial slot on the site, so it lives at the top of the studio too. The Stream timeline moves to `/stream` (the home no longer is the feed).
+> **Status:** Phase 3 · Slice 15 (Reader foundations — Source primitive) — first reader slice. The reader is "the shared room" (NEARSTREAM.md §02); slice 15 lays its first stone with a typed `Source` (a friend's feed URL + local nickname) and matching R2 store at `reader/sources/`. Studio gains a *Reader sources* section so the host can add / remove friends. No fetching yet — slice 16 wires the parser. This is the start of the reader; site primitives (Letter, Stream, Library) are unchanged.
 
 ---
 
@@ -18,7 +18,10 @@ nearstream/
 │   │   │   ├── route.ts           POST = save inventory metadata (gated, JSON) · GET = list items (public)
 │   │   │   └── upload-url/route.ts POST = mint a presigned R2 PUT URL for the browser (gated)
 │   │   ├── media/[key]/route.ts   GET = server-proxy stream of an image from R2 (public, immutable-cache)
-│   │   └── letter/route.ts        POST = update the home-page Letter (gated, form or JSON) · GET = current Letter (public)
+│   │   ├── letter/route.ts        POST = update the home-page Letter (gated, form or JSON) · GET = current Letter (public)
+│   │   └── sources/
+│   │       ├── route.ts           POST = add a reader source (gated) · GET = list (gated)
+│   │       └── [id]/delete/route.ts POST = delete a source (gated)
 │   ├── auth/
 │   │   ├── callback/      GET: verify magic-link token → set session → redirect
 │   │   └── logout/        POST: clear session cookie
@@ -51,6 +54,7 @@ nearstream/
 │   ├── inventory-store.ts Inventory store: interface + InMemory + R2 (prefix `library/inventory/`)
 │   ├── media-store.ts     Media (image) store: presigned R2 PUT URLs for upload, server-proxy stream for read (prefix `media/`)
 │   ├── letter-store.ts    Single-record Letter store. R2 key: `site/letter.json`. `get()` returns null if not set yet; `set()` overwrites with a fresh `updatedAt`.
+│   ├── source-store.ts    Reader Source store: interface + InMemory + R2 (prefix `reader/sources/`). Holds the local friend graph.
 │   ├── slug.ts            shared `slugify()` + `isValidSlug()` used by essay + inventory schemas
 │   ├── auth.ts            HMAC token sign/verify, session cookie, allowlist
 │   └── email.ts           Resend send + dev console fallback
@@ -58,7 +62,8 @@ nearstream/
 │   ├── stream.ts          StreamEntry typed primitive
 │   ├── essay.ts           Essay typed primitive (re-exports slug helpers from `lib/slug.ts`)
 │   ├── inventory.ts       InventoryItem typed primitive + `INVENTORY_STATUSES` + `isInventoryStatus()`
-│   └── letter.ts          Letter typed primitive — `{ date, body, updatedAt }`. Free-form date string so the host can be expressive ("today", "midsummer").
+│   ├── letter.ts          Letter typed primitive — `{ date, body, updatedAt }`. Free-form date string so the host can be expressive ("today", "midsummer").
+│   └── source.ts          Reader Source typed primitive — `{ id, name, feedUrl, siteUrl?, addedAt, lastFetchedAt?, etag?, lastModified?, lastError? }`. Plus `isValidFeedUrl()` helper.
 ├── proxy.ts               Next 16 Proxy: optimistic redirect on /studio/*
 ├── .env.example           R2 + auth + Resend templates
 ├── ARCHITECTURE.md        this file
@@ -233,6 +238,8 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 - **Slug uniqueness is per-primitive, not global.** An essay can have slug `garden` (URL `/library/garden`); an inventory item can also have slug `garden` (URL `/library/inventory/garden`). Different URLs, no collision. The one edge case: an essay titled "Inventory" would slug to `inventory` and shadow the inventory archive at `/library/inventory`. Next.js prefers static routes over dynamic ones, so the inventory archive wins; the essay would 404 at its expected URL. We accept this as theoretical (extremely unlikely essay title) until either (a) someone hits it or (b) a future slice moves essays to `/library/essays/[slug]`. Tracked in open questions.
 - **Inventory metadata fields are mostly optional.** Title + image required; description / dimensions / materials / edition / status / price all optional. Lets the same primitive serve casual photo posting (just title + image) and structured object inventory (everything filled). The detail page renders only the fields that have values — empty fields don't show as "Dimensions: —".
 - **Allowed image types: jpeg, png, webp, gif.** No HEIC (iPhone's default — browsers can't display it; would need server-side conversion via `libheif` or similar). iPhones export JPEG when sharing through most apps, so this is rarely a problem in practice. Listed allowlist gated at both the presign step and the metadata-save step (defense in depth — a malicious client could request a different content type at PUT time, but the metadata save would reject it).
+- **Reader sources live in R2, not env vars.** Unlike the `ALLOWED_EMAILS` allowlist (env var, redeploy to change — friction by design for the authentication boundary), the *reader friend list* changes more often and is *yours, not the system's*. It's the phone book of who you read. Per NEARSTREAM.md §05 ("friend graph is local, like a phone book"), each Source is a row in *your* reader. R2 prefix `reader/sources/{id}.json` keeps it next to the other primitives — same `R2Client`, same retry-once TLS wrapper, same picker pattern. The store interface (`SourceStore`) intentionally mirrors `EssayStore` so the next reader primitives (`FeedEntry` in slice 16) can be copy-shaped from the existing template.
+- **Studio is the place to manage sources, for now.** The host's only authenticated UI today is `/studio`. Adding a dedicated reader-settings page (e.g. `/reader/sources`) would be more correct long-term — the reader is its own surface — but until the reader page itself exists (slice 18), bolting source management onto `/studio` keeps the slice footprint small and gives one consistent "you sign in here" surface. When `/reader` lands, source management can move under it; the API routes stay where they are.
 
 ## What's next per slice
 
@@ -249,7 +256,8 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 | 9 | Inventory primitive + image upload | new `schemas/inventory.ts`, `lib/inventory-store.ts`, `lib/media-store.ts` (presigned R2 PUT URLs + server-proxy read), `lib/slug.ts` (extracted from essay schema for reuse), `app/api/inventory/route.ts` + `app/api/inventory/upload-url/route.ts` + `app/api/media/[key]/route.ts`, `app/library/inventory/` + `[slug]/page.tsx`, `app/library/page.tsx` becomes mixed hub, `app/_components/inventory-upload-form.tsx` (client), `app/studio/page.tsx` extended with third form. Follow-up commits: `lib/r2-client.ts` (retry-once on transient TLS errors), browser-side thumbnail generation, delete for all three primitives. **Requires R2 CORS config** (see Deploy section). |
 | 10 | Inventory in RSS | `app/rss.xml/route.ts` pulls all three stores in parallel, renders inventory items with `<enclosure>` (full image) + `<description>` containing `<img>` tag, markdown description, and a `<dl>` of optional metadata fields |
 | 11 | Stream → Library bridge | `schemas/stream.ts` gains `LibraryLink` + `linkHref()` helper, `StreamEntry.link?` optional. `lib/store.ts` + `lib/r2-store.ts` spread `input.link` on add. `app/api/stream/route.ts` accepts + validates `link` (form `type::slug` or JSON object). `app/studio/page.tsx` fetches essays + inventory, renders an optgroup dropdown. `app/page.tsx` builds slug→title maps from all three stores, renders ` → Title` arrow inline at the end of an entry's text. `app/rss.xml/route.ts` appends `→ Title: URL` to the stream item description CDATA. |
-| 14 (this) | Notebook home + Letter primitive (first site template) | new `schemas/letter.ts` + `lib/letter-store.ts` (single-record, `site/letter.json`) + `app/api/letter/route.ts`. `app/_components/site/human-circle.tsx` — Alessandro's moving.points port, inline Perlin 3D noise, client component. `app/page.tsx` rewritten as the **Notebook**: Human Circle masthead + Letter + Stream/Pictures/Essays/Elsewhere sections. `app/stream/page.tsx` — the full stream timeline lives here now (was at `/`). `app/studio/page.tsx` extended with a Letter form at the top (highest-leverage editorial slot). |
+| 14 | Notebook home + Letter primitive (first site template) | new `schemas/letter.ts` + `lib/letter-store.ts` (single-record, `site/letter.json`) + `app/api/letter/route.ts`. `app/_components/site/human-circle.tsx` — Alessandro's moving.points port, inline Perlin 3D noise, client component. `app/page.tsx` rewritten as the **Notebook**: Human Circle masthead + Letter + Stream/Pictures/Essays/Elsewhere sections. `app/stream/page.tsx` — the full stream timeline lives here now (was at `/`). `app/studio/page.tsx` extended with a Letter form at the top (highest-leverage editorial slot). |
+| 15 (this) | **Phase 3 begins. Reader Source primitive — the local friend graph.** | new `schemas/source.ts` + `lib/source-store.ts` (R2 prefix `reader/sources/`) + `app/api/sources/route.ts` + `app/api/sources/[id]/delete/route.ts`. `app/studio/page.tsx` extended with a "Reader sources" section (add by name + feed URL + optional site URL; remove inline). No fetching yet — slice 16 wires the parser. |
 
 Each slice is a PR. ARCHITECTURE.md updates with the slice. NEARSTREAM.md decisions log gets an entry only when a load-bearing choice is made.
 
