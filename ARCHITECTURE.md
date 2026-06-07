@@ -2,7 +2,7 @@
 
 How the code is laid out. Pairs with [`NEARSTREAM.md`](./NEARSTREAM.md), which holds philosophy + decisions. This file holds shape.
 
-> **Status:** Phase 3 · Slice 15 (Reader foundations — Source primitive) — first reader slice. The reader is "the shared room" (NEARSTREAM.md §02); slice 15 lays its first stone with a typed `Source` (a friend's feed URL + local nickname) and matching R2 store at `reader/sources/`. Studio gains a *Reader sources* section so the host can add / remove friends. No fetching yet — slice 16 wires the parser. This is the start of the reader; site primitives (Letter, Stream, Library) are unchanged.
+> **Status:** Phase 3 · Slice 16 (Feed fetcher + parser) — turns the empty Source primitive from slice 15 into something that actually reads. Adds `fast-xml-parser` (only new dep), a normalized `FeedEntry` schema, a tolerant RSS 2.0 + Atom 1.0 parser, an HTTP fetcher with conditional-GET (ETag / Last-Modified) and per-Source error capture, and an R2 entry store keyed at `reader/feed/{sourceId}/{entryId}.json` with stable IDs (SHA-256 of `sourceId+guid`) so refetches dedupe cleanly. Studio gains per-source **Refresh** and a **Refresh all** button, plus visible last-fetched / last-error state. Type detection (note / essay / picture) is still `"unknown"` — slice 17 fills it in.
 
 ---
 
@@ -20,8 +20,11 @@ nearstream/
 │   │   ├── media/[key]/route.ts   GET = server-proxy stream of an image from R2 (public, immutable-cache)
 │   │   ├── letter/route.ts        POST = update the home-page Letter (gated, form or JSON) · GET = current Letter (public)
 │   │   └── sources/
-│   │       ├── route.ts           POST = add a reader source (gated) · GET = list (gated)
-│   │       └── [id]/delete/route.ts POST = delete a source (gated)
+│   │       ├── route.ts                    POST = add a reader source (gated) · GET = list (gated)
+│   │       ├── refresh/route.ts            POST = refresh every source sequentially (gated)
+│   │       └── [id]/
+│   │           ├── delete/route.ts         POST = delete a source + cascade its feed entries (gated)
+│   │           └── refresh/route.ts        POST = refresh a single source (gated)
 │   ├── auth/
 │   │   ├── callback/      GET: verify magic-link token → set session → redirect
 │   │   └── logout/        POST: clear session cookie
@@ -55,6 +58,9 @@ nearstream/
 │   ├── media-store.ts     Media (image) store: presigned R2 PUT URLs for upload, server-proxy stream for read (prefix `media/`)
 │   ├── letter-store.ts    Single-record Letter store. R2 key: `site/letter.json`. `get()` returns null if not set yet; `set()` overwrites with a fresh `updatedAt`.
 │   ├── source-store.ts    Reader Source store: interface + InMemory + R2 (prefix `reader/sources/`). Holds the local friend graph.
+│   ├── feed-parser.ts     Pure RSS 2.0 + Atom 1.0 → `NewFeedEntry[]`. Built on `fast-xml-parser`. Tolerant of malformed input.
+│   ├── feed-fetcher.ts    HTTP fetch + conditional GET (ETag / Last-Modified) + parse + entry upsert + Source state update. `refreshSource(id)` and `refreshAllSources()`.
+│   ├── feed-entry-store.ts Reader FeedEntry store: interface + InMemory + R2 (prefix `reader/feed/{sourceId}/`). Stable entry IDs from SHA-256 of `sourceId+guid` — refetches dedupe.
 │   ├── slug.ts            shared `slugify()` + `isValidSlug()` used by essay + inventory schemas
 │   ├── auth.ts            HMAC token sign/verify, session cookie, allowlist
 │   └── email.ts           Resend send + dev console fallback
@@ -63,7 +69,8 @@ nearstream/
 │   ├── essay.ts           Essay typed primitive (re-exports slug helpers from `lib/slug.ts`)
 │   ├── inventory.ts       InventoryItem typed primitive + `INVENTORY_STATUSES` + `isInventoryStatus()`
 │   ├── letter.ts          Letter typed primitive — `{ date, body, updatedAt }`. Free-form date string so the host can be expressive ("today", "midsummer").
-│   └── source.ts          Reader Source typed primitive — `{ id, name, feedUrl, siteUrl?, addedAt, lastFetchedAt?, etag?, lastModified?, lastError? }`. Plus `isValidFeedUrl()` helper.
+│   ├── source.ts          Reader Source typed primitive — `{ id, name, feedUrl, siteUrl?, addedAt, lastFetchedAt?, etag?, lastModified?, lastError? }`. Plus `isValidFeedUrl()` helper.
+│   └── feed-entry.ts      Reader FeedEntry typed primitive — normalized RSS/Atom item with `{ id, sourceId, guid, url, publishedAt, title?, authorName?, body?, excerpt?, type, image?, fetchedAt }`. `type` is `"unknown"` until slice 17 detects it.
 ├── proxy.ts               Next 16 Proxy: optimistic redirect on /studio/*
 ├── .env.example           R2 + auth + Resend templates
 ├── ARCHITECTURE.md        this file
@@ -240,6 +247,13 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 - **Allowed image types: jpeg, png, webp, gif.** No HEIC (iPhone's default — browsers can't display it; would need server-side conversion via `libheif` or similar). iPhones export JPEG when sharing through most apps, so this is rarely a problem in practice. Listed allowlist gated at both the presign step and the metadata-save step (defense in depth — a malicious client could request a different content type at PUT time, but the metadata save would reject it).
 - **Reader sources live in R2, not env vars.** Unlike the `ALLOWED_EMAILS` allowlist (env var, redeploy to change — friction by design for the authentication boundary), the *reader friend list* changes more often and is *yours, not the system's*. It's the phone book of who you read. Per NEARSTREAM.md §05 ("friend graph is local, like a phone book"), each Source is a row in *your* reader. R2 prefix `reader/sources/{id}.json` keeps it next to the other primitives — same `R2Client`, same retry-once TLS wrapper, same picker pattern. The store interface (`SourceStore`) intentionally mirrors `EssayStore` so the next reader primitives (`FeedEntry` in slice 16) can be copy-shaped from the existing template.
 - **Studio is the place to manage sources, for now.** The host's only authenticated UI today is `/studio`. Adding a dedicated reader-settings page (e.g. `/reader/sources`) would be more correct long-term — the reader is its own surface — but until the reader page itself exists (slice 18), bolting source management onto `/studio` keeps the slice footprint small and gives one consistent "you sign in here" surface. When `/reader` lands, source management can move under it; the API routes stay where they are.
+- **`fast-xml-parser`, not `rss-parser`.** Same lightweight-dep ethos as the rest of the codebase (auth via raw HMAC, R2 via aws4fetch, Resend via fetch). `rss-parser` would have meant accepting an opinionated normalized shape over which we have no control; `fast-xml-parser` returns a JSON tree and we do the per-format mapping in ~150 lines of `lib/feed-parser.ts`. The tradeoff is that we own the edge cases (Atom 1.0, malformed feeds, CDATA, media:content, multiple link rels). For a reader that's going to see ~10 friend feeds total, this is the right side of the buy-vs-build line.
+- **Stable `FeedEntry.id` = SHA-256 of `sourceId + guid`, truncated.** Each refetch needs to land on the same R2 key for the same logical entry so we don't accumulate duplicates over time. RSS `<guid>` (or Atom `<id>`, or the entry URL as fallback) gives us identity *within* a feed; prefixing the sourceId makes it unique across feeds. Hash is purely to keep keys filename-safe and bounded — guids in the wild are sometimes 200-char URLs with reserved characters.
+- **Conditional GET (`If-None-Match` / `If-Modified-Since`), not polling-naive.** On every refresh we send the last `etag` and `last-modified` we saw. A friend's feed that hasn't changed returns 304 with no body — costs them ~0 work, costs us no parse + no R2 write. This is the polite-reader contract that makes RSS sustainable at scale.
+- **Refresh state lives on the `Source`, not in a separate table.** `lastFetchedAt`, `etag`, `lastModified`, `lastError` are optional fields on the Source row itself. One R2 PUT after a refresh updates everything atomically. The alternative (a separate `reader/source-state/{id}.json` row) would mean two reads on the studio sources list and two writes per refresh, for no gain — refresh state has the same lifecycle as the Source.
+- **Source delete cascades to entries; cascade failure does not block the delete.** `feedEntryStore.deleteBySource(id)` runs before `sourceStore.delete(id)`. If the entry cleanup throws, we log and proceed with the Source delete anyway. Same rationale as inventory image cleanup (slice 9 follow-up): an orphan R2 row is cheap; an undeletable Source row is the worse UX.
+- **Refresh-all is sequential, not parallel.** Friend feeds are unlikely to live behind CDNs sized for our burst, and 5 simultaneous TLS handshakes on a cold function eats wall time without buying much. Slice 19's scheduled refresh can revisit if N becomes large enough that latency matters.
+- **`User-Agent: Nearstream/0.1 (+https://nearstream.app)`.** Identifies us to friends running access logs. The URL is informational only — the protocol is the spec, not the URL. Update when we have a real homepage; the format itself is the polite-reader convention.
 
 ## What's next per slice
 
@@ -257,7 +271,8 @@ The `/design` route is the live spec — color swatches, type scale, brand mark 
 | 10 | Inventory in RSS | `app/rss.xml/route.ts` pulls all three stores in parallel, renders inventory items with `<enclosure>` (full image) + `<description>` containing `<img>` tag, markdown description, and a `<dl>` of optional metadata fields |
 | 11 | Stream → Library bridge | `schemas/stream.ts` gains `LibraryLink` + `linkHref()` helper, `StreamEntry.link?` optional. `lib/store.ts` + `lib/r2-store.ts` spread `input.link` on add. `app/api/stream/route.ts` accepts + validates `link` (form `type::slug` or JSON object). `app/studio/page.tsx` fetches essays + inventory, renders an optgroup dropdown. `app/page.tsx` builds slug→title maps from all three stores, renders ` → Title` arrow inline at the end of an entry's text. `app/rss.xml/route.ts` appends `→ Title: URL` to the stream item description CDATA. |
 | 14 | Notebook home + Letter primitive (first site template) | new `schemas/letter.ts` + `lib/letter-store.ts` (single-record, `site/letter.json`) + `app/api/letter/route.ts`. `app/_components/site/human-circle.tsx` — Alessandro's moving.points port, inline Perlin 3D noise, client component. `app/page.tsx` rewritten as the **Notebook**: Human Circle masthead + Letter + Stream/Pictures/Essays/Elsewhere sections. `app/stream/page.tsx` — the full stream timeline lives here now (was at `/`). `app/studio/page.tsx` extended with a Letter form at the top (highest-leverage editorial slot). |
-| 15 (this) | **Phase 3 begins. Reader Source primitive — the local friend graph.** | new `schemas/source.ts` + `lib/source-store.ts` (R2 prefix `reader/sources/`) + `app/api/sources/route.ts` + `app/api/sources/[id]/delete/route.ts`. `app/studio/page.tsx` extended with a "Reader sources" section (add by name + feed URL + optional site URL; remove inline). No fetching yet — slice 16 wires the parser. |
+| 15 | **Phase 3 begins. Reader Source primitive — the local friend graph.** | new `schemas/source.ts` + `lib/source-store.ts` (R2 prefix `reader/sources/`) + `app/api/sources/route.ts` + `app/api/sources/[id]/delete/route.ts`. `app/studio/page.tsx` extended with a "Reader sources" section (add by name + feed URL + optional site URL; remove inline). No fetching yet — slice 16 wires the parser. |
+| 16 (this) | Feed fetcher + parser (RSS 2.0 + Atom 1.0) | new `schemas/feed-entry.ts` + `lib/feed-parser.ts` (built on `fast-xml-parser`, pure) + `lib/feed-fetcher.ts` (conditional GET + Source state mutation) + `lib/feed-entry-store.ts` (R2 prefix `reader/feed/{sourceId}/`, stable IDs via SHA-256 of `sourceId+guid`). New routes `POST /api/sources/[id]/refresh` and `POST /api/sources/refresh`. Source delete now cascades to its entries. Studio source list shows last-fetched time / last error and exposes per-source Refresh + Refresh-all buttons. `type` on every entry is still `"unknown"` — slice 17 detects it. |
 
 Each slice is a PR. ARCHITECTURE.md updates with the slice. NEARSTREAM.md decisions log gets an entry only when a load-bearing choice is made.
 
