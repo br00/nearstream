@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+# throwaway scripts (kept locally during a slice; promoted to a real test if useful)
+/scratch
+
 # next.js
 /.next/
 /out/

@@ -14,6 +14,8 @@ import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
 import { TagRadio } from "@/app/_components/tag-chip";
 import { InventoryUploadForm } from "@/app/_components/inventory-upload-form";
+import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
+import { timeAgo } from "@/lib/time-ago";
 
 export const metadata = {
   title: "Studio · Nearstream",
@@ -101,7 +103,7 @@ export default async function StudioPage({ searchParams }: Props) {
               </label>
 
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
-                The date appears automatically — today's date is set when you update.
+                The date appears automatically — today&rsquo;s date is set when you update.
               </p>
 
               <SubmitButton pendingLabel="Updating…" className="self-start">
@@ -256,9 +258,17 @@ export default async function StudioPage({ searchParams }: Props) {
           {/* Reader sources — the friends you follow. "Friend graph is local,
               like a phone book" (NEARSTREAM.md §05). Add by RSS URL. */}
           <div id="sources" className="scroll-mt-6">
-            <h2 className="mt-20 text-2xl font-normal tracking-tight text-foreground">
-              Reader sources
-            </h2>
+            <div className="mt-20 flex items-baseline justify-between gap-4">
+              <h2 className="text-2xl font-normal tracking-tight text-foreground">
+                Reader sources
+              </h2>
+              <Link
+                href="/reader"
+                className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft underline underline-offset-4 decoration-transparent transition-colors hover:text-foreground hover:decoration-muted-soft"
+              >
+                Open reader →
+              </Link>
+            </div>
             <p className="mt-2 text-sm text-muted-soft">
               Friends whose feeds appear in your reader. Local to you — no one
               else sees this list.
@@ -285,7 +295,7 @@ export default async function StudioPage({ searchParams }: Props) {
                   name="name"
                   required
                   maxLength={80}
-                  placeholder="Costanza"
+                  placeholder="Marco"
                 />
               </label>
 
@@ -295,7 +305,7 @@ export default async function StudioPage({ searchParams }: Props) {
                   name="feedUrl"
                   type="url"
                   required
-                  placeholder="https://costanza.example/rss.xml"
+                  placeholder="https://marco.xyz/rss.xml"
                 />
               </label>
 
@@ -304,7 +314,7 @@ export default async function StudioPage({ searchParams }: Props) {
                 <Input
                   name="siteUrl"
                   type="url"
-                  placeholder="https://costanza.example"
+                  placeholder="https://marco.xyz"
                 />
               </label>
 
@@ -314,32 +324,66 @@ export default async function StudioPage({ searchParams }: Props) {
             </form>
 
             {sources.length > 0 && (
-              <ul className="mt-12 flex flex-col gap-4">
-                {sources.map((source) => (
-                  <li
-                    key={source.id}
-                    className="flex items-start justify-between gap-4 border-t border-border pt-4"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm text-foreground">{source.name}</div>
-                      <div className="mt-1 truncate font-mono text-[11px] text-muted-soft">
-                        {source.feedUrl}
-                      </div>
-                    </div>
-                    <form
-                      action={`/api/sources/${source.id}/delete`}
-                      method="POST"
+              <>
+                <div className="mt-12 flex items-center justify-between">
+                  <Kicker>Following</Kicker>
+                  <form action="/api/sources/refresh" method="POST">
+                    <MonoSubmitButton pendingLabel="Refreshing…">
+                      Refresh all
+                    </MonoSubmitButton>
+                  </form>
+                </div>
+
+                <ul className="mt-4 flex flex-col gap-4">
+                  {sources.map((source) => (
+                    <li
+                      key={source.id}
+                      className="flex items-start justify-between gap-4 border-t border-border pt-4"
                     >
-                      <button
-                        type="submit"
-                        className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
-                      >
-                        Remove
-                      </button>
-                    </form>
-                  </li>
-                ))}
-              </ul>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-foreground">{source.name}</div>
+                        <div className="mt-1 truncate font-mono text-[11px] text-muted-soft">
+                          {source.feedUrl}
+                        </div>
+                        {source.lastError ? (
+                          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground/80">
+                            Error: {source.lastError}
+                          </div>
+                        ) : source.lastFetchedAt ? (
+                          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
+                            Last fetched {timeAgo(source.lastFetchedAt)}
+                          </div>
+                        ) : (
+                          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
+                            Not yet fetched
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <form
+                          action={`/api/sources/${source.id}/refresh`}
+                          method="POST"
+                        >
+                          <MonoSubmitButton pendingLabel="…">
+                            Refresh
+                          </MonoSubmitButton>
+                        </form>
+                        <form
+                          action={`/api/sources/${source.id}/delete`}
+                          method="POST"
+                        >
+                          <button
+                            type="submit"
+                            className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
+                          >
+                            Remove
+                          </button>
+                        </form>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </div>
 
