@@ -14,6 +14,8 @@ import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
 import { TagRadio } from "@/app/_components/tag-chip";
 import { InventoryUploadForm } from "@/app/_components/inventory-upload-form";
+import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
+import { timeAgo } from "@/lib/time-ago";
 
 export const metadata = {
   title: "Studio · Nearstream",
@@ -256,9 +258,17 @@ export default async function StudioPage({ searchParams }: Props) {
           {/* Reader sources — the friends you follow. "Friend graph is local,
               like a phone book" (NEARSTREAM.md §05). Add by RSS URL. */}
           <div id="sources" className="scroll-mt-6">
-            <h2 className="mt-20 text-2xl font-normal tracking-tight text-foreground">
-              Reader sources
-            </h2>
+            <div className="mt-20 flex items-baseline justify-between gap-4">
+              <h2 className="text-2xl font-normal tracking-tight text-foreground">
+                Reader sources
+              </h2>
+              <Link
+                href="/reader"
+                className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft underline underline-offset-4 decoration-transparent transition-colors hover:text-foreground hover:decoration-muted-soft"
+              >
+                Open reader →
+              </Link>
+            </div>
             <p className="mt-2 text-sm text-muted-soft">
               Friends whose feeds appear in your reader. Local to you — no one
               else sees this list.
@@ -285,7 +295,7 @@ export default async function StudioPage({ searchParams }: Props) {
                   name="name"
                   required
                   maxLength={80}
-                  placeholder="Costanza"
+                  placeholder="Marco"
                 />
               </label>
 
@@ -295,7 +305,7 @@ export default async function StudioPage({ searchParams }: Props) {
                   name="feedUrl"
                   type="url"
                   required
-                  placeholder="https://costanza.example/rss.xml"
+                  placeholder="https://marco.xyz/rss.xml"
                 />
               </label>
 
@@ -304,7 +314,7 @@ export default async function StudioPage({ searchParams }: Props) {
                 <Input
                   name="siteUrl"
                   type="url"
-                  placeholder="https://costanza.example"
+                  placeholder="https://marco.xyz"
                 />
               </label>
 
@@ -318,12 +328,9 @@ export default async function StudioPage({ searchParams }: Props) {
                 <div className="mt-12 flex items-center justify-between">
                   <Kicker>Following</Kicker>
                   <form action="/api/sources/refresh" method="POST">
-                    <button
-                      type="submit"
-                      className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
-                    >
+                    <MonoSubmitButton pendingLabel="Refreshing…">
                       Refresh all
-                    </button>
+                    </MonoSubmitButton>
                   </form>
                 </div>
 
@@ -344,8 +351,7 @@ export default async function StudioPage({ searchParams }: Props) {
                           </div>
                         ) : source.lastFetchedAt ? (
                           <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
-                            Last fetched{" "}
-                            {new Date(source.lastFetchedAt).toLocaleString()}
+                            Last fetched {timeAgo(source.lastFetchedAt)}
                           </div>
                         ) : (
                           <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
@@ -358,12 +364,9 @@ export default async function StudioPage({ searchParams }: Props) {
                           action={`/api/sources/${source.id}/refresh`}
                           method="POST"
                         >
-                          <button
-                            type="submit"
-                            className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
-                          >
+                          <MonoSubmitButton pendingLabel="…">
                             Refresh
-                          </button>
+                          </MonoSubmitButton>
                         </form>
                         <form
                           action={`/api/sources/${source.id}/delete`}
