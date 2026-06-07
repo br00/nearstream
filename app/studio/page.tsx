@@ -4,6 +4,7 @@ import { DISCIPLINE_TAGS } from "@/schemas/stream";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { letterStore } from "@/lib/letter-store";
+import { sourceStore } from "@/lib/source-store";
 import { getSession } from "@/lib/auth";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { PageShell } from "@/app/_components/page-shell";
@@ -22,6 +23,7 @@ type Props = {
   searchParams: Promise<{
     "essay-error"?: string;
     "letter-error"?: string;
+    "source-error"?: string;
   }>;
 };
 
@@ -29,13 +31,17 @@ export default async function StudioPage({ searchParams }: Props) {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const { "essay-error": essayError, "letter-error": letterError } =
-    await searchParams;
+  const {
+    "essay-error": essayError,
+    "letter-error": letterError,
+    "source-error": sourceError,
+  } = await searchParams;
 
-  const [letter, essays, inventoryItems] = await Promise.all([
+  const [letter, essays, inventoryItems, sources] = await Promise.all([
     letterStore.get(),
     essayStore.list(),
     inventoryStore.list(),
+    sourceStore.list(),
   ]);
 
   const navLinkClasses =
@@ -243,6 +249,98 @@ export default async function StudioPage({ searchParams }: Props) {
             </p>
 
             <InventoryUploadForm />
+          </div>
+
+          <hr className="mt-20 border-border" />
+
+          {/* Reader sources — the friends you follow. "Friend graph is local,
+              like a phone book" (NEARSTREAM.md §05). Add by RSS URL. */}
+          <div id="sources" className="scroll-mt-6">
+            <h2 className="mt-20 text-2xl font-normal tracking-tight text-foreground">
+              Reader sources
+            </h2>
+            <p className="mt-2 text-sm text-muted-soft">
+              Friends whose feeds appear in your reader. Local to you — no one
+              else sees this list.
+            </p>
+
+            {sourceError && (
+              <div
+                role="alert"
+                className="mt-8 border-l-2 border-foreground/50 pl-4 py-2"
+              >
+                <Kicker>Could not add source</Kicker>
+                <p className="mt-1 text-sm text-muted">{sourceError}</p>
+              </div>
+            )}
+
+            <form
+              action="/api/sources"
+              method="POST"
+              className="mt-10 flex flex-col gap-8"
+            >
+              <label className="flex flex-col gap-2">
+                <Kicker>Name</Kicker>
+                <Input
+                  name="name"
+                  required
+                  maxLength={80}
+                  placeholder="Costanza"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <Kicker>Feed URL</Kicker>
+                <Input
+                  name="feedUrl"
+                  type="url"
+                  required
+                  placeholder="https://costanza.example/rss.xml"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <Kicker>Site URL (optional)</Kicker>
+                <Input
+                  name="siteUrl"
+                  type="url"
+                  placeholder="https://costanza.example"
+                />
+              </label>
+
+              <SubmitButton pendingLabel="Adding…" className="self-start">
+                Add source
+              </SubmitButton>
+            </form>
+
+            {sources.length > 0 && (
+              <ul className="mt-12 flex flex-col gap-4">
+                {sources.map((source) => (
+                  <li
+                    key={source.id}
+                    className="flex items-start justify-between gap-4 border-t border-border pt-4"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-foreground">{source.name}</div>
+                      <div className="mt-1 truncate font-mono text-[11px] text-muted-soft">
+                        {source.feedUrl}
+                      </div>
+                    </div>
+                    <form
+                      action={`/api/sources/${source.id}/delete`}
+                      method="POST"
+                    >
+                      <button
+                        type="submit"
+                        className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
+                      >
+                        Remove
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <hr className="mt-20 border-border" />
