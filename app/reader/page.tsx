@@ -6,6 +6,7 @@ import { feedEntryStore } from "@/lib/feed-entry-store";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamLockup } from "@/app/_components/nearstream-mark";
 import { Kicker } from "@/app/_components/kicker";
+import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -68,12 +69,9 @@ export default async function ReaderPage() {
                   Today
                 </h1>
                 <form action="/api/sources/refresh" method="POST">
-                  <button
-                    type="submit"
-                    className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
-                  >
+                  <MonoSubmitButton pendingLabel="Refreshing…">
                     Refresh all
-                  </button>
+                  </MonoSubmitButton>
                 </form>
               </div>
 

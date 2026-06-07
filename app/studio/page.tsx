@@ -14,6 +14,8 @@ import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
 import { TagRadio } from "@/app/_components/tag-chip";
 import { InventoryUploadForm } from "@/app/_components/inventory-upload-form";
+import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
+import { timeAgo } from "@/lib/time-ago";
 
 export const metadata = {
   title: "Studio · Nearstream",
@@ -326,12 +328,9 @@ export default async function StudioPage({ searchParams }: Props) {
                 <div className="mt-12 flex items-center justify-between">
                   <Kicker>Following</Kicker>
                   <form action="/api/sources/refresh" method="POST">
-                    <button
-                      type="submit"
-                      className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
-                    >
+                    <MonoSubmitButton pendingLabel="Refreshing…">
                       Refresh all
-                    </button>
+                    </MonoSubmitButton>
                   </form>
                 </div>
 
@@ -352,8 +351,7 @@ export default async function StudioPage({ searchParams }: Props) {
                           </div>
                         ) : source.lastFetchedAt ? (
                           <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
-                            Last fetched{" "}
-                            {new Date(source.lastFetchedAt).toLocaleString()}
+                            Last fetched {timeAgo(source.lastFetchedAt)}
                           </div>
                         ) : (
                           <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
@@ -366,12 +364,9 @@ export default async function StudioPage({ searchParams }: Props) {
                           action={`/api/sources/${source.id}/refresh`}
                           method="POST"
                         >
-                          <button
-                            type="submit"
-                            className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
-                          >
+                          <MonoSubmitButton pendingLabel="…">
                             Refresh
-                          </button>
+                          </MonoSubmitButton>
                         </form>
                         <form
                           action={`/api/sources/${source.id}/delete`}
