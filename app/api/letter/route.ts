@@ -5,7 +5,11 @@ import { getSession } from "@/lib/auth";
 const BODY_MAX = 2000;
 
 export async function GET() {
-  const letter = await letterStore.get();
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const letter = await letterStore.get(session.userId);
   return Response.json({ letter });
 }
 
@@ -40,7 +44,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const letter = await letterStore.set({ body: body.trim() });
+  const letter = await letterStore.set(session.userId, { body: body.trim() });
   revalidatePath("/");
 
   if (isJson) {

@@ -36,8 +36,8 @@ export default async function ReaderPage() {
   if (!session) redirect("/login");
 
   const [sources, entries] = await Promise.all([
-    sourceStore.list(),
-    feedEntryStore.list(),
+    sourceStore.list(session.userId),
+    feedEntryStore.list(session.userId),
   ]);
 
   const sourceById = new Map(sources.map((s) => [s.id, s]));

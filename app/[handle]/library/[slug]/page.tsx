@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { marked } from "marked";
 import { essayStore } from "@/lib/essay-store";
+import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
@@ -10,7 +11,7 @@ import { DeleteButton } from "@/app/_components/delete-button";
 export const dynamic = "force-dynamic";
 
 type Props = {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ handle: string; slug: string }>;
 };
 
 function formatDate(iso: string): string {
@@ -22,22 +23,25 @@ function formatDate(iso: string): string {
 }
 
 export async function generateMetadata({ params }: Props) {
-  const { slug } = await params;
-  const essay = await essayStore.getBySlug(slug);
+  const { handle, slug } = await params;
+  const user = await userStore.getByHandle(handle);
+  if (!user) return { title: "Not found · Nearstream" };
+  const essay = await essayStore.getBySlug(user.id, slug);
   if (!essay) return { title: "Not found · Nearstream" };
-  return {
-    title: `${essay.title} · Nearstream`,
-  };
+  return { title: `${essay.title} · ${user.displayName || handle}` };
 }
 
 export default async function EssayPage({ params }: Props) {
-  const { slug } = await params;
+  const { handle, slug } = await params;
+  const user = await userStore.getByHandle(handle);
+  if (!user) notFound();
+
   const [essay, session] = await Promise.all([
-    essayStore.getBySlug(slug),
+    essayStore.getBySlug(user.id, slug),
     getSession(),
   ]);
   if (!essay) notFound();
-  const isSignedIn = !!session;
+  const isOwner = session?.userId === user.id;
 
   const html = await marked.parse(essay.body, { async: true });
 
@@ -48,10 +52,10 @@ export default async function EssayPage({ params }: Props) {
     <PageShell
       rightNav={
         <>
-          <Link href="/library" className={navLinkClasses}>
+          <Link href={`/${handle}/library`} className={navLinkClasses}>
             ← Library
           </Link>
-          {isSignedIn && (
+          {isOwner && (
             <DeleteButton
               action={`/api/essays/${essay.slug}/delete`}
               confirmMessage={`Delete essay "${essay.title}"? This is permanent.`}

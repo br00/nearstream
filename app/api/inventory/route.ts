@@ -10,7 +10,11 @@ const DESCRIPTION_MAX = 50_000;
 const STRING_FIELD_MAX = 200;
 
 export async function GET() {
-  const items = await inventoryStore.list();
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const items = await inventoryStore.list(session.userId);
   return Response.json({ items });
 }
 
@@ -59,7 +63,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const existing = await inventoryStore.getBySlug(slug);
+  const existing = await inventoryStore.getBySlug(session.userId, slug);
   if (existing) {
     return Response.json(
       {
@@ -117,7 +121,7 @@ export async function POST(request: Request) {
     validatedStatus = status;
   }
 
-  const item = await inventoryStore.add({
+  const item = await inventoryStore.add(session.userId, {
     title: trimmedTitle,
     image: validatedImage,
     description: fields.description,

@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const results = await refreshAllSources();
+  const results = await refreshAllSources(session.userId);
 
   revalidatePath("/studio");
   revalidatePath("/reader");

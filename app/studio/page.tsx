@@ -5,6 +5,8 @@ import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { letterStore } from "@/lib/letter-store";
 import { sourceStore } from "@/lib/source-store";
+import { userStore } from "@/lib/user-store";
+import { isHostEmail } from "@/lib/auth";
 import { getSession } from "@/lib/auth";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { PageShell } from "@/app/_components/page-shell";
@@ -33,6 +35,10 @@ export default async function StudioPage({ searchParams }: Props) {
   const session = await getSession();
   if (!session) redirect("/login");
 
+  const user = await userStore.getById(session.userId);
+  if (!user) redirect("/login");
+  if (!user.handle) redirect("/onboarding");
+
   const {
     "essay-error": essayError,
     "letter-error": letterError,
@@ -40,10 +46,10 @@ export default async function StudioPage({ searchParams }: Props) {
   } = await searchParams;
 
   const [letter, essays, inventoryItems, sources] = await Promise.all([
-    letterStore.get(),
-    essayStore.list(),
-    inventoryStore.list(),
-    sourceStore.list(),
+    letterStore.get(user.id),
+    essayStore.list(user.id),
+    inventoryStore.list(user.id),
+    sourceStore.list(user.id),
   ]);
 
   const navLinkClasses =
@@ -54,10 +60,10 @@ export default async function StudioPage({ searchParams }: Props) {
       leftNav={<NearstreamLockup size={24} className="text-foreground" />}
       rightNav={
         <>
-          <Link href="/" className={navLinkClasses}>
+          <Link href={`/${user.handle}`} className={navLinkClasses}>
             ← Home
           </Link>
-          <Link href="/library" className={navLinkClasses}>
+          <Link href={`/${user.handle}/library`} className={navLinkClasses}>
             Library
           </Link>
         </>
@@ -388,6 +394,28 @@ export default async function StudioPage({ searchParams }: Props) {
           </div>
 
           <hr className="mt-20 border-border" />
+
+          {isHostEmail(user.email) && (
+            <div className="mt-12">
+              <Kicker>Host tools</Kicker>
+              <form
+                action="/api/admin/migrate-host"
+                method="POST"
+                className="mt-3"
+              >
+                <button
+                  type="submit"
+                  className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
+                >
+                  Migrate legacy content →
+                </button>
+              </form>
+              <p className="mt-2 text-[11px] text-muted-soft">
+                One-time copy of the pre-Phase-3 R2 keys into your tenant
+                namespace. Idempotent.
+              </p>
+            </div>
+          )}
 
           <form action="/auth/logout" method="POST" className="mt-12">
             <button

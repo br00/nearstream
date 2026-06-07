@@ -25,12 +25,12 @@ export async function POST(request: Request, { params }: Props) {
   // reason in /studio rather than a generic 500.
   let result;
   try {
-    result = await refreshSource(id);
+    result = await refreshSource(session.userId, id);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[refresh ${id}] unhandled error`, err);
     try {
-      await sourceStore.update(id, {
+      await sourceStore.update(session.userId, id, {
         lastFetchedAt: new Date().toISOString(),
         lastError: `unhandled: ${message}`,
       });

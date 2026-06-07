@@ -8,7 +8,11 @@ import {
 import { getSession } from "@/lib/auth";
 
 export async function GET() {
-  const entries = await store.list();
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const entries = await store.list(session.userId);
   return Response.json({ entries });
 }
 
@@ -48,7 +52,11 @@ export async function POST(request: Request) {
     return Response.json({ error: link }, { status: 400 });
   }
 
-  const entry = await store.add({ text: text.trim(), tag, link });
+  const entry = await store.add(session.userId, {
+    text: text.trim(),
+    tag,
+    link,
+  });
   revalidatePath("/");
   revalidatePath("/rss.xml");
 
