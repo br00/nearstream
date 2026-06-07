@@ -120,17 +120,24 @@ class R2FeedEntryStore implements FeedEntryStore {
   }
 
   async upsertMany(entries: NewFeedEntry[]): Promise<number> {
+    // HEAD-before-PUT is only an optimization to skip already-seen entries and
+    // preserve their original `fetchedAt`. If HEAD returns anything other than
+    // 200, we treat the object as not-present and proceed with PUT — covers
+    // the common R2 token shape that returns 403 on missing objects (no
+    // ListBucket permission) instead of the canonical 404. Worst case: a
+    // redundant PUT that overwrites with a refreshed fetchedAt, which is
+    // harmless.
     let added = 0;
-    // R2 has no atomic "if not exists" — we do a cheap HEAD first.
     for (const input of entries) {
       const id = await makeEntryId(input.sourceId, input.guid);
       const objKey = this.key(input.sourceId, id);
-      const head = await this.client.fetch(`${this.base}/${objKey}`, { method: "HEAD" });
-      if (head.ok) continue;
-      if (head.status !== 404) {
-        throw new Error(
-          `R2 HEAD failed (${head.status} ${head.statusText})`,
-        );
+      try {
+        const head = await this.client.fetch(`${this.base}/${objKey}`, {
+          method: "HEAD",
+        });
+        if (head.ok) continue;
+      } catch {
+        // network/signing hiccup on HEAD — fall through to PUT
       }
       const entry: FeedEntry = {
         ...input,
@@ -144,7 +151,7 @@ class R2FeedEntryStore implements FeedEntryStore {
       });
       if (!res.ok) {
         throw new Error(
-          `R2 PUT failed (${res.status} ${res.statusText}): ${await res.text()}`,
+          `R2 PUT ${objKey} failed (${res.status} ${res.statusText}): ${await res.text()}`,
         );
       }
       added++;

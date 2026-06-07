@@ -72,7 +72,17 @@ export async function refreshSource(id: string): Promise<RefreshResult> {
     return { status: "error", sourceId: id, error: `parse failed: ${message}` };
   }
 
-  const added = await feedEntryStore.upsertMany(parsed.entries);
+  let added: number;
+  try {
+    added = await feedEntryStore.upsertMany(parsed.entries);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await sourceStore.update(id, {
+      lastFetchedAt: new Date().toISOString(),
+      lastError: `store failed: ${message}`,
+    });
+    return { status: "error", sourceId: id, error: `store failed: ${message}` };
+  }
 
   await sourceStore.update(id, {
     lastFetchedAt: new Date().toISOString(),
@@ -92,7 +102,14 @@ export async function refreshAllSources(): Promise<RefreshResult[]> {
   // can revisit if N becomes large.
   const results: RefreshResult[] = [];
   for (const s of sources) {
-    results.push(await refreshSource(s.id));
+    try {
+      results.push(await refreshSource(s.id));
+    } catch (err) {
+      // One broken source must not break the whole batch.
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[refreshAllSources] ${s.id} threw`, err);
+      results.push({ status: "error", sourceId: s.id, error: message });
+    }
   }
   return results;
 }
