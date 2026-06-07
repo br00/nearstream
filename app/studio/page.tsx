@@ -295,7 +295,7 @@ export default async function StudioPage({ searchParams }: Props) {
                   name="name"
                   required
                   maxLength={80}
-                  placeholder="Costanza"
+                  placeholder="Marco"
                 />
               </label>
 
@@ -305,7 +305,7 @@ export default async function StudioPage({ searchParams }: Props) {
                   name="feedUrl"
                   type="url"
                   required
-                  placeholder="https://costanza.example/rss.xml"
+                  placeholder="https://marco.xyz/rss.xml"
                 />
               </label>
 
@@ -314,7 +314,7 @@ export default async function StudioPage({ searchParams }: Props) {
                 <Input
                   name="siteUrl"
                   type="url"
-                  placeholder="https://costanza.example"
+                  placeholder="https://marco.xyz"
                 />
               </label>
 
