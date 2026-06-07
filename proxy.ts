@@ -9,5 +9,5 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ["/studio/:path*"],
+  matcher: ["/studio/:path*", "/reader/:path*"],
 };

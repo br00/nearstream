@@ -256,9 +256,17 @@ export default async function StudioPage({ searchParams }: Props) {
           {/* Reader sources — the friends you follow. "Friend graph is local,
               like a phone book" (NEARSTREAM.md §05). Add by RSS URL. */}
           <div id="sources" className="scroll-mt-6">
-            <h2 className="mt-20 text-2xl font-normal tracking-tight text-foreground">
-              Reader sources
-            </h2>
+            <div className="mt-20 flex items-baseline justify-between gap-4">
+              <h2 className="text-2xl font-normal tracking-tight text-foreground">
+                Reader sources
+              </h2>
+              <Link
+                href="/reader"
+                className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft underline underline-offset-4 decoration-transparent transition-colors hover:text-foreground hover:decoration-muted-soft"
+              >
+                Open reader →
+              </Link>
+            </div>
             <p className="mt-2 text-sm text-muted-soft">
               Friends whose feeds appear in your reader. Local to you — no one
               else sees this list.
