@@ -12,7 +12,11 @@
 // `parseFeed()` is pure — no I/O. `feed-fetcher.ts` handles HTTP.
 
 import { XMLParser } from "fast-xml-parser";
-import type { NewFeedEntry, FeedEntryImage } from "@/schemas/feed-entry";
+import type {
+  NewFeedEntry,
+  FeedEntryImage,
+  FeedEntryType,
+} from "@/schemas/feed-entry";
 
 type ParseResult = {
   entries: NewFeedEntry[];
@@ -74,7 +78,7 @@ function parseRssChannel(channel: any, sourceId: string): ParseResult {
       authorName,
       body,
       excerpt: makeExcerpt(body),
-      type: "unknown",
+      type: detectRssType(item, { title, body, image }),
       image,
     });
   }
@@ -171,7 +175,7 @@ function parseAtomFeed(feed: any, sourceId: string): ParseResult {
       authorName,
       body,
       excerpt: makeExcerpt(body),
-      type: "unknown",
+      type: detectAtomType(item, { title, body }),
       image: undefined, // Atom rarely carries inline images via a stable convention
     });
   }
@@ -254,4 +258,91 @@ function makeExcerpt(html: string | undefined): string | undefined {
   if (text.length === 0) return undefined;
   if (text.length <= 240) return text;
   return text.slice(0, 237) + "…";
+}
+
+// ── Type detection ─────────────────────────────────────────────────────────
+//
+// Order of authority:
+// 1. `<nearstream:type>note|essay|picture</nearstream:type>` — Nearstream feeds
+//    emit this explicitly so the type round-trips between instances.
+// 2. `<category>` named Stream / Essay / Inventory — our older feeds and any
+//    Nearstream-shaped feed that didn't get the extension yet.
+// 3. Heuristic — for non-Nearstream feeds (Substack, Mastodon, micro.blog,
+//    a friend's blog). Image enclosure → picture; title + non-trivial body →
+//    essay; everything else → note.
+//
+// The heuristic intentionally biases toward "note" over "essay" — most things
+// without a title are short, and a wrong note feels more honest than a wrong
+// essay in the reader chrome.
+
+const ESSAY_BODY_THRESHOLD = 320; // chars of stripped text; below this a titled item is still likely a note
+
+function detectRssType(
+  item: any,
+  fallback: { title?: string; body?: string; image?: FeedEntryImage },
+): FeedEntryType {
+  const explicit = textOf(item["nearstream:type"]);
+  if (explicit) {
+    const t = normalizeType(explicit);
+    if (t !== "unknown") return t;
+  }
+  const categories = asArray(item.category)
+    .map((c: any) => textOf(c) ?? (typeof c === "string" ? c : undefined))
+    .filter((c): c is string => typeof c === "string");
+  const cat = mapNearstreamCategory(categories);
+  if (cat !== "unknown") return cat;
+  return heuristicType(fallback);
+}
+
+function detectAtomType(
+  item: any,
+  fallback: { title?: string; body?: string },
+): FeedEntryType {
+  const explicit = textOf(item["nearstream:type"]);
+  if (explicit) {
+    const t = normalizeType(explicit);
+    if (t !== "unknown") return t;
+  }
+  // Atom <category term="..."> is more common than <category>text</category>
+  const categories = asArray(item.category)
+    .map((c: any) => {
+      if (typeof c === "string") return c;
+      return c?.["@_term"] ?? textOf(c);
+    })
+    .filter((c): c is string => typeof c === "string");
+  const cat = mapNearstreamCategory(categories);
+  if (cat !== "unknown") return cat;
+  return heuristicType(fallback);
+}
+
+function normalizeType(raw: string): FeedEntryType {
+  const v = raw.trim().toLowerCase();
+  if (v === "note" || v === "essay" || v === "picture") return v;
+  return "unknown";
+}
+
+function mapNearstreamCategory(categories: string[]): FeedEntryType {
+  for (const c of categories) {
+    const v = c.trim().toLowerCase();
+    if (v === "stream") return "note";
+    if (v === "essay") return "essay";
+    if (v === "inventory") return "picture";
+  }
+  return "unknown";
+}
+
+function heuristicType(input: {
+  title?: string;
+  body?: string;
+  image?: FeedEntryImage;
+}): FeedEntryType {
+  if (input.image) return "picture";
+  const strippedBody = (input.body ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (input.title && input.title.trim().length > 0 && strippedBody.length >= ESSAY_BODY_THRESHOLD) {
+    return "essay";
+  }
+  return "note";
 }

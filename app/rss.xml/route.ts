@@ -117,6 +117,7 @@ export async function GET() {
       <pubDate>${toRfc822(entry.publishedAt)}</pubDate>
       <category>Stream</category>
       <category>${escapeXml(entry.tag)}</category>
+      <nearstream:type>note</nearstream:type>
       <description><![CDATA[${escapeCdata(body)}]]></description>
     </item>`,
     });
@@ -133,6 +134,7 @@ export async function GET() {
       <guid isPermaLink="true">${escapeXml(link)}</guid>
       <pubDate>${toRfc822(essay.publishedAt)}</pubDate>
       <category>Essay</category>
+      <nearstream:type>essay</nearstream:type>
       <description><![CDATA[${escapeCdata(html)}]]></description>
     </item>`,
     });
@@ -151,6 +153,7 @@ export async function GET() {
       <guid isPermaLink="true">${escapeXml(link)}</guid>
       <pubDate>${toRfc822(item.publishedAt)}</pubDate>
       <category>Inventory</category>
+      <nearstream:type>picture</nearstream:type>
       ${enclosure}
       <description><![CDATA[${escapeCdata(body)}]]></description>
     </item>`,
@@ -162,7 +165,7 @@ export async function GET() {
   const itemsXml = feedItems.map((it) => it.toXml()).join("\n");
 
   const xml = `<?xml version="1.0" encoding="UTF-8" ?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:nearstream="https://nearstream.app/ns/v1">
   <channel>
     <title>${escapeXml(FEED_TITLE)}</title>
     <link>${escapeXml(SITE_URL)}</link>
