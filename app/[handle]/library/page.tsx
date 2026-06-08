@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
+import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
@@ -8,9 +10,19 @@ import { DeleteButton } from "@/app/_components/delete-button";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Library · Nearstream",
+type Props = {
+  params: Promise<{ handle: string }>;
 };
+
+export async function generateMetadata({ params }: Props) {
+  const { handle } = await params;
+  const user = await userStore.getByHandle(handle);
+  return {
+    title: user
+      ? `Library · ${user.displayName || handle}`
+      : "Library · Nearstream",
+  };
+}
 
 type LibraryEntry =
   | {
@@ -40,13 +52,17 @@ function formatDate(iso: string): string {
   return sameYear ? `${month} ${day}` : `${month} ${day}, ${year}`;
 }
 
-export default async function LibraryPage() {
+export default async function LibraryPage({ params }: Props) {
+  const { handle } = await params;
+  const user = await userStore.getByHandle(handle);
+  if (!user) notFound();
+
   const [essays, items, session] = await Promise.all([
-    essayStore.list(),
-    inventoryStore.list(),
+    essayStore.list(user.id),
+    inventoryStore.list(user.id),
     getSession(),
   ]);
-  const isSignedIn = !!session;
+  const isOwner = session?.userId === user.id;
 
   const entries: LibraryEntry[] = [
     ...essays.map(
@@ -55,7 +71,7 @@ export default async function LibraryPage() {
         id: e.id,
         slug: e.slug,
         title: e.title,
-        href: `/library/${e.slug}`,
+        href: `/${handle}/library/${e.slug}`,
         publishedAt: e.publishedAt,
       }),
     ),
@@ -65,7 +81,7 @@ export default async function LibraryPage() {
         id: i.id,
         slug: i.slug,
         title: i.title,
-        href: `/library/inventory/${i.slug}`,
+        href: `/${handle}/library/inventory/${i.slug}`,
         publishedAt: i.publishedAt,
         imageKey: i.image.thumbKey ?? i.image.key,
       }),
@@ -79,12 +95,14 @@ export default async function LibraryPage() {
     <PageShell
       rightNav={
         <>
-          <Link href="/" className={navLinkClasses}>
+          <Link href={`/${handle}`} className={navLinkClasses}>
             ← Home
           </Link>
-          <Link href="/studio" className={navLinkClasses}>
-            Studio →
-          </Link>
+          {isOwner && (
+            <Link href="/studio" className={navLinkClasses}>
+              Studio →
+            </Link>
+          )}
         </>
       }
     >
@@ -92,27 +110,39 @@ export default async function LibraryPage() {
         <div className="w-full max-w-lg py-12">
           <Kicker>Library</Kicker>
           <h1 className="mt-2 text-2xl font-normal tracking-tight text-foreground">
-            All entries
+            {user.displayName || handle}
           </h1>
 
           {entries.length === 0 ? (
             <p className="mt-12 text-sm leading-relaxed text-muted">
-              No library entries yet. Post one from the{" "}
-              <Link
-                href="/studio"
-                className="text-foreground underline-offset-4 hover:underline"
-              >
-                studio
-              </Link>
-              .
+              No library entries yet.
+              {isOwner && (
+                <>
+                  {" "}Post one from the{" "}
+                  <Link
+                    href="/studio"
+                    className="text-foreground underline-offset-4 hover:underline"
+                  >
+                    studio
+                  </Link>
+                  .
+                </>
+              )}
             </p>
           ) : (
             <ul className="mt-12 space-y-8">
               {entries.map((entry) => (
-                <li key={`${entry.type}-${entry.id}`} className="flex items-start gap-4">
-                  <Link href={entry.href} className="group flex flex-1 items-start gap-4">
+                <li
+                  key={`${entry.type}-${entry.id}`}
+                  className="flex items-start gap-4"
+                >
+                  <Link
+                    href={entry.href}
+                    className="group flex flex-1 items-start gap-4"
+                  >
                     {entry.type === "inventory" ? (
                       <div className="h-16 w-16 flex-shrink-0 overflow-hidden border border-border bg-foreground/5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={`/api/media/${entry.imageKey}`}
                           alt=""
@@ -140,7 +170,7 @@ export default async function LibraryPage() {
                       </h2>
                     </div>
                   </Link>
-                  {isSignedIn && (
+                  {isOwner && (
                     <div className="pt-1">
                       <DeleteButton
                         action={

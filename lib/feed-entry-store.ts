@@ -2,10 +2,10 @@ import { R2Client } from "@/lib/r2-client";
 import type { FeedEntry, NewFeedEntry } from "@/schemas/feed-entry";
 
 export interface FeedEntryStore {
-  list(): Promise<FeedEntry[]>;
-  listBySource(sourceId: string): Promise<FeedEntry[]>;
-  upsertMany(entries: NewFeedEntry[]): Promise<number>;
-  deleteBySource(sourceId: string): Promise<number>;
+  list(userId: string): Promise<FeedEntry[]>;
+  listBySource(userId: string, sourceId: string): Promise<FeedEntry[]>;
+  upsertMany(userId: string, entries: NewFeedEntry[]): Promise<number>;
+  deleteBySource(userId: string, sourceId: string): Promise<number>;
 }
 
 /** Stable across refetches: same (sourceId, guid) → same id. */
@@ -19,38 +19,44 @@ async function makeEntryId(sourceId: string, guid: string): Promise<string> {
 }
 
 class InMemoryFeedEntryStore implements FeedEntryStore {
-  private entries = new Map<string, FeedEntry>();
+  private entries = new Map<string, Map<string, FeedEntry>>();
+  private bucket(userId: string): Map<string, FeedEntry> {
+    let b = this.entries.get(userId);
+    if (!b) {
+      b = new Map();
+      this.entries.set(userId, b);
+    }
+    return b;
+  }
 
-  async list(): Promise<FeedEntry[]> {
-    return [...this.entries.values()].sort((a, b) =>
+  async list(userId: string): Promise<FeedEntry[]> {
+    return [...this.bucket(userId).values()].sort((a, b) =>
       b.publishedAt.localeCompare(a.publishedAt),
     );
   }
 
-  async listBySource(sourceId: string): Promise<FeedEntry[]> {
-    return (await this.list()).filter((e) => e.sourceId === sourceId);
+  async listBySource(userId: string, sourceId: string): Promise<FeedEntry[]> {
+    return (await this.list(userId)).filter((e) => e.sourceId === sourceId);
   }
 
-  async upsertMany(entries: NewFeedEntry[]): Promise<number> {
+  async upsertMany(userId: string, entries: NewFeedEntry[]): Promise<number> {
+    const b = this.bucket(userId);
     let added = 0;
     for (const input of entries) {
       const id = await makeEntryId(input.sourceId, input.guid);
-      if (this.entries.has(id)) continue;
-      this.entries.set(id, {
-        ...input,
-        id,
-        fetchedAt: new Date().toISOString(),
-      });
+      if (b.has(id)) continue;
+      b.set(id, { ...input, id, fetchedAt: new Date().toISOString() });
       added++;
     }
     return added;
   }
 
-  async deleteBySource(sourceId: string): Promise<number> {
+  async deleteBySource(userId: string, sourceId: string): Promise<number> {
+    const b = this.bucket(userId);
     let n = 0;
-    for (const [id, e] of this.entries) {
+    for (const [id, e] of b) {
       if (e.sourceId === sourceId) {
-        this.entries.delete(id);
+        b.delete(id);
         n++;
       }
     }
@@ -77,20 +83,22 @@ class R2FeedEntryStore implements FeedEntryStore {
     this.base = `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}`;
   }
 
-  private key(sourceId: string, entryId: string) {
-    return `reader/feed/${sourceId}/${entryId}.json`;
+  private key(userId: string, sourceId: string, entryId: string) {
+    return `users/${userId}/reader/feed/${sourceId}/${entryId}.json`;
   }
 
-  private prefix(sourceId?: string) {
-    return sourceId ? `reader/feed/${sourceId}/` : `reader/feed/`;
+  private prefix(userId: string, sourceId?: string) {
+    return sourceId
+      ? `users/${userId}/reader/feed/${sourceId}/`
+      : `users/${userId}/reader/feed/`;
   }
 
-  async list(): Promise<FeedEntry[]> {
-    return this.listByPrefix(this.prefix());
+  async list(userId: string): Promise<FeedEntry[]> {
+    return this.listByPrefix(this.prefix(userId));
   }
 
-  async listBySource(sourceId: string): Promise<FeedEntry[]> {
-    return this.listByPrefix(this.prefix(sourceId));
+  async listBySource(userId: string, sourceId: string): Promise<FeedEntry[]> {
+    return this.listByPrefix(this.prefix(userId, sourceId));
   }
 
   private async listByPrefix(prefix: string): Promise<FeedEntry[]> {
@@ -119,18 +127,11 @@ class R2FeedEntryStore implements FeedEntryStore {
     );
   }
 
-  async upsertMany(entries: NewFeedEntry[]): Promise<number> {
-    // HEAD-before-PUT is only an optimization to skip already-seen entries and
-    // preserve their original `fetchedAt`. If HEAD returns anything other than
-    // 200, we treat the object as not-present and proceed with PUT — covers
-    // the common R2 token shape that returns 403 on missing objects (no
-    // ListBucket permission) instead of the canonical 404. Worst case: a
-    // redundant PUT that overwrites with a refreshed fetchedAt, which is
-    // harmless.
+  async upsertMany(userId: string, entries: NewFeedEntry[]): Promise<number> {
     let added = 0;
     for (const input of entries) {
       const id = await makeEntryId(input.sourceId, input.guid);
-      const objKey = this.key(input.sourceId, id);
+      const objKey = this.key(userId, input.sourceId, id);
       try {
         const head = await this.client.fetch(`${this.base}/${objKey}`, {
           method: "HEAD",
@@ -159,8 +160,8 @@ class R2FeedEntryStore implements FeedEntryStore {
     return added;
   }
 
-  async deleteBySource(sourceId: string): Promise<number> {
-    const url = `${this.base}/?list-type=2&prefix=${encodeURIComponent(this.prefix(sourceId))}`;
+  async deleteBySource(userId: string, sourceId: string): Promise<number> {
+    const url = `${this.base}/?list-type=2&prefix=${encodeURIComponent(this.prefix(userId, sourceId))}`;
     const listRes = await this.client.fetch(url);
     if (!listRes.ok) {
       throw new Error(
@@ -171,7 +172,9 @@ class R2FeedEntryStore implements FeedEntryStore {
     if (keys.length === 0) return 0;
     await Promise.all(
       keys.map(async (key) => {
-        const r = await this.client.fetch(`${this.base}/${key}`, { method: "DELETE" });
+        const r = await this.client.fetch(`${this.base}/${key}`, {
+          method: "DELETE",
+        });
         if (r.status !== 204 && r.status !== 404) {
           throw new Error(`R2 DELETE ${key} failed (${r.status} ${r.statusText})`);
         }
@@ -199,9 +202,16 @@ function pickStore(): FeedEntryStore {
 
   if (accountId && accessKeyId && secretAccessKey && bucket) {
     console.log("[nearstream] feed-entry-store: R2");
-    return new R2FeedEntryStore({ accountId, accessKeyId, secretAccessKey, bucket });
+    return new R2FeedEntryStore({
+      accountId,
+      accessKeyId,
+      secretAccessKey,
+      bucket,
+    });
   }
-  console.log("[nearstream] feed-entry-store: in-memory (set R2_* env vars for R2)");
+  console.log(
+    "[nearstream] feed-entry-store: in-memory (set R2_* env vars for R2)",
+  );
   return new InMemoryFeedEntryStore();
 }
 

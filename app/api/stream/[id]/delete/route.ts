@@ -14,7 +14,7 @@ export async function POST(_req: Request, { params }: Props) {
   }
 
   const { id } = await params;
-  await store.delete(id);
+  await store.delete(session.userId, id);
 
   revalidatePath("/");
   revalidatePath("/rss.xml");

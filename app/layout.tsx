@@ -18,13 +18,6 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: "Nearstream",
   description: "A shared journal between close friends.",
-  alternates: {
-    types: {
-      "application/rss+xml": [
-        { url: "/rss.xml", title: "Nearstream — Alessandro Borelli" },
-      ],
-    },
-  },
 };
 
 export default function RootLayout({

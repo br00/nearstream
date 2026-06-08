@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { marked } from "marked";
 import { inventoryStore } from "@/lib/inventory-store";
+import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
@@ -10,7 +11,7 @@ import { DeleteButton } from "@/app/_components/delete-button";
 export const dynamic = "force-dynamic";
 
 type Props = {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ handle: string; slug: string }>;
 };
 
 function formatDate(iso: string): string {
@@ -22,22 +23,25 @@ function formatDate(iso: string): string {
 }
 
 export async function generateMetadata({ params }: Props) {
-  const { slug } = await params;
-  const item = await inventoryStore.getBySlug(slug);
+  const { handle, slug } = await params;
+  const user = await userStore.getByHandle(handle);
+  if (!user) return { title: "Not found · Nearstream" };
+  const item = await inventoryStore.getBySlug(user.id, slug);
   if (!item) return { title: "Not found · Nearstream" };
-  return {
-    title: `${item.title} · Nearstream`,
-  };
+  return { title: `${item.title} · ${user.displayName || handle}` };
 }
 
 export default async function InventoryItemPage({ params }: Props) {
-  const { slug } = await params;
+  const { handle, slug } = await params;
+  const user = await userStore.getByHandle(handle);
+  if (!user) notFound();
+
   const [item, session] = await Promise.all([
-    inventoryStore.getBySlug(slug),
+    inventoryStore.getBySlug(user.id, slug),
     getSession(),
   ]);
   if (!item) notFound();
-  const isSignedIn = !!session;
+  const isOwner = session?.userId === user.id;
 
   const html = item.description
     ? await marked.parse(item.description, { async: true })
@@ -57,10 +61,13 @@ export default async function InventoryItemPage({ params }: Props) {
     <PageShell
       rightNav={
         <>
-          <Link href="/library/inventory" className={navLinkClasses}>
+          <Link
+            href={`/${handle}/library/inventory`}
+            className={navLinkClasses}
+          >
             ← Inventory
           </Link>
-          {isSignedIn && (
+          {isOwner && (
             <DeleteButton
               action={`/api/inventory/${item.slug}/delete`}
               confirmMessage={`Delete "${item.title}"? This removes both the metadata and the image files. Permanent.`}
@@ -74,6 +81,7 @@ export default async function InventoryItemPage({ params }: Props) {
           <Kicker>Library / Inventory</Kicker>
 
           <div className="mt-6 border border-border bg-foreground/5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/api/media/${item.image.key}`}
               alt={item.title}

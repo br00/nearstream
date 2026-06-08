@@ -1,16 +1,16 @@
 import { marked } from "marked";
+import { notFound } from "next/navigation";
 import { store } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
+import { userStore } from "@/lib/user-store";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import type { InventoryItem } from "@/schemas/inventory";
 
 export const dynamic = "force-dynamic";
 
-const SITE_URL = process.env.NEARSTREAM_SITE_URL ?? "http://localhost:3000";
-const FEED_TITLE = "Nearstream — Alessandro Borelli";
-const FEED_DESCRIPTION =
-  "Stream notes, Library essays, and Inventory entries from Alessandro Borelli.";
+const INSTANCE_URL =
+  process.env.NEARSTREAM_SITE_URL ?? "http://localhost:3000";
 
 type FeedItem = {
   publishedAt: string;
@@ -47,8 +47,11 @@ function htmlEscape(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-async function renderInventoryBody(item: InventoryItem): Promise<string> {
-  const imageUrl = `${SITE_URL}/api/media/${item.image.key}`;
+async function renderInventoryBody(
+  item: InventoryItem,
+  siteUrl: string,
+): Promise<string> {
+  const imageUrl = `${siteUrl}/api/media/${item.image.key}`;
   const dims =
     item.image.width && item.image.height
       ? ` width="${item.image.width}" height="${item.image.height}"`
@@ -83,29 +86,44 @@ async function renderInventoryBody(item: InventoryItem): Promise<string> {
   return parts.join("\n");
 }
 
-export async function GET() {
+type Props = {
+  params: Promise<{ handle: string }>;
+};
+
+export async function GET(_req: Request, { params }: Props) {
+  const { handle } = await params;
+  const user = await userStore.getByHandle(handle);
+  if (!user) notFound();
+
+  const siteUrl = `${INSTANCE_URL}/${handle}`;
+  const feedTitle = `${user.displayName || handle} — Nearstream`;
+  const feedDescription = `Stream, essays, and inventory from ${user.displayName || handle}.`;
+
   const [entries, essays, items] = await Promise.all([
-    store.list(),
-    essayStore.list(),
-    inventoryStore.list(),
+    store.list(user.id),
+    essayStore.list(user.id),
+    inventoryStore.list(user.id),
   ]);
 
   const essayTitles = new Map(essays.map((e) => [e.slug, e.title]));
   const inventoryTitles = new Map(items.map((i) => [i.slug, i.title]));
 
   function lookupLinkTitle(link: LibraryLink): string | null {
-    return (link.type === "essay" ? essayTitles : inventoryTitles).get(link.slug) ?? null;
+    return (
+      (link.type === "essay" ? essayTitles : inventoryTitles).get(link.slug) ??
+      null
+    );
   }
 
   const feedItems: FeedItem[] = [];
 
   for (const entry of entries) {
-    const link = `${SITE_URL}/#entry-${entry.id}`;
+    const link = `${siteUrl}/stream#entry-${entry.id}`;
     let body = entry.text;
     if (entry.link) {
       const title = lookupLinkTitle(entry.link);
       if (title) {
-        body += `\n\n→ ${title}: ${SITE_URL}${linkHref(entry.link)}`;
+        body += `\n\n→ ${title}: ${siteUrl}${linkHref(entry.link)}`;
       }
     }
     feedItems.push({
@@ -124,7 +142,7 @@ export async function GET() {
   }
 
   for (const essay of essays) {
-    const link = `${SITE_URL}/library/${essay.slug}`;
+    const link = `${siteUrl}/library/${essay.slug}`;
     const html = await marked.parse(essay.body, { async: true });
     feedItems.push({
       publishedAt: essay.publishedAt,
@@ -141,9 +159,9 @@ export async function GET() {
   }
 
   for (const item of items) {
-    const link = `${SITE_URL}/library/inventory/${item.slug}`;
-    const body = await renderInventoryBody(item);
-    const imageUrl = `${SITE_URL}/api/media/${item.image.key}`;
+    const link = `${siteUrl}/library/inventory/${item.slug}`;
+    const body = await renderInventoryBody(item, INSTANCE_URL);
+    const imageUrl = `${INSTANCE_URL}/api/media/${item.image.key}`;
     const enclosure = `<enclosure url="${escapeXml(imageUrl)}" length="${item.image.sizeBytes}" type="${escapeXml(item.image.contentType)}" />`;
     feedItems.push({
       publishedAt: item.publishedAt,
@@ -167,12 +185,12 @@ export async function GET() {
   const xml = `<?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:nearstream="https://nearstream.app/ns/v1">
   <channel>
-    <title>${escapeXml(FEED_TITLE)}</title>
-    <link>${escapeXml(SITE_URL)}</link>
-    <description>${escapeXml(FEED_DESCRIPTION)}</description>
+    <title>${escapeXml(feedTitle)}</title>
+    <link>${escapeXml(siteUrl)}</link>
+    <description>${escapeXml(feedDescription)}</description>
     <language>en</language>
     <lastBuildDate>${toRfc822(lastBuild)}</lastBuildDate>
-    <atom:link href="${escapeXml(SITE_URL)}/rss.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="${escapeXml(siteUrl)}/rss.xml" rel="self" type="application/rss+xml" />
 ${itemsXml}
   </channel>
 </rss>

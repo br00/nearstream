@@ -4,40 +4,49 @@ import { slugify } from "@/schemas/inventory";
 import { mediaStore } from "@/lib/media-store";
 
 export interface InventoryStore {
-  list(): Promise<InventoryItem[]>;
-  add(input: NewInventoryItem): Promise<InventoryItem>;
-  getBySlug(slug: string): Promise<InventoryItem | null>;
-  deleteBySlug(slug: string): Promise<boolean>;
+  list(userId: string): Promise<InventoryItem[]>;
+  add(userId: string, input: NewInventoryItem): Promise<InventoryItem>;
+  getBySlug(userId: string, slug: string): Promise<InventoryItem | null>;
+  deleteBySlug(userId: string, slug: string): Promise<boolean>;
 }
 
 class InMemoryInventoryStore implements InventoryStore {
-  private items: InventoryItem[] = [];
+  private items = new Map<string, InventoryItem[]>();
+  private bucket(userId: string): InventoryItem[] {
+    let b = this.items.get(userId);
+    if (!b) {
+      b = [];
+      this.items.set(userId, b);
+    }
+    return b;
+  }
 
-  async list(): Promise<InventoryItem[]> {
-    return [...this.items].sort((a, b) =>
+  async list(userId: string): Promise<InventoryItem[]> {
+    return [...this.bucket(userId)].sort((a, b) =>
       b.publishedAt.localeCompare(a.publishedAt),
     );
   }
 
-  async add(input: NewInventoryItem): Promise<InventoryItem> {
+  async add(userId: string, input: NewInventoryItem): Promise<InventoryItem> {
     const item: InventoryItem = {
       ...input,
       id: crypto.randomUUID(),
       slug: slugify(input.title),
       publishedAt: new Date().toISOString(),
     };
-    this.items.push(item);
+    this.bucket(userId).push(item);
     return item;
   }
 
-  async getBySlug(slug: string): Promise<InventoryItem | null> {
-    return this.items.find((i) => i.slug === slug) ?? null;
+  async getBySlug(userId: string, slug: string): Promise<InventoryItem | null> {
+    return this.bucket(userId).find((i) => i.slug === slug) ?? null;
   }
 
-  async deleteBySlug(slug: string): Promise<boolean> {
-    const i = this.items.findIndex((it) => it.slug === slug);
+  async deleteBySlug(userId: string, slug: string): Promise<boolean> {
+    const b = this.bucket(userId);
+    const i = b.findIndex((it) => it.slug === slug);
     if (i === -1) return false;
-    this.items.splice(i, 1);
+    b.splice(i, 1);
     return true;
   }
 }
@@ -61,22 +70,29 @@ class R2InventoryStore implements InventoryStore {
     this.base = `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}`;
   }
 
-  private key(id: string) {
-    return `library/inventory/${id}.json`;
+  private prefix(userId: string) {
+    return `users/${userId}/library/inventory/`;
   }
 
-  async add(input: NewInventoryItem): Promise<InventoryItem> {
+  private key(userId: string, id: string) {
+    return `${this.prefix(userId)}${id}.json`;
+  }
+
+  async add(userId: string, input: NewInventoryItem): Promise<InventoryItem> {
     const item: InventoryItem = {
       ...input,
       id: crypto.randomUUID(),
       slug: slugify(input.title),
       publishedAt: new Date().toISOString(),
     };
-    const res = await this.client.fetch(`${this.base}/${this.key(item.id)}`, {
-      method: "PUT",
-      body: JSON.stringify(item),
-      headers: { "content-type": "application/json" },
-    });
+    const res = await this.client.fetch(
+      `${this.base}/${this.key(userId, item.id)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(item),
+        headers: { "content-type": "application/json" },
+      },
+    );
     if (!res.ok) {
       throw new Error(
         `R2 PUT failed (${res.status} ${res.statusText}): ${await res.text()}`,
@@ -85,8 +101,8 @@ class R2InventoryStore implements InventoryStore {
     return item;
   }
 
-  async list(): Promise<InventoryItem[]> {
-    const url = `${this.base}/?list-type=2&prefix=${encodeURIComponent("library/inventory/")}`;
+  async list(userId: string): Promise<InventoryItem[]> {
+    const url = `${this.base}/?list-type=2&prefix=${encodeURIComponent(this.prefix(userId))}`;
     const listRes = await this.client.fetch(url);
     if (!listRes.ok) {
       throw new Error(
@@ -100,9 +116,7 @@ class R2InventoryStore implements InventoryStore {
       keys.map(async (key) => {
         const r = await this.client.fetch(`${this.base}/${key}`);
         if (!r.ok) {
-          throw new Error(
-            `R2 GET ${key} failed (${r.status} ${r.statusText})`,
-          );
+          throw new Error(`R2 GET ${key} failed (${r.status} ${r.statusText})`);
         }
         return (await r.json()) as InventoryItem;
       }),
@@ -113,17 +127,15 @@ class R2InventoryStore implements InventoryStore {
     );
   }
 
-  async getBySlug(slug: string): Promise<InventoryItem | null> {
-    const all = await this.list();
+  async getBySlug(userId: string, slug: string): Promise<InventoryItem | null> {
+    const all = await this.list(userId);
     return all.find((i) => i.slug === slug) ?? null;
   }
 
-  async deleteBySlug(slug: string): Promise<boolean> {
-    const target = await this.getBySlug(slug);
+  async deleteBySlug(userId: string, slug: string): Promise<boolean> {
+    const target = await this.getBySlug(userId, slug);
     if (!target) return false;
 
-    // Cascade-delete the image files first (best-effort — if these fail, we
-    // still try to delete the metadata so the item disappears from the UI).
     if (mediaStore) {
       try {
         await mediaStore.deleteImage(target.image.key);
@@ -138,9 +150,10 @@ class R2InventoryStore implements InventoryStore {
       }
     }
 
-    const res = await this.client.fetch(`${this.base}/${this.key(target.id)}`, {
-      method: "DELETE",
-    });
+    const res = await this.client.fetch(
+      `${this.base}/${this.key(userId, target.id)}`,
+      { method: "DELETE" },
+    );
     if (res.status === 204) return true;
     if (res.status === 404) return false;
     throw new Error(
@@ -174,7 +187,9 @@ function pickStore(): InventoryStore {
       bucket,
     });
   }
-  console.log("[nearstream] inventory-store: in-memory (set R2_* env vars for R2)");
+  console.log(
+    "[nearstream] inventory-store: in-memory (set R2_* env vars for R2)",
+  );
   return new InMemoryInventoryStore();
 }
 

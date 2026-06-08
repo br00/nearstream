@@ -3,22 +3,30 @@ import type { Essay, NewEssay } from "@/schemas/essay";
 import { slugify } from "@/schemas/essay";
 
 export interface EssayStore {
-  list(): Promise<Essay[]>;
-  add(input: NewEssay): Promise<Essay>;
-  getBySlug(slug: string): Promise<Essay | null>;
-  deleteBySlug(slug: string): Promise<boolean>;
+  list(userId: string): Promise<Essay[]>;
+  add(userId: string, input: NewEssay): Promise<Essay>;
+  getBySlug(userId: string, slug: string): Promise<Essay | null>;
+  deleteBySlug(userId: string, slug: string): Promise<boolean>;
 }
 
 class InMemoryEssayStore implements EssayStore {
-  private essays: Essay[] = [];
+  private essays = new Map<string, Essay[]>();
+  private bucket(userId: string): Essay[] {
+    let b = this.essays.get(userId);
+    if (!b) {
+      b = [];
+      this.essays.set(userId, b);
+    }
+    return b;
+  }
 
-  async list(): Promise<Essay[]> {
-    return [...this.essays].sort((a, b) =>
+  async list(userId: string): Promise<Essay[]> {
+    return [...this.bucket(userId)].sort((a, b) =>
       b.publishedAt.localeCompare(a.publishedAt),
     );
   }
 
-  async add(input: NewEssay): Promise<Essay> {
+  async add(userId: string, input: NewEssay): Promise<Essay> {
     const essay: Essay = {
       id: crypto.randomUUID(),
       slug: slugify(input.title),
@@ -26,18 +34,19 @@ class InMemoryEssayStore implements EssayStore {
       body: input.body,
       publishedAt: new Date().toISOString(),
     };
-    this.essays.push(essay);
+    this.bucket(userId).push(essay);
     return essay;
   }
 
-  async getBySlug(slug: string): Promise<Essay | null> {
-    return this.essays.find((e) => e.slug === slug) ?? null;
+  async getBySlug(userId: string, slug: string): Promise<Essay | null> {
+    return this.bucket(userId).find((e) => e.slug === slug) ?? null;
   }
 
-  async deleteBySlug(slug: string): Promise<boolean> {
-    const i = this.essays.findIndex((e) => e.slug === slug);
+  async deleteBySlug(userId: string, slug: string): Promise<boolean> {
+    const b = this.bucket(userId);
+    const i = b.findIndex((e) => e.slug === slug);
     if (i === -1) return false;
-    this.essays.splice(i, 1);
+    b.splice(i, 1);
     return true;
   }
 }
@@ -61,11 +70,15 @@ class R2EssayStore implements EssayStore {
     this.base = `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}`;
   }
 
-  private key(id: string) {
-    return `library/essays/${id}.json`;
+  private prefix(userId: string) {
+    return `users/${userId}/library/essays/`;
   }
 
-  async add(input: NewEssay): Promise<Essay> {
+  private key(userId: string, id: string) {
+    return `${this.prefix(userId)}${id}.json`;
+  }
+
+  async add(userId: string, input: NewEssay): Promise<Essay> {
     const essay: Essay = {
       id: crypto.randomUUID(),
       slug: slugify(input.title),
@@ -73,11 +86,14 @@ class R2EssayStore implements EssayStore {
       body: input.body,
       publishedAt: new Date().toISOString(),
     };
-    const res = await this.client.fetch(`${this.base}/${this.key(essay.id)}`, {
-      method: "PUT",
-      body: JSON.stringify(essay),
-      headers: { "content-type": "application/json" },
-    });
+    const res = await this.client.fetch(
+      `${this.base}/${this.key(userId, essay.id)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(essay),
+        headers: { "content-type": "application/json" },
+      },
+    );
     if (!res.ok) {
       throw new Error(
         `R2 PUT failed (${res.status} ${res.statusText}): ${await res.text()}`,
@@ -86,8 +102,8 @@ class R2EssayStore implements EssayStore {
     return essay;
   }
 
-  async list(): Promise<Essay[]> {
-    const url = `${this.base}/?list-type=2&prefix=${encodeURIComponent("library/essays/")}`;
+  async list(userId: string): Promise<Essay[]> {
+    const url = `${this.base}/?list-type=2&prefix=${encodeURIComponent(this.prefix(userId))}`;
     const listRes = await this.client.fetch(url);
     if (!listRes.ok) {
       throw new Error(
@@ -114,17 +130,20 @@ class R2EssayStore implements EssayStore {
     );
   }
 
-  async getBySlug(slug: string): Promise<Essay | null> {
-    const all = await this.list();
+  async getBySlug(userId: string, slug: string): Promise<Essay | null> {
+    const all = await this.list(userId);
     return all.find((e) => e.slug === slug) ?? null;
   }
 
-  async deleteBySlug(slug: string): Promise<boolean> {
-    const target = await this.getBySlug(slug);
+  async deleteBySlug(userId: string, slug: string): Promise<boolean> {
+    const target = await this.getBySlug(userId, slug);
     if (!target) return false;
-    const res = await this.client.fetch(`${this.base}/${this.key(target.id)}`, {
-      method: "DELETE",
-    });
+    const res = await this.client.fetch(
+      `${this.base}/${this.key(userId, target.id)}`,
+      {
+        method: "DELETE",
+      },
+    );
     if (res.status === 204) return true;
     if (res.status === 404) return false;
     throw new Error(

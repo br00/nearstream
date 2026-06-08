@@ -14,7 +14,7 @@ export async function POST(_req: Request, { params }: Props) {
   }
 
   const { slug } = await params;
-  await inventoryStore.deleteBySlug(slug);
+  await inventoryStore.deleteBySlug(session.userId, slug);
 
   revalidatePath("/library");
   revalidatePath("/library/inventory");

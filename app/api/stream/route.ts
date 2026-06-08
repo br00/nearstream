@@ -6,9 +6,14 @@ import {
   type LibraryLink,
 } from "@/schemas/stream";
 import { getSession } from "@/lib/auth";
+import { userStore } from "@/lib/user-store";
 
 export async function GET() {
-  const entries = await store.list();
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const entries = await store.list(session.userId);
   return Response.json({ entries });
 }
 
@@ -48,15 +53,23 @@ export async function POST(request: Request) {
     return Response.json({ error: link }, { status: 400 });
   }
 
-  const entry = await store.add({ text: text.trim(), tag, link });
-  revalidatePath("/");
-  revalidatePath("/rss.xml");
+  const entry = await store.add(session.userId, {
+    text: text.trim(),
+    tag,
+    link,
+  });
+
+  const user = await userStore.getById(session.userId);
+  const handle = user?.handle ?? "";
+  revalidatePath(`/${handle}`);
+  revalidatePath(`/${handle}/stream`);
+  revalidatePath(`/${handle}/rss.xml`);
 
   if (contentType.includes("application/json")) {
     return Response.json({ entry }, { status: 201 });
   }
 
-  return Response.redirect(new URL("/", request.url), 303);
+  return Response.redirect(new URL(`/${handle}`, request.url), 303);
 }
 
 // Accepts either a structured object (JSON) or a "type::slug" string (form).

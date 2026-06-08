@@ -2,12 +2,17 @@ import { revalidatePath } from "next/cache";
 import { essayStore } from "@/lib/essay-store";
 import { slugify } from "@/schemas/essay";
 import { getSession } from "@/lib/auth";
+import { userStore } from "@/lib/user-store";
 
 const TITLE_MAX = 200;
 const BODY_MAX = 50_000;
 
 export async function GET() {
-  const essays = await essayStore.list();
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const essays = await essayStore.list(session.userId);
   return Response.json({ essays });
 }
 
@@ -66,7 +71,7 @@ export async function POST(request: Request) {
       "title must contain at least one letter or number",
     );
   }
-  const existing = await essayStore.getBySlug(slug);
+  const existing = await essayStore.getBySlug(session.userId, slug);
   if (existing) {
     return errorResponse(
       request,
@@ -76,18 +81,26 @@ export async function POST(request: Request) {
     );
   }
 
-  const essay = await essayStore.add({
+  const essay = await essayStore.add(session.userId, {
     title: trimmedTitle,
     body: body.trim(),
   });
-  revalidatePath("/library");
-  revalidatePath(`/library/${essay.slug}`);
+
+  const user = await userStore.getById(session.userId);
+  const handle = user?.handle ?? "";
+  revalidatePath(`/${handle}`);
+  revalidatePath(`/${handle}/library`);
+  revalidatePath(`/${handle}/library/${essay.slug}`);
+  revalidatePath(`/${handle}/rss.xml`);
 
   if (isJson) {
     return Response.json({ essay }, { status: 201 });
   }
 
-  return Response.redirect(new URL(`/library/${essay.slug}`, request.url), 303);
+  return Response.redirect(
+    new URL(`/${handle}/library/${essay.slug}`, request.url),
+    303,
+  );
 }
 
 function errorResponse(

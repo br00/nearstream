@@ -4,13 +4,18 @@ import { slugify, isInventoryStatus } from "@/schemas/inventory";
 import type { InventoryImage, NewInventoryItem } from "@/schemas/inventory";
 import { isAllowedContentType } from "@/lib/media-store";
 import { getSession } from "@/lib/auth";
+import { userStore } from "@/lib/user-store";
 
 const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 50_000;
 const STRING_FIELD_MAX = 200;
 
 export async function GET() {
-  const items = await inventoryStore.list();
+  const session = await getSession();
+  if (!session) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const items = await inventoryStore.list(session.userId);
   return Response.json({ items });
 }
 
@@ -59,7 +64,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const existing = await inventoryStore.getBySlug(slug);
+  const existing = await inventoryStore.getBySlug(session.userId, slug);
   if (existing) {
     return Response.json(
       {
@@ -117,7 +122,7 @@ export async function POST(request: Request) {
     validatedStatus = status;
   }
 
-  const item = await inventoryStore.add({
+  const item = await inventoryStore.add(session.userId, {
     title: trimmedTitle,
     image: validatedImage,
     description: fields.description,
@@ -128,11 +133,15 @@ export async function POST(request: Request) {
     price: fields.price,
   });
 
-  revalidatePath("/library/inventory");
-  revalidatePath(`/library/inventory/${item.slug}`);
-  revalidatePath("/library");
+  const user = await userStore.getById(session.userId);
+  const handle = user?.handle ?? "";
+  revalidatePath(`/${handle}`);
+  revalidatePath(`/${handle}/library`);
+  revalidatePath(`/${handle}/library/inventory`);
+  revalidatePath(`/${handle}/library/inventory/${item.slug}`);
+  revalidatePath(`/${handle}/rss.xml`);
 
-  return Response.json({ item }, { status: 201 });
+  return Response.json({ item, handle }, { status: 201 });
 }
 
 function validateImage(value: unknown): InventoryImage | string {

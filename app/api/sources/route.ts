@@ -10,7 +10,7 @@ export async function GET() {
   if (!session) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const sources = await sourceStore.list();
+  const sources = await sourceStore.list(session.userId);
   return Response.json({ sources });
 }
 
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const existing = await sourceStore.list();
+  const existing = await sourceStore.list(session.userId);
   if (existing.some((s) => s.feedUrl === feedUrl.trim())) {
     return errorResponse(
       request,
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const source = await sourceStore.add({
+  const source = await sourceStore.add(session.userId, {
     name: name.trim(),
     feedUrl: feedUrl.trim(),
     siteUrl: trimmedSiteUrl,

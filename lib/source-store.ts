@@ -2,21 +2,32 @@ import { R2Client } from "@/lib/r2-client";
 import type { Source, NewSource } from "@/schemas/source";
 
 export interface SourceStore {
-  list(): Promise<Source[]>;
-  add(input: NewSource): Promise<Source>;
-  get(id: string): Promise<Source | null>;
-  update(id: string, patch: Partial<Source>): Promise<Source | null>;
-  delete(id: string): Promise<boolean>;
+  list(userId: string): Promise<Source[]>;
+  add(userId: string, input: NewSource): Promise<Source>;
+  get(userId: string, id: string): Promise<Source | null>;
+  update(
+    userId: string,
+    id: string,
+    patch: Partial<Source>,
+  ): Promise<Source | null>;
+  delete(userId: string, id: string): Promise<boolean>;
 }
 
 class InMemorySourceStore implements SourceStore {
-  private sources: Source[] = [];
-
-  async list(): Promise<Source[]> {
-    return [...this.sources].sort((a, b) => a.name.localeCompare(b.name));
+  private sources = new Map<string, Source[]>();
+  private bucket(userId: string): Source[] {
+    let b = this.sources.get(userId);
+    if (!b) {
+      b = [];
+      this.sources.set(userId, b);
+    }
+    return b;
   }
 
-  async add(input: NewSource): Promise<Source> {
+  async list(userId: string): Promise<Source[]> {
+    return [...this.bucket(userId)].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  async add(userId: string, input: NewSource): Promise<Source> {
     const source: Source = {
       id: crypto.randomUUID(),
       name: input.name,
@@ -24,25 +35,28 @@ class InMemorySourceStore implements SourceStore {
       siteUrl: input.siteUrl,
       addedAt: new Date().toISOString(),
     };
-    this.sources.push(source);
+    this.bucket(userId).push(source);
     return source;
   }
-
-  async get(id: string): Promise<Source | null> {
-    return this.sources.find((s) => s.id === id) ?? null;
+  async get(userId: string, id: string): Promise<Source | null> {
+    return this.bucket(userId).find((s) => s.id === id) ?? null;
   }
-
-  async update(id: string, patch: Partial<Source>): Promise<Source | null> {
-    const i = this.sources.findIndex((s) => s.id === id);
+  async update(
+    userId: string,
+    id: string,
+    patch: Partial<Source>,
+  ): Promise<Source | null> {
+    const b = this.bucket(userId);
+    const i = b.findIndex((s) => s.id === id);
     if (i === -1) return null;
-    this.sources[i] = { ...this.sources[i], ...patch, id: this.sources[i].id };
-    return this.sources[i];
+    b[i] = { ...b[i], ...patch, id: b[i].id };
+    return b[i];
   }
-
-  async delete(id: string): Promise<boolean> {
-    const i = this.sources.findIndex((s) => s.id === id);
+  async delete(userId: string, id: string): Promise<boolean> {
+    const b = this.bucket(userId);
+    const i = b.findIndex((s) => s.id === id);
     if (i === -1) return false;
-    this.sources.splice(i, 1);
+    b.splice(i, 1);
     return true;
   }
 }
@@ -66,11 +80,15 @@ class R2SourceStore implements SourceStore {
     this.base = `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}`;
   }
 
-  private key(id: string) {
-    return `reader/sources/${id}.json`;
+  private prefix(userId: string) {
+    return `users/${userId}/reader/sources/`;
   }
 
-  async add(input: NewSource): Promise<Source> {
+  private key(userId: string, id: string) {
+    return `${this.prefix(userId)}${id}.json`;
+  }
+
+  async add(userId: string, input: NewSource): Promise<Source> {
     const source: Source = {
       id: crypto.randomUUID(),
       name: input.name,
@@ -78,11 +96,14 @@ class R2SourceStore implements SourceStore {
       siteUrl: input.siteUrl,
       addedAt: new Date().toISOString(),
     };
-    const res = await this.client.fetch(`${this.base}/${this.key(source.id)}`, {
-      method: "PUT",
-      body: JSON.stringify(source),
-      headers: { "content-type": "application/json" },
-    });
+    const res = await this.client.fetch(
+      `${this.base}/${this.key(userId, source.id)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(source),
+        headers: { "content-type": "application/json" },
+      },
+    );
     if (!res.ok) {
       throw new Error(
         `R2 PUT failed (${res.status} ${res.statusText}): ${await res.text()}`,
@@ -91,8 +112,8 @@ class R2SourceStore implements SourceStore {
     return source;
   }
 
-  async list(): Promise<Source[]> {
-    const url = `${this.base}/?list-type=2&prefix=${encodeURIComponent("reader/sources/")}`;
+  async list(userId: string): Promise<Source[]> {
+    const url = `${this.base}/?list-type=2&prefix=${encodeURIComponent(this.prefix(userId))}`;
     const listRes = await this.client.fetch(url);
     if (!listRes.ok) {
       throw new Error(
@@ -106,9 +127,7 @@ class R2SourceStore implements SourceStore {
       keys.map(async (key) => {
         const r = await this.client.fetch(`${this.base}/${key}`);
         if (!r.ok) {
-          throw new Error(
-            `R2 GET ${key} failed (${r.status} ${r.statusText})`,
-          );
+          throw new Error(`R2 GET ${key} failed (${r.status} ${r.statusText})`);
         }
         return (await r.json()) as Source;
       }),
@@ -117,8 +136,8 @@ class R2SourceStore implements SourceStore {
     return sources.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async get(id: string): Promise<Source | null> {
-    const res = await this.client.fetch(`${this.base}/${this.key(id)}`);
+  async get(userId: string, id: string): Promise<Source | null> {
+    const res = await this.client.fetch(`${this.base}/${this.key(userId, id)}`);
     if (res.status === 404) return null;
     if (!res.ok) {
       throw new Error(
@@ -128,11 +147,15 @@ class R2SourceStore implements SourceStore {
     return (await res.json()) as Source;
   }
 
-  async update(id: string, patch: Partial<Source>): Promise<Source | null> {
-    const current = await this.get(id);
+  async update(
+    userId: string,
+    id: string,
+    patch: Partial<Source>,
+  ): Promise<Source | null> {
+    const current = await this.get(userId, id);
     if (!current) return null;
     const merged: Source = { ...current, ...patch, id: current.id };
-    const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
+    const res = await this.client.fetch(`${this.base}/${this.key(userId, id)}`, {
       method: "PUT",
       body: JSON.stringify(merged),
       headers: { "content-type": "application/json" },
@@ -145,8 +168,8 @@ class R2SourceStore implements SourceStore {
     return merged;
   }
 
-  async delete(id: string): Promise<boolean> {
-    const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
+  async delete(userId: string, id: string): Promise<boolean> {
+    const res = await this.client.fetch(`${this.base}/${this.key(userId, id)}`, {
       method: "DELETE",
     });
     if (res.status === 204) return true;
@@ -175,7 +198,12 @@ function pickStore(): SourceStore {
 
   if (accountId && accessKeyId && secretAccessKey && bucket) {
     console.log("[nearstream] source-store: R2");
-    return new R2SourceStore({ accountId, accessKeyId, secretAccessKey, bucket });
+    return new R2SourceStore({
+      accountId,
+      accessKeyId,
+      secretAccessKey,
+      bucket,
+    });
   }
   console.log("[nearstream] source-store: in-memory (set R2_* env vars for R2)");
   return new InMemorySourceStore();

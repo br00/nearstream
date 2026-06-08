@@ -2,21 +2,30 @@ import type { NewStreamEntry, StreamEntry } from "@/schemas/stream";
 import { R2Store } from "@/lib/r2-store";
 
 export interface Store {
-  list(): Promise<StreamEntry[]>;
-  add(input: NewStreamEntry): Promise<StreamEntry>;
-  delete(id: string): Promise<boolean>;
+  list(userId: string): Promise<StreamEntry[]>;
+  add(userId: string, input: NewStreamEntry): Promise<StreamEntry>;
+  delete(userId: string, id: string): Promise<boolean>;
 }
 
 class InMemoryStore implements Store {
-  private entries: StreamEntry[] = [];
+  private entries = new Map<string, StreamEntry[]>();
 
-  async list(): Promise<StreamEntry[]> {
-    return [...this.entries].sort((a, b) =>
+  private bucket(userId: string): StreamEntry[] {
+    let b = this.entries.get(userId);
+    if (!b) {
+      b = [];
+      this.entries.set(userId, b);
+    }
+    return b;
+  }
+
+  async list(userId: string): Promise<StreamEntry[]> {
+    return [...this.bucket(userId)].sort((a, b) =>
       b.publishedAt.localeCompare(a.publishedAt),
     );
   }
 
-  async add(input: NewStreamEntry): Promise<StreamEntry> {
+  async add(userId: string, input: NewStreamEntry): Promise<StreamEntry> {
     const entry: StreamEntry = {
       id: crypto.randomUUID(),
       text: input.text,
@@ -24,14 +33,15 @@ class InMemoryStore implements Store {
       publishedAt: new Date().toISOString(),
       ...(input.link ? { link: input.link } : {}),
     };
-    this.entries.push(entry);
+    this.bucket(userId).push(entry);
     return entry;
   }
 
-  async delete(id: string): Promise<boolean> {
-    const i = this.entries.findIndex((e) => e.id === id);
+  async delete(userId: string, id: string): Promise<boolean> {
+    const b = this.bucket(userId);
+    const i = b.findIndex((e) => e.id === id);
     if (i === -1) return false;
-    this.entries.splice(i, 1);
+    b.splice(i, 1);
     return true;
   }
 }

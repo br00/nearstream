@@ -126,9 +126,12 @@ export function InventoryUploadForm() {
         const err = await metaRes.json().catch(() => ({ error: "save failed" }));
         throw new Error(err.error ?? "save failed");
       }
-      const { item } = (await metaRes.json()) as { item: { slug: string } };
+      const { item, handle } = (await metaRes.json()) as {
+        item: { slug: string };
+        handle: string;
+      };
 
-      window.location.href = `/library/inventory/${item.slug}`;
+      window.location.href = `/${handle}/library/inventory/${item.slug}`;
     } catch (err) {
       const message = err instanceof Error ? err.message : "upload failed";
       setError(message);

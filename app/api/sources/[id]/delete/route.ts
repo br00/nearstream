@@ -19,13 +19,13 @@ export async function POST(_req: Request, { params }: Props) {
   // Cascade: remove cached feed entries first, then the Source row. Reverse
   // order would leave orphan entries if a later step failed.
   try {
-    await feedEntryStore.deleteBySource(id);
+    await feedEntryStore.deleteBySource(session.userId, id);
   } catch (err) {
     console.error(`[delete source ${id}] entry cascade failed`, err);
     // Surface no error to the caller — orphan entries are cheap; an
     // undeletable Source row is the worse UX.
   }
-  await sourceStore.delete(id);
+  await sourceStore.delete(session.userId, id);
 
   revalidatePath("/studio");
   revalidatePath("/reader");
