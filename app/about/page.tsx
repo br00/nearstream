@@ -71,28 +71,89 @@ export default function AboutPage() {
             <p className="mt-2 font-mono text-[11px] text-muted-soft">
               For the technically curious.
             </p>
+
             <p className="mt-8 text-sm leading-relaxed text-muted">
-              Each person runs their own site on their own domain. The site
-              publishes an RSS feed &mdash; a standard format since 1999. A
-              custom reader fetches all your friends&rsquo; feeds, merges them,
-              and sorts by date. That&rsquo;s the whole architecture.
+              A single Next.js app, AGPL-3.0, open source. Each person gets a
+              tenant &mdash; their own site at{" "}
+              <code className="font-mono text-foreground">/&#123;handle&#125;</code>
+              , their own RSS feed, their own posts. The reader pulls
+              friends&rsquo; feeds, merges by date, renders type-shaped cards.
+              That&rsquo;s the whole architecture.
             </p>
-            <pre className="mt-8 overflow-x-auto rounded border border-border p-4 text-xs leading-relaxed text-muted/80 font-mono">
-              <code>{`const friends = [
-  { name: "Marco",  feed: "https://marco.xyz/rss.xml" },
-  { name: "Sofia",  feed: "https://sofia.site/feed"   },
-]
 
-// fetch all feeds in parallel
-const posts = await Promise.all(
-  friends.map(f => parser.parseURL(f.feed))
-)
+            <div className="mt-10 flex flex-wrap gap-3">
+              <a
+                href="https://github.com/br00/nearstream"
+                className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground transition-colors hover:bg-foreground hover:text-background"
+              >
+                github.com/br00/nearstream &rarr;
+              </a>
+              <a
+                href="https://github.com/br00/nearstream/blob/main/NEARSTREAM.md"
+                className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground hover:border-foreground"
+              >
+                Manifesto
+              </a>
+              <a
+                href="https://github.com/br00/nearstream/blob/main/ARCHITECTURE.md"
+                className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground hover:border-foreground"
+              >
+                ARCHITECTURE.md
+              </a>
+            </div>
 
-// merge and sort by time — that's the whole algorithm
-const stream = posts
-  .flat()
-  .sort((a, b) => new Date(b.date) - new Date(a.date))`}</code>
-            </pre>
+            <dl className="mt-12 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-5 text-sm leading-relaxed">
+              <dt className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft pt-1">
+                Primitives
+              </dt>
+              <dd className="text-muted">
+                Stream (timestamped notes), Library (essays + inventory items,
+                each at its own URL), Letter (the dated dispatch at the top of
+                a home), Source (a friend&rsquo;s feed URL in your local reader).
+              </dd>
+
+              <dt className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft pt-1">
+                Protocol
+              </dt>
+              <dd className="text-muted">
+                RSS 2.0 with a tiny Nearstream namespace{" "}
+                <code className="font-mono text-foreground">
+                  xmlns:nearstream
+                </code>{" "}
+                so typed entries (note / essay / picture) round-trip between
+                instances. Any RSS reader can read a Nearstream feed; any
+                Nearstream reader can read any RSS feed.
+              </dd>
+
+              <dt className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft pt-1">
+                Storage
+              </dt>
+              <dd className="text-muted">
+                Cloudflare R2 (S3-compatible). Each tenant&rsquo;s content
+                lives at{" "}
+                <code className="font-mono text-foreground">
+                  users/&#123;userId&#125;/&hellip;
+                </code>
+                . No database, no migrations.
+              </dd>
+
+              <dt className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft pt-1">
+                Auth
+              </dt>
+              <dd className="text-muted">
+                Magic-link email via Resend. Sessions are HMAC-signed cookies,
+                30 lines of Web Crypto. No SDKs, no JWT library, no Lucia.
+              </dd>
+
+              <dt className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft pt-1">
+                Deploy
+              </dt>
+              <dd className="text-muted">
+                Vercel today, intentionally portable. No Vercel-specific APIs
+                &mdash; the codebase ships as a single container to anywhere
+                that runs Node.
+              </dd>
+            </dl>
           </section>
 
           <section className="mt-24 pt-24 border-t border-border">
