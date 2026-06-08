@@ -25,7 +25,11 @@ function isGated(path: string): boolean {
 
 export function proxy(request: NextRequest): NextResponse {
   const url = request.nextUrl;
-  const host = request.headers.get("host")?.toLowerCase() ?? "";
+  const rawHost = request.headers.get("host")?.toLowerCase() ?? "";
+  // Strip a leading `www.` so TENANT_DOMAINS only needs the apex form. Vercel
+  // (and most hosts) redirect bare → www, so the proxy sees `www.example.com`
+  // even when the env value is `example.com`.
+  const host = rawHost.startsWith("www.") ? rawHost.slice(4) : rawHost;
   const hostHandle = tenantByDomain[host];
 
   // ── 1. Custom-domain rewrite ──────────────────────────────────────────
