@@ -2,6 +2,14 @@ export async function sendMagicLink(to: string, url: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM;
 
+  // Always log the magic link to function logs when DEBUG_MAGIC_LINKS=1.
+  // Resend's onboarding@resend.dev sandbox sender only delivers to the
+  // account-owner's address; until a custom domain is verified in Resend,
+  // testing with secondary emails requires fetching the link from logs.
+  if (process.env.DEBUG_MAGIC_LINKS === "1") {
+    console.log(`[nearstream] DEBUG magic link for ${to}: ${url}`);
+  }
+
   if (!apiKey || !from) {
     console.log(
       `[nearstream] email: dev mode (no RESEND_API_KEY/RESEND_FROM) — magic link for ${to}:\n  ${url}`,
