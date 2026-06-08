@@ -8,14 +8,18 @@ import { userStore } from "@/lib/user-store";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Nearstream — a shared journal between close friends",
+  title: "Nearstream — a quieter way to share",
   description:
-    "A small reader for friends who keep their own sites. No algorithm, no metrics, no for-you.",
+    "Stepped off social media. Building something personal — a place to share daily life with close friends. No algorithm. No public. Just us.",
 };
 
 // The instance landing — served on `nearstream.app/` only. Custom-domain
 // requests get rewritten to `/{handle}` by the proxy before they reach this
 // page, so this page never renders on alessandroborelli.it.
+//
+// Signed-in visitors get redirected to /reader (or /onboarding if they
+// haven't picked a handle yet). Signed-out visitors see the marketing copy.
+
 export default async function InstanceLanding() {
   const session = await getSession();
   if (session) {
@@ -26,58 +30,79 @@ export default async function InstanceLanding() {
 
   const navLinkClasses =
     "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
+  const sectionLabel =
+    "font-mono text-[11px] tracking-[0.25em] uppercase text-muted-soft";
 
   return (
     <PageShell
       leftNav={<NearstreamLockup size={24} className="text-foreground" />}
       rightNav={
-        <Link href="/login" className={navLinkClasses}>
-          Sign in →
+        <Link href="/about" className={navLinkClasses}>
+          About
         </Link>
       }
     >
-      <section className="flex flex-1 justify-center px-6">
-        <div className="w-full max-w-[32rem] py-20">
-          <div className="font-mono text-[10px] uppercase tracking-[0.35em] text-muted-soft">
-            Nearstream
-          </div>
-
-          <h1 className="mt-8 text-3xl font-normal leading-tight tracking-tight text-foreground">
-            A small reader for friends who keep their own sites.
+      <main className="flex flex-1 px-6">
+        <div className="mx-auto w-full max-w-lg pt-20 pb-32">
+          {/* Hero */}
+          <p className={sectionLabel}>Nearstream</p>
+          <h1 className="mt-8 text-2xl font-normal tracking-tight text-foreground leading-snug whitespace-pre-line">
+            A quieter way to share
+            {"\n"}with people you actually know.
           </h1>
+          <p className="mt-6 text-sm leading-relaxed text-muted max-w-sm">
+            I stepped off social media. I&rsquo;m building something personal
+            &mdash; a place to share daily life with close friends. No
+            algorithm. No public. Just us.
+          </p>
 
-          <div className="mt-10 space-y-4 text-[15px] leading-relaxed text-muted">
-            <p>
-              Everyone holds a small site &mdash; short notes, longer essays,
-              pictures from their day. Nearstream pulls from each one and lays
-              them out in a single quiet feed. Chronological, no algorithm,
-              no metrics, no &ldquo;for you&rdquo;.
+          {/* What is this */}
+          <section className="mt-24 pt-24 border-t border-border">
+            <p className={sectionLabel}>What is this</p>
+            <div className="mt-8 grid gap-6 text-sm leading-relaxed text-muted">
+              <p>
+                Social networks took something simple &mdash; sharing with
+                friends &mdash; and turned it into a performance for strangers.
+              </p>
+              <p className="text-foreground">
+                Nearstream is the opposite. Your own site, your own stream.
+                Your friends see it in a reader that shows everything in order,
+                nothing more.
+              </p>
+              <p>
+                No likes. No views. No strangers. Just a quiet stream of life
+                from people you chose.
+              </p>
+            </div>
+            <p className="mt-10">
+              <Link
+                href="/about"
+                className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground underline underline-offset-4 decoration-muted-soft transition-colors hover:decoration-foreground"
+              >
+                Read more &rarr;
+              </Link>
             </p>
-            <p>
-              A way to keep up with a handful of people you actually want to
-              read.
-            </p>
-          </div>
+          </section>
 
-          <div className="mt-12 flex items-center gap-6">
-            <Link
-              href="/login"
-              className="border border-border px-5 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-foreground transition-colors hover:bg-foreground hover:text-background"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/about"
-              className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
-            >
-              About →
-            </Link>
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
-              By invitation
-            </span>
-          </div>
+          {/* CTA */}
+          <section className="mt-24 pt-24 border-t border-border">
+            <p className={sectionLabel}>Already invited?</p>
+            <div className="mt-8 flex items-center gap-6">
+              <Link
+                href="/login"
+                className="border border-border px-5 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-foreground transition-colors hover:bg-foreground hover:text-background"
+              >
+                Sign in
+              </Link>
+            </div>
+            <p className="mt-6 text-xs text-muted-soft leading-relaxed">
+              Nearstream is invitation-only. If you don&rsquo;t have an invite,
+              there&rsquo;s nothing to sign up for &mdash; that&rsquo;s by
+              design.
+            </p>
+          </section>
         </div>
-      </section>
+      </main>
     </PageShell>
   );
 }
