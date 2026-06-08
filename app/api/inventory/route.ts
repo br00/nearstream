@@ -4,6 +4,7 @@ import { slugify, isInventoryStatus } from "@/schemas/inventory";
 import type { InventoryImage, NewInventoryItem } from "@/schemas/inventory";
 import { isAllowedContentType } from "@/lib/media-store";
 import { getSession } from "@/lib/auth";
+import { userStore } from "@/lib/user-store";
 
 const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 50_000;
@@ -132,11 +133,15 @@ export async function POST(request: Request) {
     price: fields.price,
   });
 
-  revalidatePath("/library/inventory");
-  revalidatePath(`/library/inventory/${item.slug}`);
-  revalidatePath("/library");
+  const user = await userStore.getById(session.userId);
+  const handle = user?.handle ?? "";
+  revalidatePath(`/${handle}`);
+  revalidatePath(`/${handle}/library`);
+  revalidatePath(`/${handle}/library/inventory`);
+  revalidatePath(`/${handle}/library/inventory/${item.slug}`);
+  revalidatePath(`/${handle}/rss.xml`);
 
-  return Response.json({ item }, { status: 201 });
+  return Response.json({ item, handle }, { status: 201 });
 }
 
 function validateImage(value: unknown): InventoryImage | string {

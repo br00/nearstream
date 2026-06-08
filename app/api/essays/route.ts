@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { essayStore } from "@/lib/essay-store";
 import { slugify } from "@/schemas/essay";
 import { getSession } from "@/lib/auth";
+import { userStore } from "@/lib/user-store";
 
 const TITLE_MAX = 200;
 const BODY_MAX = 50_000;
@@ -84,14 +85,22 @@ export async function POST(request: Request) {
     title: trimmedTitle,
     body: body.trim(),
   });
-  revalidatePath("/library");
-  revalidatePath(`/library/${essay.slug}`);
+
+  const user = await userStore.getById(session.userId);
+  const handle = user?.handle ?? "";
+  revalidatePath(`/${handle}`);
+  revalidatePath(`/${handle}/library`);
+  revalidatePath(`/${handle}/library/${essay.slug}`);
+  revalidatePath(`/${handle}/rss.xml`);
 
   if (isJson) {
     return Response.json({ essay }, { status: 201 });
   }
 
-  return Response.redirect(new URL(`/library/${essay.slug}`, request.url), 303);
+  return Response.redirect(
+    new URL(`/${handle}/library/${essay.slug}`, request.url),
+    303,
+  );
 }
 
 function errorResponse(
