@@ -38,6 +38,7 @@ export function isValidHandle(value: string): boolean {
     "reader",
     "design",
     "tenant",
+    "about",
     "rss",
     "rss.xml",
     "favicon.ico",

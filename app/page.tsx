@@ -66,6 +66,12 @@ export default async function InstanceLanding() {
             >
               Sign in
             </Link>
+            <Link
+              href="/about"
+              className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
+            >
+              About →
+            </Link>
             <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
               By invitation
             </span>
