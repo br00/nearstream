@@ -22,6 +22,7 @@ export async function generateMetadata({ params }: Props) {
   const user = await userStore.getByHandle(handle);
   return {
     title: user ? `Stream · ${user.displayName || handle}` : "Stream",
+    robots: { index: false, follow: false },
   };
 }
 

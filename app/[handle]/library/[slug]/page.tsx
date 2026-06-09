@@ -28,7 +28,10 @@ export async function generateMetadata({ params }: Props) {
   if (!user) return { title: "Not found · Nearstream" };
   const essay = await essayStore.getBySlug(user.id, slug);
   if (!essay) return { title: "Not found · Nearstream" };
-  return { title: `${essay.title} · ${user.displayName || handle}` };
+  return {
+    title: `${essay.title} · ${user.displayName || handle}`,
+    robots: { index: false, follow: false },
+  };
 }
 
 export default async function EssayPage({ params }: Props) {

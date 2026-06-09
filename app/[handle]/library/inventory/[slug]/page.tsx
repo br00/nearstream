@@ -28,7 +28,10 @@ export async function generateMetadata({ params }: Props) {
   if (!user) return { title: "Not found · Nearstream" };
   const item = await inventoryStore.getBySlug(user.id, slug);
   if (!item) return { title: "Not found · Nearstream" };
-  return { title: `${item.title} · ${user.displayName || handle}` };
+  return {
+    title: `${item.title} · ${user.displayName || handle}`,
+    robots: { index: false, follow: false },
+  };
 }
 
 export default async function InventoryItemPage({ params }: Props) {

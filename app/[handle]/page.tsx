@@ -12,6 +12,19 @@ import { isHostEmail } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+// Soft-privacy default for tenant pages: keep them out of search indexes and
+// out of crawlers' link graphs. The URL is still reachable to anyone who has
+// it — this just stops "search myself, find my stream" surprises. Real
+// per-post privacy (public / friends / private) is a future slice.
+export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }) {
+  const { handle } = await params;
+  const user = await userStore.getByHandle(handle);
+  return {
+    title: user ? `${user.displayName || handle} · Nearstream` : "Nearstream",
+    robots: { index: false, follow: false },
+  };
+}
+
 const RECENT_STREAM = 4;
 const RECENT_PICTURES = 4;
 const RECENT_ESSAYS = 3;

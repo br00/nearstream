@@ -21,6 +21,7 @@ export async function generateMetadata({ params }: Props) {
     title: user
       ? `Library · ${user.displayName || handle}`
       : "Library · Nearstream",
+    robots: { index: false, follow: false },
   };
 }
 
