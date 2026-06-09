@@ -81,6 +81,7 @@ export async function GET() {
   // block the whole export — the JSON still has the keys, the user can fetch
   // missing files later from the running instance.
   if (mediaStore) {
+    const m = mediaStore;
     const keys = new Set<string>();
     for (const item of inventory) {
       if (item.image?.key) keys.add(item.image.key);
@@ -90,7 +91,7 @@ export async function GET() {
     await Promise.all(
       [...keys].map(async (key) => {
         try {
-          const res = await mediaStore.getImage(key);
+          const res = await m.getImage(key);
           if (!res.ok) return;
           const buf = Buffer.from(await res.arrayBuffer());
           zip.file(`media/${key}`, buf);
