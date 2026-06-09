@@ -28,6 +28,7 @@ type Props = {
     "essay-error"?: string;
     "letter-error"?: string;
     "source-error"?: string;
+    "profile-error"?: string;
   }>;
 };
 
@@ -43,6 +44,7 @@ export default async function StudioPage({ searchParams }: Props) {
     "essay-error": essayError,
     "letter-error": letterError,
     "source-error": sourceError,
+    "profile-error": profileError,
   } = await searchParams;
 
   const [letter, essays, inventoryItems, sources] = await Promise.all([
@@ -257,6 +259,52 @@ export default async function StudioPage({ searchParams }: Props) {
             </p>
 
             <InventoryUploadForm />
+          </div>
+
+          <hr className="mt-20 border-border" />
+
+          {/* Profile — your display name appears on your tenant pages, in
+              your RSS channel title, and at the top of each archive. Handle
+              is immutable (it's your URL); display name is editable. */}
+          <div id="profile" className="scroll-mt-6">
+            <h2 className="mt-20 text-2xl font-normal tracking-tight text-foreground">
+              Profile
+            </h2>
+            <p className="mt-2 text-sm text-muted-soft">
+              Your name as it appears on your site and in your RSS feed.
+              Handle (<code className="font-mono">/{user.handle}</code>) is
+              fixed; display name you can change anytime.
+            </p>
+
+            {profileError && (
+              <div
+                role="alert"
+                className="mt-8 border-l-2 border-foreground/50 pl-4 py-2"
+              >
+                <Kicker>Could not save</Kicker>
+                <p className="mt-1 text-sm text-muted">{profileError}</p>
+              </div>
+            )}
+
+            <form
+              action="/api/profile"
+              method="POST"
+              className="mt-10 flex flex-col gap-8"
+            >
+              <label className="flex flex-col gap-2">
+                <Kicker>Display name</Kicker>
+                <Input
+                  name="displayName"
+                  required
+                  maxLength={80}
+                  defaultValue={user.displayName}
+                />
+              </label>
+
+              <SubmitButton pendingLabel="Saving…" className="self-start">
+                Save
+              </SubmitButton>
+            </form>
           </div>
 
           <hr className="mt-20 border-border" />

@@ -16,6 +16,7 @@ export interface UserStore {
     handle: string,
     displayName: string,
   ): Promise<User | null>;
+  setDisplayName(id: string, displayName: string): Promise<User | null>;
 }
 
 const PREFIX = "users-meta/";
@@ -51,6 +52,12 @@ class InMemoryUserStore implements UserStore {
     const i = this.users.findIndex((u) => u.id === id);
     if (i === -1) return null;
     this.users[i] = { ...this.users[i], handle, displayName };
+    return this.users[i];
+  }
+  async setDisplayName(id: string, displayName: string) {
+    const i = this.users.findIndex((u) => u.id === id);
+    if (i === -1) return null;
+    this.users[i] = { ...this.users[i], displayName };
     return this.users[i];
   }
 }
@@ -145,6 +152,21 @@ class R2UserStore implements UserStore {
     const current = await this.getById(id);
     if (!current) return null;
     const updated: User = { ...current, handle, displayName };
+    const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(updated),
+      headers: { "content-type": "application/json" },
+    });
+    if (!res.ok) {
+      throw new Error(`R2 PUT failed (${res.status} ${res.statusText})`);
+    }
+    return updated;
+  }
+
+  async setDisplayName(id: string, displayName: string): Promise<User | null> {
+    const current = await this.getById(id);
+    if (!current) return null;
+    const updated: User = { ...current, displayName };
     const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
       method: "PUT",
       body: JSON.stringify(updated),
