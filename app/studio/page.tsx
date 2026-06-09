@@ -7,6 +7,7 @@ import { letterStore } from "@/lib/letter-store";
 import { sourceStore } from "@/lib/source-store";
 import { userStore } from "@/lib/user-store";
 import { isHostEmail } from "@/lib/auth";
+import { tenantBase } from "@/lib/tenant-domains";
 import { getSession } from "@/lib/auth";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { PageShell } from "@/app/_components/page-shell";
@@ -62,10 +63,13 @@ export default async function StudioPage({ searchParams }: Props) {
       leftNav={<NearstreamLockup size={24} className="text-foreground" />}
       rightNav={
         <>
-          <Link href={`/${user.handle}`} className={navLinkClasses}>
+          <Link href={tenantBase(user.handle)} className={navLinkClasses}>
             ← Home
           </Link>
-          <Link href={`/${user.handle}/library`} className={navLinkClasses}>
+          <Link
+            href={`${tenantBase(user.handle)}/library`}
+            className={navLinkClasses}
+          >
             Library
           </Link>
         </>

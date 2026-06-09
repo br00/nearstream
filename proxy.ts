@@ -32,6 +32,27 @@ export function proxy(request: NextRequest): NextResponse {
   const host = rawHost.startsWith("www.") ? rawHost.slice(4) : rawHost;
   const hostHandle = tenantByDomain[host];
 
+  // ── Canonical-URL redirect on custom domains ──────────────────────────
+  // On alessandroborelli.it, the URL `/alessandro/library` reads as the
+  // wrong identity — the handle defeats the point of owning the domain.
+  // Redirect to the bare form so `/alessandro/library` → `/library` and
+  // `/alessandro` → `/`. The rewrite step below will then internally map
+  // `/library` → `/alessandro/library` for routing without showing the
+  // handle in the URL bar.
+  if (
+    hostHandle &&
+    (url.pathname === `/${hostHandle}` ||
+      url.pathname.startsWith(`/${hostHandle}/`))
+  ) {
+    const stripped =
+      url.pathname === `/${hostHandle}`
+        ? "/"
+        : url.pathname.slice(`/${hostHandle}`.length);
+    return NextResponse.redirect(
+      new URL(stripped + url.search, request.url),
+    );
+  }
+
   // ── 1. Custom-domain rewrite ──────────────────────────────────────────
   // alessandroborelli.it/library → /alessandro/library (URL bar unchanged).
   // Don't rewrite the auth + tenant-owner UIs (those are instance-level).
