@@ -75,21 +75,34 @@ export async function POST(request: Request) {
     );
   }
 
-  const existing = await sourceStore.list(session.userId);
-  if (existing.some((s) => s.feedUrl === feedUrl.trim())) {
+  let source;
+  try {
+    const existing = await sourceStore.list(session.userId);
+    if (existing.some((s) => s.feedUrl === feedUrl.trim())) {
+      return errorResponse(
+        request,
+        isJson,
+        409,
+        "that feed URL is already in your sources",
+      );
+    }
+
+    source = await sourceStore.add(session.userId, {
+      name: name.trim(),
+      feedUrl: feedUrl.trim(),
+      siteUrl: trimmedSiteUrl,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[POST /api/sources] storage failed`, err);
     return errorResponse(
       request,
       isJson,
-      409,
-      "that feed URL is already in your sources",
+      502,
+      `Could not save source — ${message}. Try again in a moment.`,
     );
   }
 
-  const source = await sourceStore.add(session.userId, {
-    name: name.trim(),
-    feedUrl: feedUrl.trim(),
-    siteUrl: trimmedSiteUrl,
-  });
   revalidatePath("/studio");
 
   if (isJson) {
