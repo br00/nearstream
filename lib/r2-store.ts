@@ -82,6 +82,43 @@ export class R2Store implements Store {
     );
   }
 
+  async getById(userId: string, id: string): Promise<StreamEntry | null> {
+    const res = await this.client.fetch(`${this.base}/${this.key(userId, id)}`);
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      throw new Error(
+        `R2 GET failed (${res.status} ${res.statusText}): ${await res.text()}`,
+      );
+    }
+    return (await res.json()) as StreamEntry;
+  }
+
+  async update(
+    userId: string,
+    id: string,
+    patch: NewStreamEntry,
+  ): Promise<StreamEntry | null> {
+    const current = await this.getById(userId, id);
+    if (!current) return null;
+    const updated: StreamEntry = {
+      ...current,
+      text: patch.text,
+      tag: patch.tag,
+      ...(patch.link ? { link: patch.link } : { link: undefined }),
+    };
+    const res = await this.client.fetch(`${this.base}/${this.key(userId, id)}`, {
+      method: "PUT",
+      body: JSON.stringify(updated),
+      headers: { "content-type": "application/json" },
+    });
+    if (!res.ok) {
+      throw new Error(
+        `R2 PUT failed (${res.status} ${res.statusText}): ${await res.text()}`,
+      );
+    }
+    return updated;
+  }
+
   async delete(userId: string, id: string): Promise<boolean> {
     const res = await this.client.fetch(`${this.base}/${this.key(userId, id)}`, {
       method: "DELETE",

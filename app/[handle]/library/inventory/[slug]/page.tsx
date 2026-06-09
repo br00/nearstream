@@ -71,10 +71,18 @@ export default async function InventoryItemPage({ params }: Props) {
             ← Inventory
           </Link>
           {isOwner && (
-            <DeleteButton
-              action={`/api/inventory/${item.slug}/delete`}
-              confirmMessage={`Delete "${item.title}"? This removes both the metadata and the image files. Permanent.`}
-            />
+            <>
+              <Link
+                href={`/studio/inventory/${item.slug}/edit`}
+                className={navLinkClasses}
+              >
+                Edit
+              </Link>
+              <DeleteButton
+                action={`/api/inventory/${item.slug}/delete`}
+                confirmMessage={`Delete "${item.title}"? This removes both the metadata and the image files. Permanent.`}
+              />
+            </>
           )}
         </>
       }

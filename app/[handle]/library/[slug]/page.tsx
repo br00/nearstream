@@ -59,10 +59,18 @@ export default async function EssayPage({ params }: Props) {
             ← Library
           </Link>
           {isOwner && (
-            <DeleteButton
-              action={`/api/essays/${essay.slug}/delete`}
-              confirmMessage={`Delete essay "${essay.title}"? This is permanent.`}
-            />
+            <>
+              <Link
+                href={`/studio/essays/${essay.slug}/edit`}
+                className={navLinkClasses}
+              >
+                Edit
+              </Link>
+              <DeleteButton
+                action={`/api/essays/${essay.slug}/delete`}
+                confirmMessage={`Delete essay "${essay.title}"? This is permanent.`}
+              />
+            </>
           )}
         </>
       }

@@ -6,6 +6,12 @@ export interface EssayStore {
   list(userId: string): Promise<Essay[]>;
   add(userId: string, input: NewEssay): Promise<Essay>;
   getBySlug(userId: string, slug: string): Promise<Essay | null>;
+  /** Updates title + body. Slug stays — the URL is permanent at publish. */
+  updateBySlug(
+    userId: string,
+    slug: string,
+    patch: NewEssay,
+  ): Promise<Essay | null>;
   deleteBySlug(userId: string, slug: string): Promise<boolean>;
 }
 
@@ -40,6 +46,18 @@ class InMemoryEssayStore implements EssayStore {
 
   async getBySlug(userId: string, slug: string): Promise<Essay | null> {
     return this.bucket(userId).find((e) => e.slug === slug) ?? null;
+  }
+
+  async updateBySlug(
+    userId: string,
+    slug: string,
+    patch: NewEssay,
+  ): Promise<Essay | null> {
+    const b = this.bucket(userId);
+    const i = b.findIndex((e) => e.slug === slug);
+    if (i === -1) return null;
+    b[i] = { ...b[i], title: patch.title, body: patch.body };
+    return b[i];
   }
 
   async deleteBySlug(userId: string, slug: string): Promise<boolean> {
@@ -133,6 +151,30 @@ class R2EssayStore implements EssayStore {
   async getBySlug(userId: string, slug: string): Promise<Essay | null> {
     const all = await this.list(userId);
     return all.find((e) => e.slug === slug) ?? null;
+  }
+
+  async updateBySlug(
+    userId: string,
+    slug: string,
+    patch: NewEssay,
+  ): Promise<Essay | null> {
+    const target = await this.getBySlug(userId, slug);
+    if (!target) return null;
+    const updated: Essay = { ...target, title: patch.title, body: patch.body };
+    const res = await this.client.fetch(
+      `${this.base}/${this.key(userId, target.id)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updated),
+        headers: { "content-type": "application/json" },
+      },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `R2 PUT failed (${res.status} ${res.statusText}): ${await res.text()}`,
+      );
+    }
+    return updated;
   }
 
   async deleteBySlug(userId: string, slug: string): Promise<boolean> {

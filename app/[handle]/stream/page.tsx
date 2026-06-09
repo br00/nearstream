@@ -115,10 +115,18 @@ export default async function StreamArchive({ params }: Props) {
                     </time>
                     <TagChip>{entry.tag}</TagChip>
                     {isOwner && (
-                      <DeleteButton
-                        action={`/api/stream/${entry.id}/delete`}
-                        confirmMessage={`Delete this stream entry?\n\n"${entry.text.slice(0, 60)}${entry.text.length > 60 ? "…" : ""}"`}
-                      />
+                      <>
+                        <Link
+                          href={`/studio/stream/${entry.id}/edit`}
+                          className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
+                        >
+                          Edit
+                        </Link>
+                        <DeleteButton
+                          action={`/api/stream/${entry.id}/delete`}
+                          confirmMessage={`Delete this stream entry?\n\n"${entry.text.slice(0, 60)}${entry.text.length > 60 ? "…" : ""}"`}
+                        />
+                      </>
                     )}
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">

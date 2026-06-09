@@ -3,10 +3,20 @@ import type { InventoryItem, NewInventoryItem } from "@/schemas/inventory";
 import { slugify } from "@/schemas/inventory";
 import { mediaStore } from "@/lib/media-store";
 
+/** Edit-time patch: everything except the image (set at upload time) and
+    the slug (frozen at publish time so the URL stays stable). */
+export type InventoryPatch = Omit<NewInventoryItem, "image">;
+
 export interface InventoryStore {
   list(userId: string): Promise<InventoryItem[]>;
   add(userId: string, input: NewInventoryItem): Promise<InventoryItem>;
   getBySlug(userId: string, slug: string): Promise<InventoryItem | null>;
+  /** Updates title + description + metadata. Slug + image stay. */
+  updateBySlug(
+    userId: string,
+    slug: string,
+    patch: InventoryPatch,
+  ): Promise<InventoryItem | null>;
   deleteBySlug(userId: string, slug: string): Promise<boolean>;
 }
 
@@ -40,6 +50,27 @@ class InMemoryInventoryStore implements InventoryStore {
 
   async getBySlug(userId: string, slug: string): Promise<InventoryItem | null> {
     return this.bucket(userId).find((i) => i.slug === slug) ?? null;
+  }
+
+  async updateBySlug(
+    userId: string,
+    slug: string,
+    patch: InventoryPatch,
+  ): Promise<InventoryItem | null> {
+    const b = this.bucket(userId);
+    const i = b.findIndex((it) => it.slug === slug);
+    if (i === -1) return null;
+    b[i] = {
+      ...b[i],
+      title: patch.title,
+      description: patch.description,
+      dimensions: patch.dimensions,
+      materials: patch.materials,
+      edition: patch.edition,
+      status: patch.status,
+      price: patch.price,
+    };
+    return b[i];
   }
 
   async deleteBySlug(userId: string, slug: string): Promise<boolean> {
@@ -130,6 +161,39 @@ class R2InventoryStore implements InventoryStore {
   async getBySlug(userId: string, slug: string): Promise<InventoryItem | null> {
     const all = await this.list(userId);
     return all.find((i) => i.slug === slug) ?? null;
+  }
+
+  async updateBySlug(
+    userId: string,
+    slug: string,
+    patch: InventoryPatch,
+  ): Promise<InventoryItem | null> {
+    const target = await this.getBySlug(userId, slug);
+    if (!target) return null;
+    const updated: InventoryItem = {
+      ...target,
+      title: patch.title,
+      description: patch.description,
+      dimensions: patch.dimensions,
+      materials: patch.materials,
+      edition: patch.edition,
+      status: patch.status,
+      price: patch.price,
+    };
+    const res = await this.client.fetch(
+      `${this.base}/${this.key(userId, target.id)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(updated),
+        headers: { "content-type": "application/json" },
+      },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `R2 PUT failed (${res.status} ${res.statusText}): ${await res.text()}`,
+      );
+    }
+    return updated;
   }
 
   async deleteBySlug(userId: string, slug: string): Promise<boolean> {

@@ -4,6 +4,12 @@ import { R2Store } from "@/lib/r2-store";
 export interface Store {
   list(userId: string): Promise<StreamEntry[]>;
   add(userId: string, input: NewStreamEntry): Promise<StreamEntry>;
+  getById(userId: string, id: string): Promise<StreamEntry | null>;
+  update(
+    userId: string,
+    id: string,
+    patch: NewStreamEntry,
+  ): Promise<StreamEntry | null>;
   delete(userId: string, id: string): Promise<boolean>;
 }
 
@@ -35,6 +41,28 @@ class InMemoryStore implements Store {
     };
     this.bucket(userId).push(entry);
     return entry;
+  }
+
+  async getById(userId: string, id: string): Promise<StreamEntry | null> {
+    return this.bucket(userId).find((e) => e.id === id) ?? null;
+  }
+
+  async update(
+    userId: string,
+    id: string,
+    patch: NewStreamEntry,
+  ): Promise<StreamEntry | null> {
+    const b = this.bucket(userId);
+    const i = b.findIndex((e) => e.id === id);
+    if (i === -1) return null;
+    // Preserve id + publishedAt; let everything else come from the patch.
+    b[i] = {
+      ...b[i],
+      text: patch.text,
+      tag: patch.tag,
+      ...(patch.link ? { link: patch.link } : { link: undefined }),
+    };
+    return b[i];
   }
 
   async delete(userId: string, id: string): Promise<boolean> {
