@@ -459,9 +459,10 @@ export default async function StudioPage({ searchParams }: Props) {
               Download all my content →
             </a>
             <p className="mt-2 text-[11px] text-muted-soft">
-              A JSON file with your profile, Letter, Stream entries, Essays,
-              Inventory items, and Reader sources. Media files are linked but
-              not bundled — fetch via the URLs inside if you need the binaries.
+              A ZIP with your profile, Letter, Stream, Essays, Inventory,
+              Reader sources — and every image as actual bytes under{" "}
+              <code className="font-mono">media/</code>. Self-contained
+              snapshot, yours forever.
             </p>
           </div>
 
