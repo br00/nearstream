@@ -443,6 +443,24 @@ export default async function StudioPage({ searchParams }: Props) {
 
           <hr className="mt-20 border-border" />
 
+          {/* Export — "ownership through exit." Manifesto promise made real
+              (NEARSTREAM.md §05). JSON download of everything in your tenant
+              namespace. */}
+          <div className="mt-12">
+            <Kicker>Your data</Kicker>
+            <a
+              href="/api/export"
+              className="mt-3 inline-block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
+            >
+              Download all my content →
+            </a>
+            <p className="mt-2 text-[11px] text-muted-soft">
+              A JSON file with your profile, Letter, Stream entries, Essays,
+              Inventory items, and Reader sources. Media files are linked but
+              not bundled — fetch via the URLs inside if you need the binaries.
+            </p>
+          </div>
+
           {isHostEmail(user.email) && (
             <div className="mt-12">
               <Kicker>Host tools</Kicker>
