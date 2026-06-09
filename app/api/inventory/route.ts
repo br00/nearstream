@@ -5,6 +5,7 @@ import type { InventoryImage, NewInventoryItem } from "@/schemas/inventory";
 import { isAllowedContentType } from "@/lib/media-store";
 import { getSession } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
+import { tenantBase } from "@/lib/tenant-domains";
 
 const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 50_000;
@@ -141,7 +142,8 @@ export async function POST(request: Request) {
   revalidatePath(`/${handle}/library/inventory/${item.slug}`);
   revalidatePath(`/${handle}/rss.xml`);
 
-  return Response.json({ item, handle }, { status: 201 });
+  const redirectTo = `${tenantBase(handle)}/library/inventory/${item.slug}`;
+  return Response.json({ item, redirectTo }, { status: 201 });
 }
 
 function validateImage(value: unknown): InventoryImage | string {

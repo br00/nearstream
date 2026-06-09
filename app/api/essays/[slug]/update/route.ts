@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { essayStore } from "@/lib/essay-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
+import { tenantBase } from "@/lib/tenant-domains";
 
 const TITLE_MAX = 200;
 const BODY_MAX = 50_000;
@@ -63,7 +64,8 @@ export async function POST(request: Request, { params }: Props) {
   }
 
   const user = await userStore.getById(session.userId);
-  redirect(`/${user?.handle ?? ""}/library/${slug}`);
+  const base = user?.handle ? tenantBase(user.handle) : "";
+  redirect(`${base}/library/${slug}`);
 }
 
 function errorRedirect(

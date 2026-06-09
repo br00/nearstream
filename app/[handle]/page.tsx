@@ -9,6 +9,7 @@ import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
 import { HumanCircle } from "@/app/_components/site/human-circle";
 import { isHostEmail } from "@/lib/auth";
+import { tenantBase } from "@/lib/tenant-domains";
 
 export const dynamic = "force-dynamic";
 
@@ -84,8 +85,10 @@ export default async function TenantHome({ params }: Props) {
     );
   }
 
+  const base = tenantBase(handle);
+
   function tenantPath(link: LibraryLink): string {
-    return `/${handle}${linkHref(link)}`;
+    return `${base}${linkHref(link)}`;
   }
 
   const recentStream = entries.slice(0, RECENT_STREAM);
@@ -101,7 +104,7 @@ export default async function TenantHome({ params }: Props) {
     <PageShell
       rightNav={
         <>
-          <Link href={`/${handle}/library`} className={navLinkClasses}>
+          <Link href={`${base}/library`} className={navLinkClasses}>
             Library
           </Link>
           <Link href="/studio" className={navLinkClasses}>
@@ -139,7 +142,7 @@ export default async function TenantHome({ params }: Props) {
 
           <section style={{ marginTop: "4.5rem" }}>
             <Link
-              href={`/${handle}/stream`}
+              href={`${base}/stream`}
               className={sectionLabelClasses + " mb-8"}
             >
               Stream
@@ -187,7 +190,7 @@ export default async function TenantHome({ params }: Props) {
           {recentPictures.length > 0 && (
             <section style={{ marginTop: "4.5rem" }}>
               <Link
-                href={`/${handle}/library/inventory`}
+                href={`${base}/library/inventory`}
                 className={sectionLabelClasses + " mb-8"}
               >
                 Pictures
@@ -196,7 +199,7 @@ export default async function TenantHome({ params }: Props) {
                 {recentPictures.map((item) => (
                   <li key={item.id}>
                     <Link
-                      href={`/${handle}/library/inventory/${item.slug}`}
+                      href={`${base}/library/inventory/${item.slug}`}
                       className="group flex items-center gap-5 text-foreground transition-colors hover:text-white"
                     >
                       <div className="aspect-[4/3] w-24 flex-shrink-0 overflow-hidden border border-border bg-foreground/5">
@@ -229,7 +232,7 @@ export default async function TenantHome({ params }: Props) {
           {recentEssays.length > 0 && (
             <section style={{ marginTop: "4.5rem" }}>
               <Link
-                href={`/${handle}/library`}
+                href={`${base}/library`}
                 className={sectionLabelClasses + " mb-8"}
               >
                 Essays
@@ -238,7 +241,7 @@ export default async function TenantHome({ params }: Props) {
                 {recentEssays.map((essay) => (
                   <li key={essay.id}>
                     <Link
-                      href={`/${handle}/library/${essay.slug}`}
+                      href={`${base}/library/${essay.slug}`}
                       className="group flex items-baseline justify-between gap-4 text-foreground transition-colors hover:text-white"
                     >
                       <span className="text-[15px] leading-snug">
@@ -273,7 +276,7 @@ export default async function TenantHome({ params }: Props) {
                 </li>
                 <li>
                   <a
-                    href={`/${handle}/rss.xml`}
+                    href={`${base}/rss.xml`}
                     className="text-[14px] text-muted transition-colors hover:text-foreground"
                   >
                     rss
@@ -297,7 +300,7 @@ export default async function TenantHome({ params }: Props) {
               <ul className="mt-8 flex flex-col gap-3">
                 <li>
                   <a
-                    href={`/${handle}/rss.xml`}
+                    href={`${base}/rss.xml`}
                     className="text-[14px] text-muted transition-colors hover:text-foreground"
                   >
                     rss

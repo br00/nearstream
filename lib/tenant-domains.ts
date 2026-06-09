@@ -24,9 +24,22 @@ export function customDomainFor(handle: string): string | null {
     With custom domain → "https://alessandroborelli.it"
     Without → "/alessandro" (instance-relative path).
 
-    Used for nav links from auth-only pages like /studio so signed-in users
-    land at the cleanest URL for their own site. */
+    Used for nav links and in-page anchors so the URL never includes the
+    handle when the tenant has a custom domain. */
 export function tenantBase(handle: string): string {
   const custom = customDomainFor(handle);
   return custom ? `https://${custom}` : `/${handle}`;
+}
+
+/** Always-absolute base URL for a tenant's site, useful for RSS channel
+    links + per-item permalinks where relative paths aren't valid.
+
+    With custom domain → "https://alessandroborelli.it"
+    Without → "{instanceUrl}/{handle}" */
+export function tenantAbsoluteBase(
+  handle: string,
+  instanceUrl: string,
+): string {
+  const custom = customDomainFor(handle);
+  return custom ? `https://${custom}` : `${instanceUrl}/${handle}`;
 }

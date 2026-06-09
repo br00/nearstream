@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
+import { tenantBase } from "@/lib/tenant-domains";
 import { isInventoryStatus } from "@/schemas/inventory";
 import type { NewInventoryItem } from "@/schemas/inventory";
 
@@ -101,7 +102,8 @@ export async function POST(request: Request, { params }: Props) {
   }
 
   const user = await userStore.getById(session.userId);
-  redirect(`/${user?.handle ?? ""}/library/inventory/${slug}`);
+  const base = user?.handle ? tenantBase(user.handle) : "";
+  redirect(`${base}/library/inventory/${slug}`);
 }
 
 function errorRedirect(

@@ -4,6 +4,7 @@ import { marked } from "marked";
 import { essayStore } from "@/lib/essay-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
+import { tenantBase } from "@/lib/tenant-domains";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { DeleteButton } from "@/app/_components/delete-button";
@@ -55,7 +56,10 @@ export default async function EssayPage({ params }: Props) {
     <PageShell
       rightNav={
         <>
-          <Link href={`/${handle}/library`} className={navLinkClasses}>
+          <Link
+            href={`${tenantBase(handle)}/library`}
+            className={navLinkClasses}
+          >
             ← Library
           </Link>
           {isOwner && (

@@ -4,6 +4,7 @@ import { store } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
+import { tenantAbsoluteBase } from "@/lib/tenant-domains";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import type { InventoryItem } from "@/schemas/inventory";
 
@@ -95,7 +96,7 @@ export async function GET(_req: Request, { params }: Props) {
   const user = await userStore.getByHandle(handle);
   if (!user) notFound();
 
-  const siteUrl = `${INSTANCE_URL}/${handle}`;
+  const siteUrl = tenantAbsoluteBase(handle, INSTANCE_URL);
   const feedTitle = `${user.displayName || handle} — Nearstream`;
   const feedDescription = `Stream, essays, and inventory from ${user.displayName || handle}.`;
 

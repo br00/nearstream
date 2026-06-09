@@ -4,6 +4,7 @@ import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
+import { tenantBase } from "@/lib/tenant-domains";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { DeleteButton } from "@/app/_components/delete-button";
@@ -64,6 +65,7 @@ export default async function LibraryPage({ params }: Props) {
     getSession(),
   ]);
   const isOwner = session?.userId === user.id;
+  const base = tenantBase(handle);
 
   const entries: LibraryEntry[] = [
     ...essays.map(
@@ -72,7 +74,7 @@ export default async function LibraryPage({ params }: Props) {
         id: e.id,
         slug: e.slug,
         title: e.title,
-        href: `/${handle}/library/${e.slug}`,
+        href: `${base}/library/${e.slug}`,
         publishedAt: e.publishedAt,
       }),
     ),
@@ -82,7 +84,7 @@ export default async function LibraryPage({ params }: Props) {
         id: i.id,
         slug: i.slug,
         title: i.title,
-        href: `/${handle}/library/inventory/${i.slug}`,
+        href: `${base}/library/inventory/${i.slug}`,
         publishedAt: i.publishedAt,
         imageKey: i.image.thumbKey ?? i.image.key,
       }),
@@ -96,7 +98,7 @@ export default async function LibraryPage({ params }: Props) {
     <PageShell
       rightNav={
         <>
-          <Link href={`/${handle}`} className={navLinkClasses}>
+          <Link href={base} className={navLinkClasses}>
             ← Home
           </Link>
           {isOwner && (

@@ -7,6 +7,7 @@ import {
 } from "@/schemas/stream";
 import { getSession } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
+import { tenantBase } from "@/lib/tenant-domains";
 
 export async function GET() {
   const session = await getSession();
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
     return Response.json({ entry }, { status: 201 });
   }
 
-  return Response.redirect(new URL(`/${handle}`, request.url), 303);
+  return Response.redirect(new URL(tenantBase(handle), request.url), 303);
 }
 
 // Accepts either a structured object (JSON) or a "type::slug" string (form).

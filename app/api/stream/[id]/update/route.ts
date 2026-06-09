@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { store } from "@/lib/store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
+import { tenantBase } from "@/lib/tenant-domains";
 import {
   isDisciplineTag,
   isLibraryLinkType,
@@ -58,7 +59,8 @@ export async function POST(request: Request, { params }: Props) {
   }
 
   const user = await userStore.getById(session.userId);
-  redirect(`/${user?.handle ?? ""}/stream#entry-${id}`);
+  const base = user?.handle ? tenantBase(user.handle) : "";
+  redirect(`${base}/stream#entry-${id}`);
 }
 
 function errorRedirect(request: Request, id: string, message: string): Response {

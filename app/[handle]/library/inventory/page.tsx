@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
+import { tenantBase } from "@/lib/tenant-domains";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { DeleteButton } from "@/app/_components/delete-button";
@@ -35,6 +36,7 @@ export default async function InventoryArchivePage({ params }: Props) {
   ]);
   const isOwner = session?.userId === user.id;
 
+  const base = tenantBase(handle);
   const navLinkClasses =
     "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
 
@@ -42,7 +44,7 @@ export default async function InventoryArchivePage({ params }: Props) {
     <PageShell
       rightNav={
         <>
-          <Link href={`/${handle}/library`} className={navLinkClasses}>
+          <Link href={`${base}/library`} className={navLinkClasses}>
             ← Library
           </Link>
           {isOwner && (
@@ -81,7 +83,7 @@ export default async function InventoryArchivePage({ params }: Props) {
               {items.map((item) => (
                 <li key={item.id}>
                   <Link
-                    href={`/${handle}/library/inventory/${item.slug}`}
+                    href={`${base}/library/inventory/${item.slug}`}
                     className="group block"
                   >
                     <div className="aspect-square w-full overflow-hidden border border-border bg-foreground/5">

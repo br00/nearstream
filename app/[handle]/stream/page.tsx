@@ -5,6 +5,7 @@ import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
+import { tenantBase } from "@/lib/tenant-domains";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
@@ -63,13 +64,14 @@ export default async function StreamArchive({ params }: Props) {
     );
   }
 
+  const base = tenantBase(handle);
   const navLinkClasses =
     "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
 
   return (
     <PageShell
       rightNav={
-        <Link href={`/${handle}`} className={navLinkClasses}>
+        <Link href={base} className={navLinkClasses}>
           ← Home
         </Link>
       }
@@ -139,7 +141,7 @@ export default async function StreamArchive({ params }: Props) {
                           <>
                             {" "}
                             <Link
-                              href={`/${handle}${linkHref(entry.link)}`}
+                              href={`${base}${linkHref(entry.link)}`}
                               className="inline text-foreground underline-offset-4 hover:underline"
                             >
                               {title} →

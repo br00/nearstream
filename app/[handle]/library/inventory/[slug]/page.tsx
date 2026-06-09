@@ -4,6 +4,7 @@ import { marked } from "marked";
 import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
+import { tenantBase } from "@/lib/tenant-domains";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { DeleteButton } from "@/app/_components/delete-button";
@@ -65,7 +66,7 @@ export default async function InventoryItemPage({ params }: Props) {
       rightNav={
         <>
           <Link
-            href={`/${handle}/library/inventory`}
+            href={`${tenantBase(handle)}/library/inventory`}
             className={navLinkClasses}
           >
             ← Inventory

@@ -3,6 +3,7 @@ import { essayStore } from "@/lib/essay-store";
 import { slugify } from "@/schemas/essay";
 import { getSession } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
+import { tenantBase } from "@/lib/tenant-domains";
 
 const TITLE_MAX = 200;
 const BODY_MAX = 50_000;
@@ -98,7 +99,7 @@ export async function POST(request: Request) {
   }
 
   return Response.redirect(
-    new URL(`/${handle}/library/${essay.slug}`, request.url),
+    new URL(`${tenantBase(handle)}/library/${essay.slug}`, request.url),
     303,
   );
 }
