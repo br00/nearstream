@@ -6,6 +6,7 @@ import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
+import { visibilityOf } from "@/schemas/visibility";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
@@ -47,13 +48,16 @@ export default async function StreamArchive({ params }: Props) {
   const user = await userStore.getByHandle(handle);
   if (!user) notFound();
 
-  const [entries, essays, inventoryItems, session] = await Promise.all([
+  const [allEntries, essays, inventoryItems, session] = await Promise.all([
     store.list(user.id),
     essayStore.list(user.id),
     inventoryStore.list(user.id),
     getSession(),
   ]);
   const isOwner = session?.userId === user.id;
+  const entries = isOwner
+    ? allEntries
+    : allEntries.filter((e) => visibilityOf(e) === "public");
 
   const essayTitles = new Map(essays.map((e) => [e.slug, e.title]));
   const inventoryTitles = new Map(inventoryItems.map((i) => [i.slug, i.title]));
@@ -116,6 +120,11 @@ export default async function StreamArchive({ params }: Props) {
                       {formatRelative(entry.publishedAt)}
                     </time>
                     <TagChip>{entry.tag}</TagChip>
+                    {visibilityOf(entry) === "private" && (
+                      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground/70">
+                        Private
+                      </span>
+                    )}
                     {isOwner && (
                       <>
                         <Link

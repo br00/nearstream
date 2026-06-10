@@ -1,3 +1,5 @@
+import type { Visibility } from "@/schemas/visibility";
+
 export { slugify, isValidSlug } from "@/lib/slug";
 
 export type Essay = {
@@ -6,6 +8,7 @@ export type Essay = {
   title: string;
   body: string;
   publishedAt: string;
+  visibility?: Visibility;
 };
 
-export type NewEssay = Pick<Essay, "title" | "body">;
+export type NewEssay = Pick<Essay, "title" | "body" | "visibility">;

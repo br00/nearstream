@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
 import { isInventoryStatus } from "@/schemas/inventory";
 import type { NewInventoryItem } from "@/schemas/inventory";
+import { isVisibility, type Visibility } from "@/schemas/visibility";
 
 const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 50_000;
@@ -76,6 +77,11 @@ export async function POST(request: Request, { params }: Props) {
     validatedStatus = rawStatus;
   }
 
+  const rawVisibility = form.get("visibility");
+  const visibility: Visibility = isVisibility(rawVisibility)
+    ? rawVisibility
+    : "public";
+
   try {
     const updated = await inventoryStore.updateBySlug(session.userId, slug, {
       title: title.trim(),
@@ -85,6 +91,7 @@ export async function POST(request: Request, { params }: Props) {
       edition: fields.edition,
       status: validatedStatus,
       price: fields.price,
+      visibility,
     });
     if (!updated) return errorRedirect(request, slug, "item not found");
 

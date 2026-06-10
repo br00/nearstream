@@ -4,6 +4,7 @@ import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
+import { visibilityOf } from "@/schemas/visibility";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { DeleteButton } from "@/app/_components/delete-button";
@@ -30,11 +31,14 @@ export default async function InventoryArchivePage({ params }: Props) {
   const user = await userStore.getByHandle(handle);
   if (!user) notFound();
 
-  const [items, session] = await Promise.all([
+  const [allItems, session] = await Promise.all([
     inventoryStore.list(user.id),
     getSession(),
   ]);
   const isOwner = session?.userId === user.id;
+  const items = isOwner
+    ? allItems
+    : allItems.filter((i) => visibilityOf(i) === "public");
 
   const base = tenantBase(handle);
   const navLinkClasses =

@@ -6,6 +6,7 @@ import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
 import { tenantAbsoluteBase } from "@/lib/tenant-domains";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
+import { visibilityOf } from "@/schemas/visibility";
 import type { InventoryItem } from "@/schemas/inventory";
 
 export const dynamic = "force-dynamic";
@@ -100,11 +101,17 @@ export async function GET(_req: Request, { params }: Props) {
   const feedTitle = `${user.displayName || handle} — Nearstream`;
   const feedDescription = `Stream, essays, and inventory from ${user.displayName || handle}.`;
 
-  const [entries, essays, items] = await Promise.all([
+  const [allEntries, allEssays, allItems] = await Promise.all([
     store.list(user.id),
     essayStore.list(user.id),
     inventoryStore.list(user.id),
   ]);
+  // RSS is public-only — private entries never leave the instance, and the
+  // RSS guid for an entry that flips from public → private wouldn't reappear
+  // if it ever flipped back, so the feed stays clean across edits.
+  const entries = allEntries.filter((e) => visibilityOf(e) === "public");
+  const essays = allEssays.filter((e) => visibilityOf(e) === "public");
+  const items = allItems.filter((i) => visibilityOf(i) === "public");
 
   const essayTitles = new Map(essays.map((e) => [e.slug, e.title]));
   const inventoryTitles = new Map(items.map((i) => [i.slug, i.title]));

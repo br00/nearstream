@@ -5,6 +5,7 @@ import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
+import { visibilityOf } from "@/schemas/visibility";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { DeleteButton } from "@/app/_components/delete-button";
@@ -46,6 +47,7 @@ export default async function InventoryItemPage({ params }: Props) {
   ]);
   if (!item) notFound();
   const isOwner = session?.userId === user.id;
+  if (visibilityOf(item) === "private" && !isOwner) notFound();
 
   const html = item.description
     ? await marked.parse(item.description, { async: true })

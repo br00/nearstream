@@ -39,6 +39,7 @@ class InMemoryEssayStore implements EssayStore {
       title: input.title,
       body: input.body,
       publishedAt: new Date().toISOString(),
+      visibility: input.visibility ?? "public",
     };
     this.bucket(userId).push(essay);
     return essay;
@@ -56,7 +57,12 @@ class InMemoryEssayStore implements EssayStore {
     const b = this.bucket(userId);
     const i = b.findIndex((e) => e.slug === slug);
     if (i === -1) return null;
-    b[i] = { ...b[i], title: patch.title, body: patch.body };
+    b[i] = {
+      ...b[i],
+      title: patch.title,
+      body: patch.body,
+      visibility: patch.visibility ?? b[i].visibility ?? "public",
+    };
     return b[i];
   }
 
@@ -103,6 +109,7 @@ class R2EssayStore implements EssayStore {
       title: input.title,
       body: input.body,
       publishedAt: new Date().toISOString(),
+      visibility: input.visibility ?? "public",
     };
     const res = await this.client.fetch(
       `${this.base}/${this.key(userId, essay.id)}`,
@@ -160,7 +167,12 @@ class R2EssayStore implements EssayStore {
   ): Promise<Essay | null> {
     const target = await this.getBySlug(userId, slug);
     if (!target) return null;
-    const updated: Essay = { ...target, title: patch.title, body: patch.body };
+    const updated: Essay = {
+      ...target,
+      title: patch.title,
+      body: patch.body,
+      visibility: patch.visibility ?? target.visibility ?? "public",
+    };
     const res = await this.client.fetch(
       `${this.base}/${this.key(userId, target.id)}`,
       {

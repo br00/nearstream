@@ -5,6 +5,7 @@ import {
   isLibraryLinkType,
   type LibraryLink,
 } from "@/schemas/stream";
+import { isVisibility, type Visibility } from "@/schemas/visibility";
 import { getSession } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
 import { tenantBase } from "@/lib/tenant-domains";
@@ -29,17 +30,20 @@ export async function POST(request: Request) {
   let text: unknown;
   let tag: unknown;
   let rawLink: unknown;
+  let rawVisibility: unknown;
 
   if (contentType.includes("application/json")) {
     const body = await request.json();
     text = body?.text;
     tag = body?.tag;
     rawLink = body?.link;
+    rawVisibility = body?.visibility;
   } else {
     const form = await request.formData();
     text = form.get("text");
     tag = form.get("tag");
     rawLink = form.get("link");
+    rawVisibility = form.get("visibility");
   }
 
   if (typeof text !== "string" || text.trim().length === 0) {
@@ -54,10 +58,15 @@ export async function POST(request: Request) {
     return Response.json({ error: link }, { status: 400 });
   }
 
+  const visibility: Visibility = isVisibility(rawVisibility)
+    ? rawVisibility
+    : "public";
+
   const entry = await store.add(session.userId, {
     text: text.trim(),
     tag,
     link,
+    visibility,
   });
 
   const user = await userStore.getById(session.userId);
