@@ -4,7 +4,8 @@ import { getSession } from "@/lib/auth";
 import { sourceStore } from "@/lib/source-store";
 import { feedEntryStore } from "@/lib/feed-entry-store";
 import { PageShell } from "@/app/_components/page-shell";
-import { NearstreamLockup, NearstreamMark } from "@/app/_components/nearstream-mark";
+import { NearstreamLockup } from "@/app/_components/nearstream-mark";
+import { NearstreamMarkAnimated } from "@/app/_components/site/nearstream-mark-animated";
 import { Kicker } from "@/app/_components/kicker";
 import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
 
@@ -125,13 +126,13 @@ export default async function ReaderPage() {
   );
 }
 
-// Empty-state mark — the static `>` chevron, left-aligned in the same column
-// as the heading + copy. Stable baseline while we pick an animated version
-// in /design/logo-lab. Disappears the moment there's real content.
+// Empty-state mark — the animated `>` (Final from /design/logo-lab), left-
+// aligned in the same column as the heading + copy. Disappears the moment
+// there's real content.
 function EmptyStateMark() {
   return (
     <div className="mt-12">
-      <NearstreamMark size={64} className="text-foreground" />
+      <NearstreamMarkAnimated size={120} />
     </div>
   );
 }
