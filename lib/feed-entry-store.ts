@@ -5,6 +5,15 @@ export interface FeedEntryStore {
   list(userId: string): Promise<FeedEntry[]>;
   listBySource(userId: string, sourceId: string): Promise<FeedEntry[]>;
   upsertMany(userId: string, entries: NewFeedEntry[]): Promise<number>;
+  /** Replace this source's locally-stored entries with `entries`. Anything we
+   *  had cached whose `(sourceId, guid)` isn't in the new list gets deleted —
+   *  the source feed is authoritative on each successful refresh. Returns
+   *  counts of what was added and what was removed. */
+  syncBySource(
+    userId: string,
+    sourceId: string,
+    entries: NewFeedEntry[],
+  ): Promise<{ added: number; removed: number }>;
   deleteBySource(userId: string, sourceId: string): Promise<number>;
 }
 
@@ -49,6 +58,27 @@ class InMemoryFeedEntryStore implements FeedEntryStore {
       added++;
     }
     return added;
+  }
+
+  async syncBySource(
+    userId: string,
+    sourceId: string,
+    entries: NewFeedEntry[],
+  ): Promise<{ added: number; removed: number }> {
+    const b = this.bucket(userId);
+    const newIds = new Set<string>();
+    for (const e of entries) {
+      newIds.add(await makeEntryId(e.sourceId, e.guid));
+    }
+    let removed = 0;
+    for (const [id, e] of b) {
+      if (e.sourceId === sourceId && !newIds.has(id)) {
+        b.delete(id);
+        removed++;
+      }
+    }
+    const added = await this.upsertMany(userId, entries);
+    return { added, removed };
   }
 
   async deleteBySource(userId: string, sourceId: string): Promise<number> {
@@ -158,6 +188,50 @@ class R2FeedEntryStore implements FeedEntryStore {
       added++;
     }
     return added;
+  }
+
+  async syncBySource(
+    userId: string,
+    sourceId: string,
+    entries: NewFeedEntry[],
+  ): Promise<{ added: number; removed: number }> {
+    // What does the friend's feed *currently* say? Anything else we have
+    // locally is a stale entry the friend deleted on their end.
+    const newIds = new Set<string>();
+    for (const e of entries) {
+      newIds.add(await makeEntryId(e.sourceId, e.guid));
+    }
+
+    const prefix = this.prefix(userId, sourceId);
+    const listUrl = `${this.base}/?list-type=2&prefix=${encodeURIComponent(prefix)}`;
+    const listRes = await this.client.fetch(listUrl);
+    if (!listRes.ok) {
+      throw new Error(
+        `R2 LIST failed (${listRes.status} ${listRes.statusText})`,
+      );
+    }
+    const keys = parseListKeys(await listRes.text());
+
+    let removed = 0;
+    await Promise.all(
+      keys.map(async (key) => {
+        // Extract the entry id from `users/{u}/reader/feed/{s}/{id}.json`.
+        const idPart = key.slice(prefix.length).replace(/\.json$/, "");
+        if (newIds.has(idPart)) return;
+        const r = await this.client.fetch(`${this.base}/${key}`, {
+          method: "DELETE",
+        });
+        if (r.status !== 204 && r.status !== 404) {
+          throw new Error(
+            `R2 DELETE ${key} failed (${r.status} ${r.statusText})`,
+          );
+        }
+        removed++;
+      }),
+    );
+
+    const added = await this.upsertMany(userId, entries);
+    return { added, removed };
   }
 
   async deleteBySource(userId: string, sourceId: string): Promise<number> {
