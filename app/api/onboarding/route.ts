@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
 import { isValidHandle } from "@/schemas/user";
+import { normalizeProfileMark } from "@/lib/profile-mark-variants";
 
 const DISPLAY_NAME_MAX = 80;
 
@@ -14,6 +15,10 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const handleRaw = form.get("handle");
   const displayName = form.get("displayName");
+  const profileMarkRaw = form.get("profileMark");
+  const profileMark = normalizeProfileMark(
+    typeof profileMarkRaw === "string" ? Number(profileMarkRaw) : undefined,
+  );
 
   if (typeof handleRaw !== "string") {
     return errorRedirect(request, "handle is required");
@@ -48,7 +53,12 @@ export async function POST(request: Request) {
     return Response.redirect(new URL("/studio", request.url), 303);
   }
 
-  await userStore.setHandleAndName(current.id, handle, displayName.trim());
+  await userStore.setHandleAndName(
+    current.id,
+    handle,
+    displayName.trim(),
+    profileMark,
+  );
 
   return Response.redirect(new URL("/studio", request.url), 303);
 }

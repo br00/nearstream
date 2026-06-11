@@ -5,6 +5,7 @@ import { sourceStore } from "@/lib/source-store";
 import { feedEntryStore } from "@/lib/feed-entry-store";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamLockup } from "@/app/_components/nearstream-mark";
+import { NearstreamMarkAnimated } from "@/app/_components/site/nearstream-mark-animated";
 import { Kicker } from "@/app/_components/kicker";
 import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
 
@@ -125,10 +126,22 @@ export default async function ReaderPage() {
   );
 }
 
-function EmptySourcesState() {
+// Empty-state mark — the animated `>` (Final from /design/logo-lab), left-
+// aligned in the same column as the heading + copy. Disappears the moment
+// there's real content.
+function EmptyStateMark() {
   return (
     <div className="mt-12">
-      <h1 className="text-2xl font-normal tracking-tight text-foreground">
+      <NearstreamMarkAnimated size={120} />
+    </div>
+  );
+}
+
+function EmptySourcesState() {
+  return (
+    <div>
+      <EmptyStateMark />
+      <h1 className="mt-8 text-2xl font-normal tracking-tight text-foreground">
         No friends followed yet
       </h1>
       <p className="mt-4 text-sm leading-relaxed text-muted">
@@ -148,8 +161,9 @@ function EmptySourcesState() {
 
 function EmptyFeedState() {
   return (
-    <div className="mt-12">
-      <h1 className="text-2xl font-normal tracking-tight text-foreground">
+    <div>
+      <EmptyStateMark />
+      <h1 className="mt-8 text-2xl font-normal tracking-tight text-foreground">
         Quiet so far
       </h1>
       <p className="mt-4 text-sm leading-relaxed text-muted">

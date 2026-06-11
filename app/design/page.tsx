@@ -3,12 +3,13 @@ import { Kicker } from "@/app/_components/kicker";
 import { Button } from "@/app/_components/button";
 import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
-import { TagChip, TagRadio } from "@/app/_components/tag-chip";
+import { TagChip } from "@/app/_components/tag-chip";
+import { ModeRadioGroup } from "@/app/_components/mode-radio";
 import {
   NearstreamMark,
   NearstreamLockup,
 } from "@/app/_components/nearstream-mark";
-import { DISCIPLINE_TAGS } from "@/schemas/stream";
+import { MODE_TAGS, DEFAULT_MODE } from "@/schemas/stream";
 
 export const metadata = {
   title: "Design · Nearstream",
@@ -163,29 +164,20 @@ export default function DesignPage() {
             </div>
           </Section>
 
-          <Section title="Tag chips">
-            <div className="space-y-4">
+          <Section title="Mode tags">
+            <div className="space-y-6">
               <div>
                 <Kicker>Display</Kicker>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {DISCIPLINE_TAGS.map((tag) => (
-                    <TagChip key={tag}>{tag}</TagChip>
+                  {MODE_TAGS.map((mode) => (
+                    <TagChip key={mode.value}>{mode.value}</TagChip>
                   ))}
                 </div>
               </div>
               <div>
-                <Kicker>Radio</Kicker>
-                <form className="mt-2 flex flex-wrap gap-2">
-                  {DISCIPLINE_TAGS.map((tag, i) => (
-                    <TagRadio
-                      key={tag}
-                      name="design_demo"
-                      value={tag}
-                      defaultChecked={i === 0}
-                    >
-                      {tag}
-                    </TagRadio>
-                  ))}
+                <Kicker>Picker</Kicker>
+                <form className="mt-3">
+                  <ModeRadioGroup current={DEFAULT_MODE} name="design_demo" />
                 </form>
               </div>
             </div>

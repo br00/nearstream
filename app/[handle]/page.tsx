@@ -7,7 +7,7 @@ import { letterStore } from "@/lib/letter-store";
 import { userStore } from "@/lib/user-store";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
-import { HumanCircle } from "@/app/_components/site/human-circle";
+import { ProfileMark } from "@/app/_components/site/profile-mark";
 import { isHostEmail, getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
 import { visibilityOf } from "@/schemas/visibility";
@@ -132,13 +132,17 @@ export default async function TenantHome({ params }: Props) {
     >
       <section className="flex flex-1 justify-center px-6">
         <div className="w-full max-w-[30rem] pt-12 pb-32">
-          {/* Hero — HumanCircle only for the host (Alessandro's signature).
-              Other tenants get a quiet typographic masthead. */}
+          {/* Hero — everyone renders the profile mark they picked in
+              onboarding (variant 0 = original signature parameters, so the
+              default still looks like the piece). */}
           <div className="flex flex-col items-center">
-            {isHost ? <HumanCircle size={280} className="block" /> : null}
-            <h1
-              className={`text-[17px] font-normal text-foreground ${isHost ? "mt-6" : "mt-12"}`}
-            >
+            <ProfileMark
+              variantIndex={user.profileMark}
+              size={280}
+              className="block"
+              ariaLabel={`${user.displayName || handle} — profile mark`}
+            />
+            <h1 className="mt-6 text-[17px] font-normal text-foreground">
               {user.displayName || handle}
             </h1>
           </div>
@@ -157,16 +161,14 @@ export default async function TenantHome({ params }: Props) {
             </div>
           ) : null}
 
-          <section style={{ marginTop: "4.5rem" }}>
-            <Link
-              href={`${base}/stream`}
-              className={sectionLabelClasses + " mb-8"}
-            >
-              Stream
-            </Link>
-            {recentStream.length === 0 ? (
-              <p className="mt-6 text-sm text-muted">No notes yet.</p>
-            ) : (
+          {recentStream.length > 0 && (
+            <section style={{ marginTop: "4.5rem" }}>
+              <Link
+                href={`${base}/stream`}
+                className={sectionLabelClasses + " mb-8"}
+              >
+                Stream
+              </Link>
               <ul className="mt-8 flex flex-col gap-4">
                 {recentStream.map((entry) => (
                   <li
@@ -201,8 +203,8 @@ export default async function TenantHome({ params }: Props) {
                   </li>
                 ))}
               </ul>
-            )}
-          </section>
+            </section>
+          )}
 
           {recentPictures.length > 0 && (
             <section style={{ marginTop: "4.5rem" }}>

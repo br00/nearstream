@@ -16,6 +16,12 @@ export type User = {
   handle: string;
   /** Free-form display name shown on the user's site and in the reader. */
   displayName: string;
+  /**
+   * Index into PROFILE_MARK_VARIANTS — the animated mark we render where
+   * other products would show a profile photo. Optional for back-compat with
+   * users created before profile marks shipped (treated as variant 0).
+   */
+  profileMark?: number;
   createdAt: string;
 };
 
@@ -39,6 +45,7 @@ export function isValidHandle(value: string): boolean {
     "design",
     "tenant",
     "about",
+    "manifesto",
     "rss",
     "rss.xml",
     "favicon.ico",

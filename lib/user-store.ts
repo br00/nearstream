@@ -15,8 +15,10 @@ export interface UserStore {
     id: string,
     handle: string,
     displayName: string,
+    profileMark?: number,
   ): Promise<User | null>;
   setDisplayName(id: string, displayName: string): Promise<User | null>;
+  setProfileMark(id: string, profileMark: number): Promise<User | null>;
 }
 
 const PREFIX = "users-meta/";
@@ -48,16 +50,32 @@ class InMemoryUserStore implements UserStore {
     this.users.push(user);
     return user;
   }
-  async setHandleAndName(id: string, handle: string, displayName: string) {
+  async setHandleAndName(
+    id: string,
+    handle: string,
+    displayName: string,
+    profileMark?: number,
+  ) {
     const i = this.users.findIndex((u) => u.id === id);
     if (i === -1) return null;
-    this.users[i] = { ...this.users[i], handle, displayName };
+    this.users[i] = {
+      ...this.users[i],
+      handle,
+      displayName,
+      ...(profileMark !== undefined ? { profileMark } : {}),
+    };
     return this.users[i];
   }
   async setDisplayName(id: string, displayName: string) {
     const i = this.users.findIndex((u) => u.id === id);
     if (i === -1) return null;
     this.users[i] = { ...this.users[i], displayName };
+    return this.users[i];
+  }
+  async setProfileMark(id: string, profileMark: number) {
+    const i = this.users.findIndex((u) => u.id === id);
+    if (i === -1) return null;
+    this.users[i] = { ...this.users[i], profileMark };
     return this.users[i];
   }
 }
@@ -148,10 +166,16 @@ class R2UserStore implements UserStore {
     id: string,
     handle: string,
     displayName: string,
+    profileMark?: number,
   ): Promise<User | null> {
     const current = await this.getById(id);
     if (!current) return null;
-    const updated: User = { ...current, handle, displayName };
+    const updated: User = {
+      ...current,
+      handle,
+      displayName,
+      ...(profileMark !== undefined ? { profileMark } : {}),
+    };
     const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
       method: "PUT",
       body: JSON.stringify(updated),
@@ -167,6 +191,21 @@ class R2UserStore implements UserStore {
     const current = await this.getById(id);
     if (!current) return null;
     const updated: User = { ...current, displayName };
+    const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(updated),
+      headers: { "content-type": "application/json" },
+    });
+    if (!res.ok) {
+      throw new Error(`R2 PUT failed (${res.status} ${res.statusText})`);
+    }
+    return updated;
+  }
+
+  async setProfileMark(id: string, profileMark: number): Promise<User | null> {
+    const current = await this.getById(id);
+    if (!current) return null;
+    const updated: User = { ...current, profileMark };
     const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
       method: "PUT",
       body: JSON.stringify(updated),

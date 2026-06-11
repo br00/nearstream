@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { essayStore } from "@/lib/essay-store";
+import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
+import { tenantBase } from "@/lib/tenant-domains";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -16,9 +18,11 @@ export async function POST(_req: Request, { params }: Props) {
   const { slug } = await params;
   await essayStore.deleteBySlug(session.userId, slug);
 
-  revalidatePath("/library");
-  revalidatePath(`/library/${slug}`);
-  revalidatePath("/rss.xml");
+  const user = await userStore.getById(session.userId);
+  const handle = user?.handle ?? "";
+  revalidatePath(`/${handle}/library`);
+  revalidatePath(`/${handle}/library/${slug}`);
+  revalidatePath(`/${handle}/rss.xml`);
 
-  redirect("/library");
+  redirect(`${tenantBase(handle)}/library`);
 }

@@ -5,13 +5,13 @@ import { store } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
-import { DISCIPLINE_TAGS } from "@/schemas/stream";
+import { DEFAULT_MODE, isModeTag, type ModeTag } from "@/schemas/stream";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamLockup } from "@/app/_components/nearstream-mark";
 import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
-import { TagRadio } from "@/app/_components/tag-chip";
+import { ModeRadioGroup } from "@/app/_components/mode-radio";
 import { VisibilityRadio } from "@/app/_components/visibility-radio";
 import { visibilityOf } from "@/schemas/visibility";
 
@@ -44,6 +44,10 @@ export default async function EditStreamEntry({ params, searchParams }: Props) {
     "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
 
   const linkValue = entry.link ? `${entry.link.type}::${entry.link.slug}` : "";
+  // Pre-2026-06-11 entries carry legacy discipline tags ("Code" etc.) that
+  // are no longer valid modes. Fall back to the default so the radio group
+  // always has something checked.
+  const currentMode: ModeTag = isModeTag(entry.tag) ? entry.tag : DEFAULT_MODE;
 
   return (
     <PageShell
@@ -61,8 +65,7 @@ export default async function EditStreamEntry({ params, searchParams }: Props) {
             Stream entry
           </h1>
           <p className="mt-2 text-sm text-muted-soft">
-            Edit the text, discipline tag, and link. Publish date stays the
-            same.
+            Edit the text, mode, and link. Publish date stays the same.
           </p>
 
           {error && (
@@ -87,21 +90,9 @@ export default async function EditStreamEntry({ params, searchParams }: Props) {
 
             <fieldset className="flex flex-col gap-3">
               <legend>
-                <Kicker>Discipline</Kicker>
+                <Kicker>Mode</Kicker>
               </legend>
-              <div className="flex flex-wrap gap-2">
-                {DISCIPLINE_TAGS.map((tag) => (
-                  <TagRadio
-                    key={tag}
-                    name="tag"
-                    value={tag}
-                    defaultChecked={tag === entry.tag}
-                    required
-                  >
-                    {tag}
-                  </TagRadio>
-                ))}
-              </div>
+              <ModeRadioGroup current={currentMode} />
             </fieldset>
 
             {(essays.length > 0 || inventoryItems.length > 0) && (

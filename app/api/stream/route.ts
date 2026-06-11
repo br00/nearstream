@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { store } from "@/lib/store";
 import {
-  isDisciplineTag,
+  isModeTag,
   isLibraryLinkType,
   type LibraryLink,
 } from "@/schemas/stream";
@@ -49,8 +49,8 @@ export async function POST(request: Request) {
   if (typeof text !== "string" || text.trim().length === 0) {
     return Response.json({ error: "text is required" }, { status: 400 });
   }
-  if (!isDisciplineTag(tag)) {
-    return Response.json({ error: "invalid tag" }, { status: 400 });
+  if (!isModeTag(tag)) {
+    return Response.json({ error: "invalid mode" }, { status: 400 });
   }
 
   const link = parseLink(rawLink);
