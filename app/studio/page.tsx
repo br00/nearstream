@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { DISCIPLINE_TAGS } from "@/schemas/stream";
+import { DEFAULT_MODE } from "@/schemas/stream";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { letterStore } from "@/lib/letter-store";
@@ -16,7 +16,7 @@ import { NearstreamLockup } from "@/app/_components/nearstream-mark";
 import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
-import { TagRadio } from "@/app/_components/tag-chip";
+import { ModeRadioGroup } from "@/app/_components/mode-radio";
 import { InventoryUploadForm } from "@/app/_components/inventory-upload-form";
 import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
 import { ProfileMarkPicker } from "@/app/_components/site/profile-mark-picker";
@@ -175,21 +175,9 @@ export default async function StudioPage({ searchParams }: Props) {
 
               <fieldset className="flex flex-col gap-3">
                 <legend>
-                  <Kicker>Discipline</Kicker>
+                  <Kicker>Mode</Kicker>
                 </legend>
-                <div className="flex flex-wrap gap-2">
-                  {DISCIPLINE_TAGS.map((tag, i) => (
-                    <TagRadio
-                      key={tag}
-                      name="tag"
-                      value={tag}
-                      defaultChecked={i === 0}
-                      required
-                    >
-                      {tag}
-                    </TagRadio>
-                  ))}
-                </div>
+                <ModeRadioGroup current={DEFAULT_MODE} />
               </fieldset>
 
               {(essays.length > 0 || inventoryItems.length > 0) && (

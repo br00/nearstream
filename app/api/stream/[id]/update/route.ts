@@ -5,7 +5,7 @@ import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
 import {
-  isDisciplineTag,
+  isModeTag,
   isLibraryLinkType,
   type LibraryLink,
 } from "@/schemas/stream";
@@ -30,8 +30,8 @@ export async function POST(request: Request, { params }: Props) {
   if (typeof text !== "string" || text.trim().length === 0) {
     return errorRedirect(request, id, "text is required");
   }
-  if (!isDisciplineTag(tag)) {
-    return errorRedirect(request, id, "invalid tag");
+  if (!isModeTag(tag)) {
+    return errorRedirect(request, id, "invalid mode");
   }
 
   const link = parseLink(rawLink);
