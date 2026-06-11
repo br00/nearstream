@@ -7,7 +7,6 @@ import { letterStore } from "@/lib/letter-store";
 import { userStore } from "@/lib/user-store";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
-import { HumanCircle } from "@/app/_components/site/human-circle";
 import { ProfileMark } from "@/app/_components/site/profile-mark";
 import { isHostEmail } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
@@ -116,20 +115,16 @@ export default async function TenantHome({ params }: Props) {
     >
       <section className="flex flex-1 justify-center px-6">
         <div className="w-full max-w-[30rem] pt-12 pb-32">
-          {/* Hero — host keeps the original HumanCircle (Alessandro's
-              signature, baked into the piece). Every other tenant gets the
-              animated profile mark they picked in onboarding. */}
+          {/* Hero — everyone renders the profile mark they picked in
+              onboarding (variant 0 = original signature parameters, so the
+              default still looks like the piece). */}
           <div className="flex flex-col items-center">
-            {isHost ? (
-              <HumanCircle size={280} className="block" />
-            ) : (
-              <ProfileMark
-                variantIndex={user.profileMark}
-                size={220}
-                className="block"
-                ariaLabel={`${user.displayName || handle} — profile mark`}
-              />
-            )}
+            <ProfileMark
+              variantIndex={user.profileMark}
+              size={280}
+              className="block"
+              ariaLabel={`${user.displayName || handle} — profile mark`}
+            />
             <h1 className="mt-6 text-[17px] font-normal text-foreground">
               {user.displayName || handle}
             </h1>
