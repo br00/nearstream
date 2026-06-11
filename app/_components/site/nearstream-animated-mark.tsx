@@ -2,125 +2,192 @@
 
 import { useEffect, useRef } from "react";
 
-// Animated version of the static NearstreamMark — same 15 dots that form the
-// `>` chevron, but each one breathes (opacity drift) and jitters slightly
-// (position drift) on its own seeded phase. Same family of motion as the
-// Human Circle, scaled down for a tiny brand mark.
+// "Flying terrain" — a port of Alessandro's Processing piece (perlin floor +
+// open simplex noise, 03.mp4) into a small canvas brand mark for the reader
+// empty state. Same idea: a grid of dots, each one's height driven by 3D
+// noise, drawn with a fake perspective so the back rows sit higher and
+// smaller and the front rows sit lower and brighter. `flying` advances per
+// frame so the terrain feels like it's scrolling toward you — which is
+// the right metaphor for "Nearstream".
 //
-// SVG, not canvas — 15 dots is cheap and lets us inherit `currentColor` so
-// the mark adopts whatever text color it's nested inside.
+// We use the 3D Perlin already proven in human-circle (the original sketch
+// used OpenSimplex 4D for a seamless loop; for a brand element a drifting
+// 3D field is plenty and ~10× cheaper).
 
-const POINTS = [
-  { cx: 22, cy: 8, r: 1.8, opacity: 0.3 },
-  { cx: 28, cy: 16, r: 2.8, opacity: 0.5 },
-  { cx: 38, cy: 22, r: 2.0, opacity: 0.4 },
-  { cx: 50, cy: 28, r: 3.5, opacity: 0.9 },
-  { cx: 58, cy: 38, r: 2.2, opacity: 0.6 },
-  { cx: 62, cy: 48, r: 3.0, opacity: 0.8 },
-  { cx: 58, cy: 58, r: 2.5, opacity: 0.7 },
-  { cx: 50, cy: 66, r: 3.2, opacity: 1.0 },
-  { cx: 42, cy: 74, r: 2.0, opacity: 0.5 },
-  { cx: 38, cy: 82, r: 2.8, opacity: 0.6 },
-  { cx: 40, cy: 90, r: 1.5, opacity: 0.3 },
-  { cx: 70, cy: 32, r: 1.2, opacity: 0.2 },
-  { cx: 32, cy: 44, r: 1.0, opacity: 0.15 },
-  { cx: 72, cy: 60, r: 1.4, opacity: 0.2 },
-  { cx: 28, cy: 70, r: 1.1, opacity: 0.15 },
-] as const;
-
-// Cheap two-sine pseudo-noise — good enough for organic-feeling drift on 15
-// independent dots. Returns roughly -1..1.
-function pseudo(t: number, seed: number): number {
-  return (
-    Math.sin(t * 0.0009 + seed) * 0.6 +
-    Math.cos(t * 0.0013 + seed * 1.7) * 0.4
+// ---------- inline 3D Perlin (Ken Perlin, "improved noise") ----------
+const PERM = (() => {
+  const p = [
+    151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140,
+    36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23, 190, 6, 148, 247, 120,
+    234, 75, 0, 26, 197, 62, 94, 252, 219, 203, 117, 35, 11, 32, 57, 177, 33,
+    88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74, 165, 71,
+    134, 139, 48, 27, 166, 77, 146, 158, 231, 83, 111, 229, 122, 60, 211, 133,
+    230, 220, 105, 92, 41, 55, 46, 245, 40, 244, 102, 143, 54, 65, 25, 63, 161,
+    1, 216, 80, 73, 209, 76, 132, 187, 208, 89, 18, 169, 200, 196, 135, 130,
+    116, 188, 159, 86, 164, 100, 109, 198, 173, 186, 3, 64, 52, 217, 226, 250,
+    124, 123, 5, 202, 38, 147, 118, 126, 255, 82, 85, 212, 207, 206, 59, 227,
+    47, 16, 58, 17, 182, 189, 28, 42, 223, 183, 170, 213, 119, 248, 152, 2, 44,
+    154, 163, 70, 221, 153, 101, 155, 167, 43, 172, 9, 129, 22, 39, 253, 19, 98,
+    108, 110, 79, 113, 224, 232, 178, 185, 112, 104, 218, 246, 97, 228, 251, 34,
+    242, 193, 238, 210, 144, 12, 191, 179, 162, 241, 81, 51, 145, 235, 249, 14,
+    239, 107, 49, 192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121,
+    50, 45, 127, 4, 150, 254, 138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243,
+    141, 128, 195, 78, 66, 215, 61, 156, 180,
+  ];
+  const arr = new Uint8Array(512);
+  for (let i = 0; i < 256; i++) arr[i] = arr[i + 256] = p[i];
+  return arr;
+})();
+function fade(t: number) {
+  return t * t * t * (t * (t * 6 - 15) + 10);
+}
+function lerpN(a: number, b: number, t: number) {
+  return a + t * (b - a);
+}
+function grad3(hash: number, x: number, y: number, z: number) {
+  const h = hash & 15;
+  const u = h < 8 ? x : y;
+  const v = h < 4 ? y : h === 12 || h === 14 ? x : z;
+  return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+}
+function perlin3(x: number, y: number, z: number) {
+  const X = Math.floor(x) & 255;
+  const Y = Math.floor(y) & 255;
+  const Z = Math.floor(z) & 255;
+  x -= Math.floor(x);
+  y -= Math.floor(y);
+  z -= Math.floor(z);
+  const u = fade(x);
+  const v = fade(y);
+  const w = fade(z);
+  const A = PERM[X] + Y;
+  const AA = PERM[A] + Z;
+  const AB = PERM[A + 1] + Z;
+  const B = PERM[X + 1] + Y;
+  const BA = PERM[B] + Z;
+  const BB = PERM[B + 1] + Z;
+  return lerpN(
+    lerpN(
+      lerpN(grad3(PERM[AA], x, y, z), grad3(PERM[BA], x - 1, y, z), u),
+      lerpN(grad3(PERM[AB], x, y - 1, z), grad3(PERM[BB], x - 1, y - 1, z), u),
+      v,
+    ),
+    lerpN(
+      lerpN(
+        grad3(PERM[AA + 1], x, y, z - 1),
+        grad3(PERM[BA + 1], x - 1, y, z - 1),
+        u,
+      ),
+      lerpN(
+        grad3(PERM[AB + 1], x, y - 1, z - 1),
+        grad3(PERM[BB + 1], x - 1, y - 1, z - 1),
+        u,
+      ),
+      v,
+    ),
+    w,
   );
 }
 
+// ---------- terrain mark ----------
+
+const COLS = 36;
+const ROWS = 22;
+const X_STEP = 0.14;      // noise x-stride (matches Processing's 0.1 at lower res)
+const Y_STEP = 0.18;      // noise y-stride (matches 0.15)
+const FLY_SPEED = 0.012;  // forward drift per frame
+const Z_AMP = 18;         // max height in screen pixels (front row)
+
 type Props = {
+  /** Canvas height in CSS px. Width auto-scales 1.7× wider for the perspective. */
   size?: number;
   className?: string;
 };
 
-export function NearstreamAnimatedMark({ size = 80, className }: Props) {
-  const circleRefs = useRef<(SVGCircleElement | null)[]>([]);
-  // Background glow circles for the bigger dots (matches the static mark).
-  const glowRefs = useRef<(SVGCircleElement | null)[]>([]);
+export function NearstreamAnimatedMark({ size = 96, className }: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const cssW = Math.round(size * 1.7);
+    const cssH = size;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = cssW * dpr;
+    canvas.height = cssH * dpr;
+    canvas.style.width = `${cssW}px`;
+    canvas.style.height = `${cssH}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
-    if (prefersReducedMotion) return;
 
+    const horizonY = cssH * 0.32; // back of terrain on screen
+    const groundY = cssH * 0.92;  // front of terrain on screen
+    const centerX = cssW / 2;
+
+    let flying = 0;
     let raf = 0;
-    let start = performance.now();
 
-    function tick(now: number) {
-      const t = now - start;
-      for (let i = 0; i < POINTS.length; i++) {
-        const p = POINTS[i];
-        const dx = pseudo(t, i * 7) * 1.4;
-        const dy = pseudo(t, i * 11 + 13) * 1.4;
-        const breath = (pseudo(t, i * 5 + 19) + 1) / 2; // 0..1
-        const opacity = p.opacity * (0.5 + 0.5 * breath);
+    function drawFrame() {
+      if (!ctx) return;
+      ctx.clearRect(0, 0, cssW, cssH);
 
-        const c = circleRefs.current[i];
-        if (c) {
-          c.setAttribute("cx", String(p.cx + dx));
-          c.setAttribute("cy", String(p.cy + dy));
-          c.setAttribute("fill-opacity", opacity.toFixed(3));
-        }
-        const g = glowRefs.current[i];
-        if (g) {
-          g.setAttribute("cx", String(p.cx + dx));
-          g.setAttribute("cy", String(p.cy + dy));
-          g.setAttribute("fill-opacity", (opacity * 0.06).toFixed(3));
+      // Draw from back to front so front dots layer over back dots.
+      for (let y = 0; y < ROWS; y++) {
+        // Depth fraction: 0 at the back, 1 at the front.
+        const d = y / (ROWS - 1);
+        // Perspective curve — exaggerate the back compression a touch so the
+        // far rows really bunch up at the horizon (matches the Processing
+        // look better than a linear lerp).
+        const dCurve = d * d * 0.6 + d * 0.4;
+        const baseY = horizonY + (groundY - horizonY) * dCurve;
+        const rowScale = 0.18 + d * 0.82; // narrower at the back
+        const alpha = 0.1 + d * 0.85;
+        const dotR = 0.4 + d * 1.4;
+
+        for (let x = 0; x < COLS; x++) {
+          const n = perlin3(x * X_STEP + flying, y * Y_STEP, 0.3);
+          // Height also fades with distance so the back stays calm.
+          const heightZ = n * Z_AMP * (0.25 + d * 0.75);
+          const sx = centerX + (x - COLS / 2) * 4 * rowScale;
+          const sy = baseY - heightZ;
+
+          ctx.fillStyle = `rgba(228, 228, 231, ${alpha.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(sx, sy, dotR, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
+    }
+
+    function tick() {
+      flying += FLY_SPEED;
+      drawFrame();
       raf = requestAnimationFrame(tick);
     }
 
-    raf = requestAnimationFrame(tick);
+    if (prefersReducedMotion) {
+      drawFrame();
+    } else {
+      raf = requestAnimationFrame(tick);
+    }
+
     return () => {
       if (raf) cancelAnimationFrame(raf);
     };
-  }, []);
+  }, [size]);
 
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 100 100"
-      fill="currentColor"
+    <canvas
+      ref={canvasRef}
+      className={className}
       aria-label="Nearstream"
       role="img"
-      className={className}
-    >
-      {POINTS.map((p, i) => (
-        <g key={i}>
-          {p.r > 2.5 && (
-            <circle
-              ref={(el) => {
-                glowRefs.current[i] = el;
-              }}
-              cx={p.cx}
-              cy={p.cy}
-              r={p.r * 3}
-              fillOpacity={p.opacity * 0.06}
-            />
-          )}
-          <circle
-            ref={(el) => {
-              circleRefs.current[i] = el;
-            }}
-            cx={p.cx}
-            cy={p.cy}
-            r={p.r}
-            fillOpacity={p.opacity}
-          />
-        </g>
-      ))}
-    </svg>
+    />
   );
 }
