@@ -5,6 +5,7 @@ import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
+import { visibilityOf } from "@/schemas/visibility";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { DeleteButton } from "@/app/_components/delete-button";
@@ -34,6 +35,7 @@ type LibraryEntry =
       title: string;
       href: string;
       publishedAt: string;
+      isPrivate: boolean;
     }
   | {
       type: "inventory";
@@ -43,6 +45,7 @@ type LibraryEntry =
       href: string;
       publishedAt: string;
       imageKey: string;
+      isPrivate: boolean;
     };
 
 function formatDate(iso: string): string {
@@ -59,12 +62,18 @@ export default async function LibraryPage({ params }: Props) {
   const user = await userStore.getByHandle(handle);
   if (!user) notFound();
 
-  const [essays, items, session] = await Promise.all([
+  const [allEssays, allItems, session] = await Promise.all([
     essayStore.list(user.id),
     inventoryStore.list(user.id),
     getSession(),
   ]);
   const isOwner = session?.userId === user.id;
+  const essays = isOwner
+    ? allEssays
+    : allEssays.filter((e) => visibilityOf(e) === "public");
+  const items = isOwner
+    ? allItems
+    : allItems.filter((i) => visibilityOf(i) === "public");
   const base = tenantBase(handle);
 
   const entries: LibraryEntry[] = [
@@ -76,6 +85,7 @@ export default async function LibraryPage({ params }: Props) {
         title: e.title,
         href: `${base}/library/${e.slug}`,
         publishedAt: e.publishedAt,
+        isPrivate: visibilityOf(e) === "private",
       }),
     ),
     ...items.map(
@@ -87,6 +97,7 @@ export default async function LibraryPage({ params }: Props) {
         href: `${base}/library/inventory/${i.slug}`,
         publishedAt: i.publishedAt,
         imageKey: i.image.thumbKey ?? i.image.key,
+        isPrivate: visibilityOf(i) === "private",
       }),
     ),
   ].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
@@ -167,6 +178,11 @@ export default async function LibraryPage({ params }: Props) {
                         <span className="inline-block border border-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
                           {entry.type}
                         </span>
+                        {entry.isPrivate && (
+                          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground/70">
+                            Private
+                          </span>
+                        )}
                       </div>
                       <h2 className="mt-2 text-base font-normal tracking-tight text-foreground/90 transition-colors group-hover:text-foreground">
                         {entry.title}

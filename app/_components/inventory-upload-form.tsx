@@ -22,6 +22,7 @@ export function InventoryUploadForm() {
   const [edition, setEdition] = useState("");
   const [status, setStatus] = useState<string>("");
   const [price, setPrice] = useState("");
+  const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [state, setState] = useState<FlowState>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +121,7 @@ export function InventoryUploadForm() {
           edition: edition.trim() || undefined,
           status: status || undefined,
           price: price.trim() || undefined,
+          visibility,
         }),
       });
       if (!metaRes.ok) {
@@ -252,6 +254,40 @@ export function InventoryUploadForm() {
           </label>
         </div>
       </details>
+
+      <fieldset className="flex flex-col gap-3">
+        <legend>
+          <Kicker>Visibility</Kicker>
+        </legend>
+        <div className="flex flex-col gap-2">
+          {(["public", "private"] as const).map((level) => (
+            <label
+              key={level}
+              className="flex items-baseline gap-3 cursor-pointer"
+            >
+              <input
+                type="radio"
+                name="visibility"
+                value={level}
+                checked={visibility === level}
+                onChange={() => setVisibility(level)}
+                disabled={disabled}
+                className="accent-foreground"
+              />
+              <span className="flex flex-col gap-0.5">
+                <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground">
+                  {level}
+                </span>
+                <span className="text-[12px] text-muted-soft">
+                  {level === "public"
+                    ? "Anyone with the URL."
+                    : "Only you. Hidden from the public site and your RSS feed."}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
 
       {error && (
         <div

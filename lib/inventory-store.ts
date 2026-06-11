@@ -4,7 +4,8 @@ import { slugify } from "@/schemas/inventory";
 import { mediaStore } from "@/lib/media-store";
 
 /** Edit-time patch: everything except the image (set at upload time) and
-    the slug (frozen at publish time so the URL stays stable). */
+    the slug (frozen at publish time so the URL stays stable). Visibility
+    can be flipped during edit. */
 export type InventoryPatch = Omit<NewInventoryItem, "image">;
 
 export interface InventoryStore {
@@ -43,6 +44,7 @@ class InMemoryInventoryStore implements InventoryStore {
       id: crypto.randomUUID(),
       slug: slugify(input.title),
       publishedAt: new Date().toISOString(),
+      visibility: input.visibility ?? "public",
     };
     this.bucket(userId).push(item);
     return item;
@@ -69,6 +71,7 @@ class InMemoryInventoryStore implements InventoryStore {
       edition: patch.edition,
       status: patch.status,
       price: patch.price,
+      visibility: patch.visibility ?? "public",
     };
     return b[i];
   }
@@ -115,6 +118,7 @@ class R2InventoryStore implements InventoryStore {
       id: crypto.randomUUID(),
       slug: slugify(input.title),
       publishedAt: new Date().toISOString(),
+      visibility: input.visibility ?? "public",
     };
     const res = await this.client.fetch(
       `${this.base}/${this.key(userId, item.id)}`,
@@ -179,6 +183,7 @@ class R2InventoryStore implements InventoryStore {
       edition: patch.edition,
       status: patch.status,
       price: patch.price,
+      visibility: patch.visibility ?? "public",
     };
     const res = await this.client.fetch(
       `${this.base}/${this.key(userId, target.id)}`,

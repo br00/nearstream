@@ -1,3 +1,5 @@
+import type { Visibility } from "@/schemas/visibility";
+
 export const DISCIPLINE_TAGS = ["Code", "Photo", "Music", "Writing"] as const;
 
 export type DisciplineTag = (typeof DISCIPLINE_TAGS)[number];
@@ -16,9 +18,13 @@ export type StreamEntry = {
   tag: DisciplineTag;
   publishedAt: string;
   link?: LibraryLink;
+  visibility?: Visibility;
 };
 
-export type NewStreamEntry = Pick<StreamEntry, "text" | "tag" | "link">;
+export type NewStreamEntry = Pick<
+  StreamEntry,
+  "text" | "tag" | "link" | "visibility"
+>;
 
 export function isDisciplineTag(value: unknown): value is DisciplineTag {
   return (

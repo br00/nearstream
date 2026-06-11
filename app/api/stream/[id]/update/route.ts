@@ -9,6 +9,7 @@ import {
   isLibraryLinkType,
   type LibraryLink,
 } from "@/schemas/stream";
+import { isVisibility, type Visibility } from "@/schemas/visibility";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -26,6 +27,7 @@ export async function POST(request: Request, { params }: Props) {
   const text = form.get("text");
   const tag = form.get("tag");
   const rawLink = form.get("link");
+  const rawVisibility = form.get("visibility");
 
   if (typeof text !== "string" || text.trim().length === 0) {
     return errorRedirect(request, id, "text is required");
@@ -39,11 +41,16 @@ export async function POST(request: Request, { params }: Props) {
     return errorRedirect(request, id, link);
   }
 
+  const visibility: Visibility = isVisibility(rawVisibility)
+    ? rawVisibility
+    : "public";
+
   try {
     const updated = await store.update(session.userId, id, {
       text: text.trim(),
       tag,
       link,
+      visibility,
     });
     if (!updated) return errorRedirect(request, id, "entry not found");
 

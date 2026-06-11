@@ -8,8 +8,9 @@ import { userStore } from "@/lib/user-store";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
 import { HumanCircle } from "@/app/_components/site/human-circle";
-import { isHostEmail } from "@/lib/auth";
+import { isHostEmail, getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
+import { visibilityOf } from "@/schemas/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -69,12 +70,28 @@ export default async function TenantHome({ params }: Props) {
 
   const isHost = isHostEmail(user.email);
 
-  const [letter, entries, essays, inventoryItems] = await Promise.all([
-    letterStore.get(user.id),
-    store.list(user.id),
-    essayStore.list(user.id),
-    inventoryStore.list(user.id),
-  ]);
+  const [letter, allEntries, allEssays, allInventory, session] =
+    await Promise.all([
+      letterStore.get(user.id),
+      store.list(user.id),
+      essayStore.list(user.id),
+      inventoryStore.list(user.id),
+      getSession(),
+    ]);
+
+  // Owner sees everything (including their own private entries); anyone else
+  // only sees public ones. Letter has no per-entry visibility yet — it's the
+  // host's broadcast slot.
+  const isOwner = session?.userId === user.id;
+  const entries = isOwner
+    ? allEntries
+    : allEntries.filter((e) => visibilityOf(e) === "public");
+  const essays = isOwner
+    ? allEssays
+    : allEssays.filter((e) => visibilityOf(e) === "public");
+  const inventoryItems = isOwner
+    ? allInventory
+    : allInventory.filter((i) => visibilityOf(i) === "public");
 
   const essayTitles = new Map(essays.map((e) => [e.slug, e.title]));
   const inventoryTitles = new Map(inventoryItems.map((i) => [i.slug, i.title]));

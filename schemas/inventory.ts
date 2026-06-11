@@ -1,3 +1,5 @@
+import type { Visibility } from "@/schemas/visibility";
+
 export { slugify, isValidSlug } from "@/lib/slug";
 
 export const INVENTORY_STATUSES = [
@@ -35,6 +37,7 @@ export type InventoryItem = {
   status?: InventoryStatus;
   price?: string;
   publishedAt: string;
+  visibility?: Visibility;
 };
 
 export type NewInventoryItem = Omit<InventoryItem, "id" | "slug" | "publishedAt">;

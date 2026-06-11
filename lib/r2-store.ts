@@ -35,6 +35,7 @@ export class R2Store implements Store {
       text: input.text,
       tag: input.tag,
       publishedAt: new Date().toISOString(),
+      visibility: input.visibility ?? "public",
       ...(input.link ? { link: input.link } : {}),
     };
     const body = JSON.stringify(entry);
@@ -104,6 +105,7 @@ export class R2Store implements Store {
       ...current,
       text: patch.text,
       tag: patch.tag,
+      visibility: patch.visibility ?? current.visibility ?? "public",
       ...(patch.link ? { link: patch.link } : { link: undefined }),
     };
     const res = await this.client.fetch(`${this.base}/${this.key(userId, id)}`, {

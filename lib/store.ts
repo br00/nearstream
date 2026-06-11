@@ -37,6 +37,7 @@ class InMemoryStore implements Store {
       text: input.text,
       tag: input.tag,
       publishedAt: new Date().toISOString(),
+      visibility: input.visibility ?? "public",
       ...(input.link ? { link: input.link } : {}),
     };
     this.bucket(userId).push(entry);
@@ -60,6 +61,7 @@ class InMemoryStore implements Store {
       ...b[i],
       text: patch.text,
       tag: patch.tag,
+      visibility: patch.visibility ?? b[i].visibility ?? "public",
       ...(patch.link ? { link: patch.link } : { link: undefined }),
     };
     return b[i];
