@@ -4,8 +4,10 @@ import { NearstreamLockup } from "@/app/_components/nearstream-mark";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { Input } from "@/app/_components/input";
 import { Kicker } from "@/app/_components/kicker";
+import { ProfileMarkPicker } from "@/app/_components/site/profile-mark-picker";
 import { getSession } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
+import { DEFAULT_PROFILE_MARK } from "@/lib/profile-mark-variants";
 
 export const metadata = {
   title: "Welcome · Nearstream",
@@ -82,6 +84,23 @@ export default async function OnboardingPage({ searchParams }: Props) {
                 placeholder="Gosia Tymczak"
               />
             </label>
+
+            <fieldset className="flex flex-col gap-3">
+              <legend>
+                <Kicker>Profile mark</Kicker>
+              </legend>
+              <p className="text-sm leading-relaxed text-muted">
+                No face, just a moving signature. Pick the one that feels
+                closest to you &mdash; you can change it later.
+              </p>
+              <div className="mt-2">
+                <ProfileMarkPicker
+                  name="profileMark"
+                  defaultValue={DEFAULT_PROFILE_MARK}
+                  tileSize={88}
+                />
+              </div>
+            </fieldset>
 
             <SubmitButton pendingLabel="Saving…" className="self-start">
               Continue

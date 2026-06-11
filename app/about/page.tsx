@@ -88,12 +88,12 @@ export default function AboutPage() {
               >
                 github.com/br00/nearstream &rarr;
               </a>
-              <a
-                href="https://github.com/br00/nearstream/blob/main/NEARSTREAM.md"
+              <Link
+                href="/manifesto"
                 className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground hover:border-foreground"
               >
                 Manifesto
-              </a>
+              </Link>
               <a
                 href="https://github.com/br00/nearstream/blob/main/ARCHITECTURE.md"
                 className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground hover:border-foreground"

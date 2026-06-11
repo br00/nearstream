@@ -74,12 +74,18 @@ export default async function InstanceLanding() {
                 from people you chose.
               </p>
             </div>
-            <p className="mt-10">
+            <p className="mt-10 flex flex-wrap gap-x-8 gap-y-3">
               <Link
                 href="/about"
                 className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground underline underline-offset-4 decoration-muted-soft transition-colors hover:decoration-foreground"
               >
-                Read more &rarr;
+                About &rarr;
+              </Link>
+              <Link
+                href="/manifesto"
+                className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground underline underline-offset-4 decoration-muted-soft transition-colors hover:decoration-foreground"
+              >
+                Manifesto &rarr;
               </Link>
             </p>
           </section>

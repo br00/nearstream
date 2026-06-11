@@ -95,6 +95,7 @@ function isInstanceOnlyPath(path: string): boolean {
     path.startsWith("/reader/") ||
     path === "/design" ||
     path === "/about" ||
+    path === "/manifesto" ||
     path === "/favicon.ico" ||
     path === "/robots.txt" ||
     path === "/sitemap.xml"

@@ -5,6 +5,7 @@ import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { letterStore } from "@/lib/letter-store";
 import { sourceStore } from "@/lib/source-store";
+import { store as streamStore } from "@/lib/store";
 import { userStore } from "@/lib/user-store";
 import { isHostEmail } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
@@ -18,6 +19,7 @@ import { Kicker } from "@/app/_components/kicker";
 import { TagRadio } from "@/app/_components/tag-chip";
 import { InventoryUploadForm } from "@/app/_components/inventory-upload-form";
 import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
+import { ProfileMarkPicker } from "@/app/_components/site/profile-mark-picker";
 import { timeAgo } from "@/lib/time-ago";
 
 export const metadata = {
@@ -48,12 +50,20 @@ export default async function StudioPage({ searchParams }: Props) {
     "profile-error": profileError,
   } = await searchParams;
 
-  const [letter, essays, inventoryItems, sources] = await Promise.all([
+  const [letter, essays, inventoryItems, sources, streams] = await Promise.all([
     letterStore.get(user.id),
     essayStore.list(user.id),
     inventoryStore.list(user.id),
     sourceStore.list(user.id),
+    streamStore.list(user.id),
   ]);
+
+  const isFirstTime =
+    !letter &&
+    streams.length === 0 &&
+    essays.length === 0 &&
+    inventoryItems.length === 0 &&
+    sources.length === 0;
 
   const navLinkClasses =
     "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
@@ -77,6 +87,27 @@ export default async function StudioPage({ searchParams }: Props) {
     >
       <section className="flex flex-1 justify-center px-6">
         <div className="w-full max-w-lg py-12">
+          {/* First-time empty state — disappears the moment the user posts
+              anything, edits the Letter, or adds a Reader source. */}
+          {isFirstTime && (
+            <div className="mb-16 border-l-2 border-foreground/40 pl-4">
+                <Kicker>Welcome, {user.displayName.split(" ")[0] || user.handle}</Kicker>
+                <p className="mt-2 text-sm leading-relaxed text-muted">
+                  This is your studio &mdash; the room where you write things.
+                  Start with a <strong className="text-foreground">Stream entry</strong> below.
+                  It&rsquo;s the most casual thing you can post: a short note,
+                  no title, no commitment. Your site lives at{" "}
+                  <Link
+                    href={tenantBase(user.handle)}
+                    className="text-foreground underline-offset-4 hover:underline"
+                  >
+                    {tenantBase(user.handle).replace(/^https?:\/\//, "")}
+                  </Link>
+                  .
+                </p>
+              </div>
+            )}
+
           {/* The Letter — top of the home page, top of the studio.
               First thing to update when your head changes. */}
           <div id="letter-form" className="scroll-mt-6">
@@ -304,6 +335,23 @@ export default async function StudioPage({ searchParams }: Props) {
                   defaultValue={user.displayName}
                 />
               </label>
+
+              <fieldset className="flex flex-col gap-3">
+                <legend>
+                  <Kicker>Profile mark</Kicker>
+                </legend>
+                <p className="text-sm leading-relaxed text-muted-soft">
+                  The animated mark that sits at the top of your home page in
+                  place of a profile photo.
+                </p>
+                <div className="mt-2">
+                  <ProfileMarkPicker
+                    name="profileMark"
+                    defaultValue={user.profileMark}
+                    tileSize={88}
+                  />
+                </div>
+              </fieldset>
 
               <SubmitButton pendingLabel="Saving…" className="self-start">
                 Save

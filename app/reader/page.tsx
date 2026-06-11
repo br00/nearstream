@@ -5,6 +5,7 @@ import { sourceStore } from "@/lib/source-store";
 import { feedEntryStore } from "@/lib/feed-entry-store";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamLockup } from "@/app/_components/nearstream-mark";
+import { NearstreamAnimatedMark } from "@/app/_components/site/nearstream-animated-mark";
 import { Kicker } from "@/app/_components/kicker";
 import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
 
@@ -56,7 +57,12 @@ export default async function ReaderPage() {
     >
       <section className="flex flex-1 justify-center px-6">
         <div className="w-full max-w-[32rem] py-12">
-          <Kicker>Reader</Kicker>
+          <div className="flex justify-center">
+            <NearstreamAnimatedMark size={140} />
+          </div>
+          <div className="mt-8">
+            <Kicker>Reader</Kicker>
+          </div>
 
           {sources.length === 0 ? (
             <EmptySourcesState />

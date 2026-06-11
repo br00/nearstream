@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
+import { normalizeProfileMark } from "@/lib/profile-mark-variants";
 
 const DISPLAY_NAME_MAX = 80;
 
@@ -13,6 +14,11 @@ export async function POST(request: Request) {
 
   const form = await request.formData();
   const displayName = form.get("displayName");
+  const profileMarkRaw = form.get("profileMark");
+  const profileMark =
+    typeof profileMarkRaw === "string"
+      ? normalizeProfileMark(Number(profileMarkRaw))
+      : undefined;
 
   if (typeof displayName !== "string" || displayName.trim().length === 0) {
     return errorRedirect(request, "display name is required");
@@ -30,6 +36,12 @@ export async function POST(request: Request) {
       displayName.trim(),
     );
     if (!updated) return errorRedirect(request, "user not found");
+
+    // Display name + profile mark live in the same Profile form. We persist
+    // them in two writes (one R2 PUT each) for clarity; the form is rare.
+    if (profileMark !== undefined && profileMark !== updated.profileMark) {
+      await userStore.setProfileMark(session.userId, profileMark);
+    }
 
     revalidatePath("/studio");
     if (updated.handle) {

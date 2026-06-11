@@ -90,14 +90,42 @@ const mapTo = (v: number, a: number, b: number, c: number, d: number) =>
 // blobs scattered along a noise-perturbed circle. Each brush mark is its own
 // noisy closed shape. The noise z-axis drifts slowly so the macro shape
 // morphs over many seconds.
+//
+// All the levers below are exposed as `HumanCircleParams` so the same engine
+// can render Alessandro's signature, the Nearstream platform mark on /reader,
+// and the 10 profile marks anyone can pick during onboarding.
 // ---------------------------------------------------------------------------
-const N_MAX = 0.45;
-const ANGLE_STEP = 0.012;
-const BRUSH_ANGLE_STEP = 0.1;
-const BRUSH_NOISE_RANGE = 15;
-const BASE_RADIUS_FRAC = 0.30;
-const RADIUS_RANGE_FRAC = 0.10;
-const SEED_SPEED = 0.0024;
+export type HumanCircleParams = {
+  /** How tight the noise field is sampled around the circle. Higher = more chaos. */
+  nMax: number;
+  /** Radians between brush stamps along the macro circle. Smaller = denser. */
+  angleStep: number;
+  /** Radians between vertices of each individual brush blob. */
+  brushAngleStep: number;
+  /** Noise sample range inside the brush blob. Higher = more wobble per stamp. */
+  brushNoiseRange: number;
+  /** Inner radius as a fraction of half the canvas. */
+  baseRadiusFrac: number;
+  /** Extra radial range on top of base, as a fraction of half the canvas. */
+  radiusRangeFrac: number;
+  /** Z-axis advance per frame. Smaller = slower morph. */
+  seedSpeed: number;
+  /** Brush-size scale relative to the canvas (≈1 at half=220). */
+  brushScaleFrac: number;
+  /** Optional fixed z-offset so different marks live in different noise slices. */
+  zOffset?: number;
+};
+
+export const HUMAN_CIRCLE_DEFAULTS: HumanCircleParams = {
+  nMax: 0.45,
+  angleStep: 0.012,
+  brushAngleStep: 0.1,
+  brushNoiseRange: 15,
+  baseRadiusFrac: 0.3,
+  radiusRangeFrac: 0.1,
+  seedSpeed: 0.0024,
+  brushScaleFrac: 1 / 220,
+};
 
 function pencilBrush(
   ctx: CanvasRenderingContext2D,
@@ -105,14 +133,16 @@ function pencilBrush(
   y1: number,
   inc: number,
   brushScale: number,
+  brushAngleStep: number,
+  brushNoiseRange: number,
 ) {
   const alpha = mapTo(inc, -1, 1, 100, 160) / 255;
   ctx.fillStyle = `rgba(245, 245, 245, ${alpha})`;
   ctx.beginPath();
   let first = true;
-  for (let a = 0; a < Math.PI * 2; a += BRUSH_ANGLE_STEP) {
-    const xoff = mapTo(Math.cos(a), -1, 1, 0, BRUSH_NOISE_RANGE);
-    const yoff = mapTo(Math.sin(a), -1, 1, 0, BRUSH_NOISE_RANGE);
+  for (let a = 0; a < Math.PI * 2; a += brushAngleStep) {
+    const xoff = mapTo(Math.cos(a), -1, 1, 0, brushNoiseRange);
+    const yoff = mapTo(Math.sin(a), -1, 1, 0, brushNoiseRange);
     const r = mapTo(noise01(xoff, yoff, 100), 0, 1, 1, 3) * brushScale;
     const bx = r * Math.cos(a);
     const by = r * Math.sin(a);
@@ -132,34 +162,46 @@ function drawHumanCircle(
   w: number,
   h: number,
   z: number,
+  p: HumanCircleParams,
 ) {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, w, h);
   const cx = w / 2;
   const cy = h / 2;
   const half = Math.min(cx, cy);
-  const radiusBase = half * BASE_RADIUS_FRAC;
-  const radiusRange = half * RADIUS_RANGE_FRAC;
-  const brushScale = half / 220;
-  for (let a = 0; a < Math.PI * 2; a += ANGLE_STEP) {
-    const xoff = mapTo(Math.cos(a), -1, 1, 0, N_MAX);
-    const yoff = mapTo(Math.sin(a), -1, 1, 0, N_MAX);
+  const radiusBase = half * p.baseRadiusFrac;
+  const radiusRange = half * p.radiusRangeFrac;
+  const brushScale = half * p.brushScaleFrac;
+  for (let a = 0; a < Math.PI * 2; a += p.angleStep) {
+    const xoff = mapTo(Math.cos(a), -1, 1, 0, p.nMax);
+    const yoff = mapTo(Math.sin(a), -1, 1, 0, p.nMax);
     const n = noise01(xoff, yoff, z);
     const r = mapTo(n, 0, 1, radiusBase, radiusBase + radiusRange * 2);
     const x = cx + r * Math.cos(a);
     const y = cy + r * Math.sin(a);
-    pencilBrush(ctx, x, y, Math.cos(a), brushScale);
+    pencilBrush(ctx, x, y, Math.cos(a), brushScale, p.brushAngleStep, p.brushNoiseRange);
   }
 }
 
 // ---------------------------------------------------------------------------
-type Props = {
+type AnimatedMarkProps = {
   size?: number;
   className?: string;
+  params?: Partial<HumanCircleParams>;
+  ariaLabel?: string;
 };
 
-export function HumanCircle({ size = 280, className }: Props) {
+// Low-level reusable engine. Renders the noise circle with any param set on
+// its own canvas, with reduced-motion handling and DPR scaling. Used by the
+// host's signature, the Nearstream platform mark, and every profile mark.
+export function AnimatedMark({
+  size = 280,
+  className,
+  params,
+  ariaLabel = "Animated mark",
+}: AnimatedMarkProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const merged: HumanCircleParams = { ...HUMAN_CIRCLE_DEFAULTS, ...params };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -178,17 +220,17 @@ export function HumanCircle({ size = 280, className }: Props) {
       "(prefers-reduced-motion: reduce)",
     ).matches;
 
-    let z = 0;
+    let z = merged.zOffset ?? 0;
     let raf = 0;
     function tick() {
       if (!ctx) return;
-      drawHumanCircle(ctx, size, size, z);
-      z += SEED_SPEED;
+      drawHumanCircle(ctx, size, size, z, merged);
+      z += merged.seedSpeed;
       raf = requestAnimationFrame(tick);
     }
 
     if (prefersReducedMotion) {
-      drawHumanCircle(ctx, size, size, 0);
+      drawHumanCircle(ctx, size, size, merged.zOffset ?? 0, merged);
     } else {
       raf = requestAnimationFrame(tick);
     }
@@ -196,14 +238,35 @@ export function HumanCircle({ size = 280, className }: Props) {
     return () => {
       if (raf) cancelAnimationFrame(raf);
     };
+    // We intentionally re-run only on size change; param changes are rare and
+    // a remount via key= prop is the cleaner way to swap variants in pickers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size]);
 
   return (
     <canvas
       ref={canvasRef}
       className={className}
-      aria-label="Human circle — an animated signature by Alessandro Borelli"
+      aria-label={ariaLabel}
       role="img"
+    />
+  );
+}
+
+type Props = {
+  size?: number;
+  className?: string;
+};
+
+// Backwards-compatible export — Alessandro's signature on his tenant home.
+// Same parameters as the original piece (the constants are now in
+// HUMAN_CIRCLE_DEFAULTS).
+export function HumanCircle({ size = 280, className }: Props) {
+  return (
+    <AnimatedMark
+      size={size}
+      className={className}
+      ariaLabel="Human circle — an animated signature by Alessandro Borelli"
     />
   );
 }
