@@ -1,3 +1,5 @@
+import type { Visibility } from "@/schemas/visibility";
+
 // Stream entries are tagged with a **mode** — what *kind* of moment this is —
 // not a discipline. Three broad buckets so any friend's stream fits without
 // inventing new hashtags. The hint strings are what we show beside each
@@ -31,9 +33,13 @@ export type StreamEntry = {
   tag: ModeTag;
   publishedAt: string;
   link?: LibraryLink;
+  visibility?: Visibility;
 };
 
-export type NewStreamEntry = Pick<StreamEntry, "text" | "tag" | "link">;
+export type NewStreamEntry = Pick<
+  StreamEntry,
+  "text" | "tag" | "link" | "visibility"
+>;
 
 export function isModeTag(value: unknown): value is ModeTag {
   if (typeof value !== "string") return false;

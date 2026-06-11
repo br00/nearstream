@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { essayStore } from "@/lib/essay-store";
+import { isVisibility, type Visibility } from "@/schemas/visibility";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
@@ -22,6 +23,10 @@ export async function POST(request: Request, { params }: Props) {
   const form = await request.formData();
   const title = form.get("title");
   const body = form.get("body");
+  const rawVisibility = form.get("visibility");
+  const visibility: Visibility = isVisibility(rawVisibility)
+    ? rawVisibility
+    : "public";
 
   if (typeof title !== "string" || title.trim().length === 0) {
     return errorRedirect(request, slug, "title is required");
@@ -48,6 +53,7 @@ export async function POST(request: Request, { params }: Props) {
     const updated = await essayStore.updateBySlug(session.userId, slug, {
       title: title.trim(),
       body: body.trim(),
+      visibility,
     });
     if (!updated) return errorRedirect(request, slug, "essay not found");
 

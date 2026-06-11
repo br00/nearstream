@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { essayStore } from "@/lib/essay-store";
 import { slugify } from "@/schemas/essay";
+import { isVisibility, type Visibility } from "@/schemas/visibility";
 import { getSession } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
 import { tenantBase } from "@/lib/tenant-domains";
@@ -28,16 +29,23 @@ export async function POST(request: Request) {
 
   let title: unknown;
   let body: unknown;
+  let rawVisibility: unknown;
 
   if (isJson) {
     const json = await request.json();
     title = json?.title;
     body = json?.body;
+    rawVisibility = json?.visibility;
   } else {
     const form = await request.formData();
     title = form.get("title");
     body = form.get("body");
+    rawVisibility = form.get("visibility");
   }
+
+  const visibility: Visibility = isVisibility(rawVisibility)
+    ? rawVisibility
+    : "public";
 
   if (typeof title !== "string" || title.trim().length === 0) {
     return errorResponse(request, isJson, 400, "title is required");
@@ -85,6 +93,7 @@ export async function POST(request: Request) {
   const essay = await essayStore.add(session.userId, {
     title: trimmedTitle,
     body: body.trim(),
+    visibility,
   });
 
   const user = await userStore.getById(session.userId);

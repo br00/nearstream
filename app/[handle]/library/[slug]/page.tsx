@@ -5,6 +5,7 @@ import { essayStore } from "@/lib/essay-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
+import { visibilityOf } from "@/schemas/visibility";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { DeleteButton } from "@/app/_components/delete-button";
@@ -46,6 +47,8 @@ export default async function EssayPage({ params }: Props) {
   ]);
   if (!essay) notFound();
   const isOwner = session?.userId === user.id;
+  // Private essays 404 for non-owners — don't even leak that the slug exists.
+  if (visibilityOf(essay) === "private" && !isOwner) notFound();
 
   const html = await marked.parse(essay.body, { async: true });
 

@@ -9,6 +9,8 @@ import { NearstreamLockup } from "@/app/_components/nearstream-mark";
 import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
+import { VisibilityRadio } from "@/app/_components/visibility-radio";
+import { visibilityOf } from "@/schemas/visibility";
 
 export const metadata = {
   title: "Edit essay · Studio",
@@ -91,6 +93,8 @@ export default async function EditEssay({ params, searchParams }: Props) {
                 defaultValue={essay.body}
               />
             </label>
+
+            <VisibilityRadio defaultValue={visibilityOf(essay)} />
 
             <div className="flex items-center gap-4">
               <SubmitButton pendingLabel="Saving…">Save</SubmitButton>

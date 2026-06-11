@@ -18,6 +18,7 @@ import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
 import { ModeRadioGroup } from "@/app/_components/mode-radio";
 import { InventoryUploadForm } from "@/app/_components/inventory-upload-form";
+import { VisibilityRadio } from "@/app/_components/visibility-radio";
 import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
 import { ProfileMarkPicker } from "@/app/_components/site/profile-mark-picker";
 import { timeAgo } from "@/lib/time-ago";
@@ -217,6 +218,8 @@ export default async function StudioPage({ searchParams }: Props) {
                 </label>
               )}
 
+              <VisibilityRadio />
+
               <SubmitButton pendingLabel="Posting…" className="self-start">
                 Post
               </SubmitButton>
@@ -263,6 +266,8 @@ export default async function StudioPage({ searchParams }: Props) {
                   placeholder="## A heading&#10;&#10;Markdown body. Links, *italics*, **bold**, lists, code, blockquotes — all supported."
                 />
               </label>
+
+              <VisibilityRadio />
 
               <SubmitButton pendingLabel="Publishing…" className="self-start">
                 Publish

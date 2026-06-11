@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { inventoryStore } from "@/lib/inventory-store";
 import { slugify, isInventoryStatus } from "@/schemas/inventory";
+import { isVisibility, type Visibility } from "@/schemas/visibility";
 import type { InventoryImage, NewInventoryItem } from "@/schemas/inventory";
 import { isAllowedContentType } from "@/lib/media-store";
 import { getSession } from "@/lib/auth";
@@ -40,7 +41,12 @@ export async function POST(request: Request) {
     edition,
     status,
     price,
+    visibility: rawVisibility,
   } = body as Record<string, unknown>;
+
+  const visibility: Visibility = isVisibility(rawVisibility)
+    ? rawVisibility
+    : "public";
 
   if (typeof title !== "string" || title.trim().length === 0) {
     return Response.json({ error: "title is required" }, { status: 400 });
@@ -132,6 +138,7 @@ export async function POST(request: Request) {
     edition: fields.edition,
     status: validatedStatus,
     price: fields.price,
+    visibility,
   });
 
   const user = await userStore.getById(session.userId);
