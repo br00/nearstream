@@ -5,6 +5,7 @@ import { sourceStore } from "@/lib/source-store";
 import { feedEntryStore } from "@/lib/feed-entry-store";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamLockup } from "@/app/_components/nearstream-mark";
+import { NearstreamAnimatedMark } from "@/app/_components/site/nearstream-animated-mark";
 import { Kicker } from "@/app/_components/kicker";
 import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
 
@@ -125,13 +126,14 @@ export default async function ReaderPage() {
   );
 }
 
-// Empty-state wordmark — quiet platform identity when the reader has nothing
-// to show. We only render this when the page would otherwise be just a Kicker
-// + a paragraph, so the room never feels anonymous on first load.
+// Empty-state mark — just the `>` chevron, animated. Left-aligned to sit in
+// the same column as the heading + copy, so the empty state reads as one
+// quiet block rather than a centered hero. Disappears the moment there's
+// real content.
 function EmptyStateMark() {
   return (
-    <div className="mt-16 flex justify-center">
-      <NearstreamLockup size={28} className="text-muted" />
+    <div className="mt-12">
+      <NearstreamAnimatedMark size={72} className="text-foreground" />
     </div>
   );
 }
@@ -140,22 +142,20 @@ function EmptySourcesState() {
   return (
     <div>
       <EmptyStateMark />
-      <div className="mt-12 text-center">
-        <h1 className="text-2xl font-normal tracking-tight text-foreground">
-          No friends followed yet
-        </h1>
-        <p className="mt-4 text-sm leading-relaxed text-muted">
-          Nearstream pulls posts from friends&rsquo; sites and lays them out in a
-          single chronological feed. Add a friend by their RSS URL in the studio
-          to begin.
-        </p>
-        <Link
-          href="/studio#sources"
-          className="mt-8 inline-block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground underline underline-offset-4 decoration-muted-soft transition-colors hover:decoration-foreground"
-        >
-          Add a source →
-        </Link>
-      </div>
+      <h1 className="mt-8 text-2xl font-normal tracking-tight text-foreground">
+        No friends followed yet
+      </h1>
+      <p className="mt-4 text-sm leading-relaxed text-muted">
+        Nearstream pulls posts from friends&rsquo; sites and lays them out in a
+        single chronological feed. Add a friend by their RSS URL in the studio
+        to begin.
+      </p>
+      <Link
+        href="/studio#sources"
+        className="mt-8 inline-block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground underline underline-offset-4 decoration-muted-soft transition-colors hover:decoration-foreground"
+      >
+        Add a source →
+      </Link>
     </div>
   );
 }
@@ -164,23 +164,21 @@ function EmptyFeedState() {
   return (
     <div>
       <EmptyStateMark />
-      <div className="mt-12 text-center">
-        <h1 className="text-2xl font-normal tracking-tight text-foreground">
-          Quiet so far
-        </h1>
-        <p className="mt-4 text-sm leading-relaxed text-muted">
-          Your sources are set up but no entries have been fetched yet. Try a
-          refresh.
-        </p>
-        <form action="/api/sources/refresh" method="POST" className="mt-8 inline-block">
-          <button
-            type="submit"
-            className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground underline underline-offset-4 decoration-muted-soft transition-colors hover:decoration-foreground"
-          >
-            Refresh all →
-          </button>
-        </form>
-      </div>
+      <h1 className="mt-8 text-2xl font-normal tracking-tight text-foreground">
+        Quiet so far
+      </h1>
+      <p className="mt-4 text-sm leading-relaxed text-muted">
+        Your sources are set up but no entries have been fetched yet. Try a
+        refresh.
+      </p>
+      <form action="/api/sources/refresh" method="POST" className="mt-8">
+        <button
+          type="submit"
+          className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground underline underline-offset-4 decoration-muted-soft transition-colors hover:decoration-foreground"
+        >
+          Refresh all →
+        </button>
+      </form>
     </div>
   );
 }
