@@ -1240,7 +1240,7 @@ const PHASES: Phase[] = [
   {
     num: "04",
     name: "Onboard the first friends",
-    body: "Adding Gosia + Federico to the allowlist. Watching how they use the studio and reader. Iterating on the empty states and the picker UX.",
+    body: "Adding the first close friends to the allowlist. Watching how they use the studio and reader. Iterating on the empty states and the picker UX.",
     estimate: "ongoing",
     status: "doing",
   },
