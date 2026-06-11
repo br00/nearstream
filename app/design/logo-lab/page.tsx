@@ -2,11 +2,11 @@ import Link from "next/link";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamLockup, NearstreamMark } from "@/app/_components/nearstream-mark";
 import { Kicker } from "@/app/_components/kicker";
+import { LogoHelix, LogoSwarm } from "@/app/_components/site/logo-lab";
 import {
-  LogoFinal,
-  LogoHelix,
-  LogoSwarm,
-} from "@/app/_components/site/logo-lab";
+  NearstreamMarkAnimated,
+  NearstreamMarkSnapshot,
+} from "@/app/_components/site/nearstream-mark-animated";
 
 export const metadata = {
   title: "Logo lab · Nearstream",
@@ -81,7 +81,7 @@ export default function LogoLabPage() {
           <div className="mt-12">
             <div className="flex flex-col gap-4">
               <div className="flex aspect-square w-full max-w-md items-center justify-center border border-foreground/40 bg-black">
-                <LogoFinal size={260} />
+                <NearstreamMarkAnimated size={260} />
               </div>
               <div>
                 <Kicker>Final — Helix + dust</Kicker>
@@ -91,6 +91,19 @@ export default function LogoLabPage() {
                   underneath as quiet dust. Anchors always at full opacity
                   so the chevron shape never dissolves.
                 </p>
+              </div>
+              <div className="mt-4">
+                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-soft">
+                  Snapshot
+                </p>
+                <p className="mt-2 text-xs leading-relaxed text-muted">
+                  Captures the current animation frame at any size and
+                  downloads a PNG. Each click grabs a different moment —
+                  click again if you want a different pose.
+                </p>
+                <div className="mt-4">
+                  <NearstreamMarkSnapshot sizes={[256, 512, 1024, 2048]} />
+                </div>
               </div>
             </div>
           </div>

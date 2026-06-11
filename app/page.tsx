@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamLockup } from "@/app/_components/nearstream-mark";
+import { NearstreamMarkAnimated } from "@/app/_components/site/nearstream-mark-animated";
 import { getSession } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
 
@@ -45,6 +46,9 @@ export default async function InstanceLanding() {
       <main className="flex flex-1 px-6">
         <div className="mx-auto w-full max-w-lg pt-20 pb-32">
           {/* Hero */}
+          <div className="mb-12">
+            <NearstreamMarkAnimated size={140} />
+          </div>
           <p className={sectionLabel}>Nearstream</p>
           <h1 className="mt-8 text-2xl font-normal tracking-tight text-foreground leading-snug whitespace-pre-line">
             A quieter way to share
