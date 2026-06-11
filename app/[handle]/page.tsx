@@ -144,16 +144,14 @@ export default async function TenantHome({ params }: Props) {
             </div>
           ) : null}
 
-          <section style={{ marginTop: "4.5rem" }}>
-            <Link
-              href={`${base}/stream`}
-              className={sectionLabelClasses + " mb-8"}
-            >
-              Stream
-            </Link>
-            {recentStream.length === 0 ? (
-              <p className="mt-6 text-sm text-muted">No notes yet.</p>
-            ) : (
+          {recentStream.length > 0 && (
+            <section style={{ marginTop: "4.5rem" }}>
+              <Link
+                href={`${base}/stream`}
+                className={sectionLabelClasses + " mb-8"}
+              >
+                Stream
+              </Link>
               <ul className="mt-8 flex flex-col gap-4">
                 {recentStream.map((entry) => (
                   <li
@@ -188,8 +186,8 @@ export default async function TenantHome({ params }: Props) {
                   </li>
                 ))}
               </ul>
-            )}
-          </section>
+            </section>
+          )}
 
           {recentPictures.length > 0 && (
             <section style={{ marginTop: "4.5rem" }}>
