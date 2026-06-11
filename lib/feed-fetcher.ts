@@ -81,7 +81,12 @@ export async function refreshSource(
 
   let added: number;
   try {
-    added = await feedEntryStore.upsertMany(userId, parsed.entries);
+    // Sync, not upsert: anything we have locally for this source whose
+    // (sourceId, guid) is not in the current feed gets dropped. The feed is
+    // authoritative each refresh — if the friend deleted a post on their
+    // end, it disappears from our reader on the next refresh too.
+    const result = await feedEntryStore.syncBySource(userId, id, parsed.entries);
+    added = result.added;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await sourceStore.update(userId, id, {
