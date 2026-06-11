@@ -259,6 +259,67 @@ export function LogoHalos({ size = 160 }: { size?: number }) {
 }
 
 // ============================================================
+// FINAL — "Helix + dust"
+// A's helix backbone (DNA base-pair orbit per anchor, depth via
+// opacity) plus a couple of tiny low-opacity satellites per anchor
+// borrowed from E. The satellites are deliberately much smaller
+// than the helix partners — they read as quiet dust, not as a
+// second layer of pairs, so the chevron stays the dominant shape.
+// ============================================================
+function drawFinal(ctx: CanvasRenderingContext2D, size: number, t: number) {
+  ctx.clearRect(0, 0, size, size);
+  const s = scaleOf(size);
+  const time = t * 0.0014;
+  const SATS = 2;
+
+  for (let i = 0; i < POINTS.length; i++) {
+    const p = POINTS[i];
+    const bx = p.cx * s;
+    const by = p.cy * s;
+    const phase = time + i * 0.55;
+    const orbitR = (p.r * 2.4) * s;
+    const ox = bx + Math.cos(phase) * orbitR;
+    const oy = by + Math.sin(phase) * orbitR * 0.35;
+    const depth = (Math.cos(phase) + 1) / 2;
+
+    // Tiny dust satellites — drawn FIRST so the helix dots sit on top.
+    // Only around the 11 chevron anchors, skipping the existing scattered
+    // satellites at i>=11 (they're already faint dust).
+    if (i < 11) {
+      for (let k = 0; k < SATS; k++) {
+        const satPhase = time * (1.4 + k * 0.35) + i * 0.7 + k * 2.1;
+        const satOrbit = (p.r * 1.1 + k * 0.5) * s;
+        const sx = bx + Math.cos(satPhase) * satOrbit;
+        const sy = by + Math.sin(satPhase * 1.3) * satOrbit * 0.75;
+        const satAlpha = p.opacity * 0.18 * (1 - k * 0.25);
+        const satR = p.r * s * (0.22 - k * 0.04);
+        dot(ctx, sx, sy, satR, satAlpha);
+      }
+    }
+
+    // Back partner (dimmer when on the far side of the orbit)
+    const backOpacity = p.opacity * (0.15 + (1 - depth) * 0.55);
+    halo(ctx, ox, oy, p.r * s, backOpacity);
+    dot(ctx, ox, oy, p.r * s * (0.5 + (1 - depth) * 0.4), backOpacity);
+
+    // Anchor — full brightness, never fades. The chevron shape rests here.
+    halo(ctx, bx, by, p.r * s, p.opacity);
+    dot(ctx, bx, by, p.r * s, p.opacity);
+
+    // Front partner (brighter when on the near side of the orbit)
+    const fx = bx - Math.cos(phase) * orbitR;
+    const fy = by - Math.sin(phase) * orbitR * 0.35;
+    const frontOpacity = p.opacity * (0.2 + depth * 0.7);
+    dot(ctx, fx, fy, p.r * s * (0.5 + depth * 0.5), frontOpacity);
+  }
+}
+
+export function LogoFinal({ size = 160 }: { size?: number }) {
+  const ref = useCanvasLoop(drawFinal, size);
+  return <canvas ref={ref} aria-label="Nearstream — final variant" role="img" />;
+}
+
+// ============================================================
 // VARIANT E — "Swarm"
 // Each anchor is a faint static dot; a swarm of tiny satellites
 // orbits each one at small radii and speeds. The chevron emerges

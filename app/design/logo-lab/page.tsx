@@ -3,10 +3,8 @@ import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamLockup, NearstreamMark } from "@/app/_components/nearstream-mark";
 import { Kicker } from "@/app/_components/kicker";
 import {
+  LogoFinal,
   LogoHelix,
-  LogoPulse,
-  LogoSpin,
-  LogoHalos,
   LogoSwarm,
 } from "@/app/_components/site/logo-lab";
 
@@ -15,9 +13,10 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-// Sandbox for the animated `>` mark. Five takes side-by-side so we can pick
-// one (or none) without touching the live empty-state on /reader. Each tile
-// is the existing chevron shape with a different motion interpretation.
+// Sandbox for the animated `>` mark. Three live takes side-by-side: the
+// lead candidate ("Final") on top, with its two parents (A — Helix, E —
+// Swarm) underneath so we can compare what made it through. Doesn't touch
+// the live empty state on /reader.
 
 type VariantProps = {
   name: string;
@@ -58,14 +57,12 @@ export default function LogoLabPage() {
         <div className="w-full max-w-4xl">
           <Kicker>Logo lab</Kicker>
           <h1 className="mt-2 text-2xl font-normal tracking-tight text-foreground">
-            Animated mark — five takes
+            Animated mark — lead candidate
           </h1>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted">
-            All five preserve the existing `&gt;` chevron from{" "}
-            <code className="font-mono text-foreground">NearstreamMark</code>,
-            but apply a different motion or depth interpretation. White dots,
-            black ground, opacity carries the 3D feel. Refresh to re-randomize
-            the start phase.
+            Final = A&rsquo;s helix backbone (DNA base-pair orbit per anchor)
+            with E&rsquo;s tiny dust satellites layered underneath. The two
+            parents are below for direct comparison.
           </p>
 
           <div className="mt-12 flex items-end gap-6 border-b border-border pb-6">
@@ -81,48 +78,48 @@ export default function LogoLabPage() {
             </p>
           </div>
 
-          <div className="mt-12 grid grid-cols-1 gap-12 sm:grid-cols-2">
-            <Variant
-              name="A — Helix"
-              description="Each chevron point has a partner dot orbiting it on a tilted axis. The pair reads as a DNA base pair; opacity carries the depth (front partner brighter, back partner dimmer). The whole thing reads as one spiraling thread."
-            >
-              <LogoHelix size={180} />
-            </Variant>
+          <div className="mt-12">
+            <div className="flex flex-col gap-4">
+              <div className="flex aspect-square w-full max-w-md items-center justify-center border border-foreground/40 bg-black">
+                <LogoFinal size={260} />
+              </div>
+              <div>
+                <Kicker>Final — Helix + dust</Kicker>
+                <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">
+                  Helix backbone gives the chevron its 3D spiraling-thread
+                  feel; two tiny low-opacity satellites per anchor sit
+                  underneath as quiet dust. Anchors always at full opacity
+                  so the chevron shape never dissolves.
+                </p>
+              </div>
+            </div>
+          </div>
 
-            <Variant
-              name="B — Pulse"
-              description="Static chevron, a brightness wave travels through it. Each dot's opacity + radius is modulated by a sine whose phase shifts along the path — reads as a calm signal moving through the mark."
-            >
-              <LogoPulse size={180} />
-            </Variant>
-
-            <Variant
-              name="C — Spin"
-              description="The whole chevron rotates around its vertical mid-axis. Each anchor's horizontal position oscillates relative to the apex line; opacity fades when the dot is on the back side. Reads as a 3D chevron turning."
-            >
-              <LogoSpin size={180} />
-            </Variant>
-
-            <Variant
-              name="D — Halos"
-              description="Each anchor pulses 2–3 concentric translucent halos on offset phases — layers of breath stacking. The shape stays put; depth comes entirely from layered alpha. The quietest of the five."
-            >
-              <LogoHalos size={180} />
-            </Variant>
-
-            <Variant
-              name="E — Swarm"
-              description="Each anchor is a faint dot with a swarm of tiny satellites orbiting it. The chevron emerges from the swarm's density rather than from fixed positions — reads as a constellation slowly settling into shape."
-            >
-              <LogoSwarm size={180} />
-            </Variant>
+          <div className="mt-16 border-t border-border pt-12">
+            <p className="text-xs uppercase tracking-[0.25em] text-muted-soft">
+              Parents — for comparison
+            </p>
+            <div className="mt-8 grid grid-cols-1 gap-12 sm:grid-cols-2">
+              <Variant
+                name="A — Helix (base)"
+                description="DNA base-pair orbit per anchor. Same backbone as Final, without the dust."
+              >
+                <LogoHelix size={180} />
+              </Variant>
+              <Variant
+                name="E — Swarm (dust source)"
+                description="Where Final's tiny satellites came from. Subtler and smaller in Final because the helix is already doing the depth work."
+              >
+                <LogoSwarm size={180} />
+              </Variant>
+            </div>
           </div>
 
           <div className="mt-16 border-t border-border pt-8">
             <p className="text-xs text-muted-soft">
-              Tell me which one (or none) — I&rsquo;ll wire it into{" "}
+              Happy with Final? I&rsquo;ll wire it into{" "}
               <code className="font-mono">/reader</code> empty states and
-              delete the other four.
+              delete the lab + the other variants.
             </p>
           </div>
         </div>
