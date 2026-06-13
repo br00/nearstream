@@ -103,17 +103,18 @@ export default async function SettingsPage({ searchParams }: Props) {
           <hr className="mt-20 border-border" />
 
           {/* Your URL — the canonical "where do I find my URL to send to a
-              friend?" answer. We surface the absolute site URL (recognisable
-              to a friend) and the RSS feed URL (the functional artifact they
-              paste into their /reader/friends form). The Share button picks
-              the latter — that's what actually wires you into their reader. */}
+              friend?" answer. The Share button shares the SITE URL because
+              that's an HTML page with OpenGraph metadata, so WhatsApp /
+              iMessage render a proper preview card (mark + display name +
+              tagline). The feed URL is shown below for friends who want to
+              paste it directly into a reader instead of clicking through. */}
           <div className="mt-12">
             <Kicker>Your URL</Kicker>
             <p className="mt-2 text-sm leading-relaxed text-muted">
               Send this to a friend so they can add you to their Nearstream
               reader. Tap Share — your phone&rsquo;s share sheet opens
-              (WhatsApp, Messages, Mail, anything) with the message and link
-              ready to send.
+              (WhatsApp, Messages, Mail, anything) with the link ready to
+              send, complete with a preview card.
             </p>
 
             {(() => {
@@ -122,7 +123,7 @@ export default async function SettingsPage({ searchParams }: Props) {
               const siteUrl = tenantAbsoluteBase(user.handle, instanceUrl);
               const feedUrl = `${siteUrl}/rss.xml`;
               const firstName = user.displayName.split(" ")[0] || user.handle;
-              const shareMessage = `Add me on Nearstream — paste this into your reader:`;
+              const shareMessage = `Add me on Nearstream →`;
               return (
                 <>
                   <dl className="mt-6 grid grid-cols-[max-content_1fr] gap-x-5 gap-y-3 text-[13px]">
@@ -141,7 +142,7 @@ export default async function SettingsPage({ searchParams }: Props) {
                   </dl>
                   <div className="mt-6">
                     <ShareUrlButton
-                      url={feedUrl}
+                      url={siteUrl}
                       title={`Add ${firstName} on Nearstream`}
                       message={shareMessage}
                     />

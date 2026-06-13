@@ -143,8 +143,10 @@ export default async function FriendsPage({ searchParams }: Props) {
             <Kicker>Add a friend</Kicker>
             <p className="mt-2 text-sm leading-relaxed text-muted-soft">
               You need their RSS feed URL — usually something like{" "}
-              <code className="font-mono">site.com/rss.xml</code>. Ask them for
-              it.
+              <code className="font-mono">site.com/rss.xml</code>. If they
+              sent you their site URL (like{" "}
+              <code className="font-mono">site.com</code>), append{" "}
+              <code className="font-mono">/rss.xml</code> and use that.
             </p>
 
             <form
