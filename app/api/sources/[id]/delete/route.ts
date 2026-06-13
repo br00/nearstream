@@ -27,8 +27,8 @@ export async function POST(_req: Request, { params }: Props) {
   }
   await sourceStore.delete(session.userId, id);
 
-  revalidatePath("/studio");
   revalidatePath("/reader");
+  revalidatePath("/reader/friends");
 
-  redirect("/studio#sources");
+  redirect("/reader/friends");
 }

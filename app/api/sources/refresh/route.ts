@@ -11,8 +11,8 @@ export async function POST(request: Request) {
 
   const results = await refreshAllSources(session.userId);
 
-  revalidatePath("/studio");
   revalidatePath("/reader");
+  revalidatePath("/reader/friends");
 
   const isJson = (request.headers.get("content-type") ?? "").includes(
     "application/json",
@@ -21,5 +21,21 @@ export async function POST(request: Request) {
     return Response.json({ results });
   }
 
-  redirect("/studio#sources");
+  // Land on whichever page the user clicked Refresh from (reader feed or
+  // /reader/friends). Default to /reader if no referer.
+  redirect(refererPath(request) ?? "/reader");
+}
+
+function refererPath(req: Request): string | undefined {
+  const ref = req.headers.get("referer");
+  if (!ref) return undefined;
+  try {
+    const u = new URL(ref);
+    if (u.pathname === "/reader/friends" || u.pathname === "/reader") {
+      return u.pathname;
+    }
+  } catch {
+    // ignore malformed referer
+  }
+  return undefined;
 }

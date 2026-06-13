@@ -45,13 +45,14 @@ export async function POST(request: Request, { params }: Props) {
     };
   }
 
-  revalidatePath("/studio");
   revalidatePath("/reader");
+  revalidatePath("/reader/friends");
 
   if (isJson) {
     const status = result.status === "error" ? 502 : 200;
     return Response.json(result, { status });
   }
 
-  redirect("/studio#sources");
+  // Per-source Refresh button only exists on /reader/friends today.
+  redirect("/reader/friends");
 }

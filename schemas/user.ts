@@ -42,6 +42,8 @@ export function isValidHandle(value: string): boolean {
     "onboarding",
     "studio",
     "reader",
+    "friends",
+    "settings",
     "design",
     "tenant",
     "about",

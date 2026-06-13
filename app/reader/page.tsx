@@ -50,14 +50,21 @@ export default async function ReaderPage() {
     <PageShell
       leftNav={<NearstreamLockup size={24} className="text-foreground" />}
       rightNav={
-        <Link href="/studio" className={navLinkClasses}>
-          Studio →
-        </Link>
+        <>
+          <Link href="/studio" className={navLinkClasses}>
+            Studio
+          </Link>
+          <Link href="/settings" className={navLinkClasses}>
+            Settings
+          </Link>
+        </>
       }
     >
       <section className="flex flex-1 justify-center px-6">
         <div className="w-full max-w-[32rem] py-12">
           <Kicker>Reader</Kicker>
+
+          {sources.length > 0 && <FriendsPill count={sources.length} />}
 
           {sources.length === 0 ? (
             <EmptySourcesState />
@@ -65,7 +72,7 @@ export default async function ReaderPage() {
             <EmptyFeedState />
           ) : (
             <>
-              <div className="mt-2 flex items-center justify-between">
+              <div className="mt-8 flex items-center justify-between">
                 <h1 className="text-2xl font-normal tracking-tight text-foreground">
                   Today
                 </h1>
@@ -142,20 +149,36 @@ function EmptySourcesState() {
     <div>
       <EmptyStateMark />
       <h1 className="mt-8 text-2xl font-normal tracking-tight text-foreground">
-        No friends followed yet
+        No friends yet
       </h1>
       <p className="mt-4 text-sm leading-relaxed text-muted">
         Nearstream pulls posts from friends&rsquo; sites and lays them out in a
-        single chronological feed. Add a friend by their RSS URL in the studio
-        to begin.
+        single chronological feed. Add the first friend by their RSS URL to
+        begin.
       </p>
       <Link
-        href="/studio#sources"
+        href="/reader/friends"
         className="mt-8 inline-block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground underline underline-offset-4 decoration-muted-soft transition-colors hover:decoration-foreground"
       >
-        Add a source →
+        Add a friend →
       </Link>
     </div>
+  );
+}
+
+// "Friends · N →" pill below the Reader kicker, linking to /reader/friends.
+// Sole entry point to the friend-graph management surface from the feed.
+function FriendsPill({ count }: { count: number }) {
+  return (
+    <Link
+      href="/reader/friends"
+      className="mt-3 inline-flex items-center gap-2 border border-border px-3 py-1.5 transition-colors hover:border-foreground"
+    >
+      <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-foreground">
+        Friends · {count}
+      </span>
+      <span className="font-mono text-[10px] text-muted-soft">→</span>
+    </Link>
   );
 }
 
