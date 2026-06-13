@@ -68,6 +68,15 @@ export default async function StudioPage({ searchParams }: Props) {
       leftNav={<NearstreamLockup size={24} className="text-foreground" />}
       rightNav={
         <>
+          <Link href={tenantBase(user.handle)} className={navLinkClasses}>
+            Site
+          </Link>
+          <Link
+            href={`${tenantBase(user.handle)}/library`}
+            className={navLinkClasses}
+          >
+            Library
+          </Link>
           <Link href="/reader" className={navLinkClasses}>
             Reader
           </Link>

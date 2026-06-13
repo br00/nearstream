@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { sourceStore } from "@/lib/source-store";
 import { feedEntryStore } from "@/lib/feed-entry-store";
+import { userStore } from "@/lib/user-store";
+import { tenantBase } from "@/lib/tenant-domains";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamLockup } from "@/app/_components/nearstream-mark";
 import { NearstreamMarkAnimated } from "@/app/_components/site/nearstream-mark-animated";
@@ -36,10 +38,15 @@ export default async function ReaderPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [sources, entries] = await Promise.all([
+  const [sources, entries, user] = await Promise.all([
     sourceStore.list(session.userId),
     feedEntryStore.list(session.userId),
+    userStore.getById(session.userId),
   ]);
+  // Tenant nav links — defensively fall back to a placeholder if the user
+  // record vanished mid-request (shouldn't happen post-onboarding; we still
+  // render rather than 500).
+  const handle = user?.handle ?? "";
 
   const sourceById = new Map(sources.map((s) => [s.id, s]));
 
@@ -51,6 +58,19 @@ export default async function ReaderPage() {
       leftNav={<NearstreamLockup size={24} className="text-foreground" />}
       rightNav={
         <>
+          {handle && (
+            <>
+              <Link href={tenantBase(handle)} className={navLinkClasses}>
+                Site
+              </Link>
+              <Link
+                href={`${tenantBase(handle)}/library`}
+                className={navLinkClasses}
+              >
+                Library
+              </Link>
+            </>
+          )}
           <Link href="/studio" className={navLinkClasses}>
             Studio
           </Link>

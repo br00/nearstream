@@ -41,6 +41,15 @@ export default async function SettingsPage({ searchParams }: Props) {
       leftNav={<NearstreamLockup size={24} className="text-foreground" />}
       rightNav={
         <>
+          <Link href={tenantBase(user.handle)} className={navLinkClasses}>
+            Site
+          </Link>
+          <Link
+            href={`${tenantBase(user.handle)}/library`}
+            className={navLinkClasses}
+          >
+            Library
+          </Link>
           <Link href="/studio" className={navLinkClasses}>
             Studio
           </Link>
@@ -111,34 +120,17 @@ export default async function SettingsPage({ searchParams }: Props) {
 
           <hr className="mt-20 border-border" />
 
-          {/* Your site — quick link out to your own tenant home + library,
-              now that those links are gone from the /studio nav. */}
+          {/* Your site URL — the address you share with friends. Site +
+              Library are also in the top nav; this section is the canonical
+              "where do I find my URL to send to someone?" answer. */}
           <div className="mt-12">
-            <Kicker>Your site</Kicker>
+            <Kicker>Your URL</Kicker>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Lives at{" "}
-              <Link
-                href={tenantBase(user.handle)}
-                className="text-foreground underline underline-offset-4 decoration-muted-soft hover:decoration-foreground"
-              >
-                {tenantBase(user.handle).replace(/^https?:\/\//, "")}
-              </Link>
-              .
+              Share this with friends so they can add you as a source.
             </p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Link
-                href={tenantBase(user.handle)}
-                className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground transition-colors hover:bg-foreground hover:text-background"
-              >
-                Open home →
-              </Link>
-              <Link
-                href={`${tenantBase(user.handle)}/library`}
-                className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground hover:border-foreground"
-              >
-                Open library →
-              </Link>
-            </div>
+            <p className="mt-4 font-mono text-[13px] text-foreground">
+              {tenantBase(user.handle).replace(/^https?:\/\//, "")}
+            </p>
           </div>
 
           <hr className="mt-20 border-border" />
