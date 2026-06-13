@@ -18,7 +18,10 @@ export function PageShell({ leftNav, rightNav, children }: PageShellProps) {
 
       {children}
 
-      <footer className="border-t border-border px-6 py-8">
+      {/* Decorative footer — hidden on mobile so the bottom tab bar on
+          authed pages doesn't overlap it, and the year stamp on un-authed
+          pages (landing / about / manifesto) isn't load-bearing anyway. */}
+      <footer className="hidden border-t border-border px-6 py-8 sm:block">
         <div className="mx-auto flex max-w-lg items-center justify-end">
           <span className="font-mono text-[11px] text-muted-soft/60">
             {new Date().getFullYear()}_

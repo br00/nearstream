@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       await userStore.setProfileMark(session.userId, profileMark);
     }
 
-    revalidatePath("/studio");
+    revalidatePath("/settings");
     if (updated.handle) {
       revalidatePath(`/${updated.handle}`);
       revalidatePath(`/${updated.handle}/stream`);
@@ -57,12 +57,11 @@ export async function POST(request: Request) {
     return errorRedirect(request, `Could not save — ${message}. Try again.`);
   }
 
-  redirect("/studio#profile");
+  redirect("/settings");
 }
 
 function errorRedirect(request: Request, message: string): Response {
-  const url = new URL("/studio", request.url);
+  const url = new URL("/settings", request.url);
   url.searchParams.set("profile-error", message);
-  url.hash = "profile";
   return Response.redirect(url, 303);
 }

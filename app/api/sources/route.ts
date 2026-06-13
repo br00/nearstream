@@ -103,15 +103,14 @@ export async function POST(request: Request) {
     );
   }
 
-  revalidatePath("/studio");
+  revalidatePath("/reader");
+  revalidatePath("/reader/friends");
 
   if (isJson) {
     return Response.json({ source }, { status: 201 });
   }
 
-  const url = new URL("/studio", request.url);
-  url.hash = "sources";
-  return Response.redirect(url, 303);
+  return Response.redirect(new URL("/reader/friends", request.url), 303);
 }
 
 function errorResponse(
@@ -123,8 +122,7 @@ function errorResponse(
   if (isJson) {
     return Response.json({ error: message }, { status });
   }
-  const url = new URL("/studio", request.url);
-  url.searchParams.set("source-error", message);
-  url.hash = "sources";
+  const url = new URL("/reader/friends", request.url);
+  url.searchParams.set("friend-error", message);
   return Response.redirect(url, 303);
 }

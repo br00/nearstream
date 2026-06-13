@@ -15,7 +15,7 @@ const tenantByDomain: Record<string, string> = (() => {
   return out;
 })();
 
-const GATED_PREFIXES = ["/studio", "/reader", "/onboarding"];
+const GATED_PREFIXES = ["/studio", "/reader", "/settings", "/onboarding"];
 
 function isGated(path: string): boolean {
   return GATED_PREFIXES.some(
@@ -93,6 +93,8 @@ function isInstanceOnlyPath(path: string): boolean {
     path.startsWith("/studio/") ||
     path === "/reader" ||
     path.startsWith("/reader/") ||
+    path === "/settings" ||
+    path.startsWith("/settings/") ||
     path === "/design" ||
     path.startsWith("/design/") ||
     path === "/about" ||
