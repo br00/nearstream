@@ -6,8 +6,9 @@ import { feedEntryStore } from "@/lib/feed-entry-store";
 import { userStore } from "@/lib/user-store";
 import { tenantBase } from "@/lib/tenant-domains";
 import { PageShell } from "@/app/_components/page-shell";
-import { NearstreamLockup } from "@/app/_components/nearstream-mark";
+import { NearstreamMark } from "@/app/_components/nearstream-mark";
 import { NearstreamMarkAnimated } from "@/app/_components/site/nearstream-mark-animated";
+import { AuthedNavTop, AuthedNavBottom } from "@/app/_components/authed-nav";
 import { Kicker } from "@/app/_components/kicker";
 import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
 
@@ -55,32 +56,10 @@ export default async function ReaderPage() {
 
   return (
     <PageShell
-      leftNav={<NearstreamLockup size={24} className="text-foreground" />}
-      rightNav={
-        <>
-          {handle && (
-            <>
-              <Link href={tenantBase(handle)} className={navLinkClasses}>
-                Site
-              </Link>
-              <Link
-                href={`${tenantBase(handle)}/library`}
-                className={navLinkClasses}
-              >
-                Library
-              </Link>
-            </>
-          )}
-          <Link href="/studio" className={navLinkClasses}>
-            Studio
-          </Link>
-          <Link href="/settings" className={navLinkClasses}>
-            Settings
-          </Link>
-        </>
-      }
+      leftNav={<NearstreamMark size={24} className="text-foreground" />}
+      rightNav={<AuthedNavTop active="reader" tenantHandle={handle} />}
     >
-      <section className="flex flex-1 justify-center px-6">
+      <section className="flex flex-1 justify-center px-6 pb-24 sm:pb-12">
         <div className="w-full max-w-[32rem] py-12">
           <Kicker>Reader</Kicker>
 
@@ -149,6 +128,7 @@ export default async function ReaderPage() {
           )}
         </div>
       </section>
+      <AuthedNavBottom active="reader" tenantHandle={handle} />
     </PageShell>
   );
 }

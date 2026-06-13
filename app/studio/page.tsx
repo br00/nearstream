@@ -10,7 +10,8 @@ import { tenantBase } from "@/lib/tenant-domains";
 import { getSession } from "@/lib/auth";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { PageShell } from "@/app/_components/page-shell";
-import { NearstreamLockup } from "@/app/_components/nearstream-mark";
+import { NearstreamMark } from "@/app/_components/nearstream-mark";
+import { AuthedNavTop, AuthedNavBottom } from "@/app/_components/authed-nav";
 import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
@@ -60,33 +61,14 @@ export default async function StudioPage({ searchParams }: Props) {
     essays.length === 0 &&
     inventoryItems.length === 0;
 
-  const navLinkClasses =
-    "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
-
   return (
     <PageShell
-      leftNav={<NearstreamLockup size={24} className="text-foreground" />}
+      leftNav={<NearstreamMark size={24} className="text-foreground" />}
       rightNav={
-        <>
-          <Link href={tenantBase(user.handle)} className={navLinkClasses}>
-            Site
-          </Link>
-          <Link
-            href={`${tenantBase(user.handle)}/library`}
-            className={navLinkClasses}
-          >
-            Library
-          </Link>
-          <Link href="/reader" className={navLinkClasses}>
-            Reader
-          </Link>
-          <Link href="/settings" className={navLinkClasses}>
-            Settings
-          </Link>
-        </>
+        <AuthedNavTop active="studio" tenantHandle={user.handle} />
       }
     >
-      <section className="flex flex-1 justify-center px-6">
+      <section className="flex flex-1 justify-center px-6 pb-24 sm:pb-12">
         <div className="w-full max-w-lg py-12">
           {/* First-time empty state — disappears the moment the user posts
               anything or edits the Letter. */}
@@ -290,6 +272,7 @@ export default async function StudioPage({ searchParams }: Props) {
           </div>
         </div>
       </section>
+      <AuthedNavBottom active="studio" tenantHandle={user.handle} />
     </PageShell>
   );
 }

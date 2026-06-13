@@ -8,8 +8,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { sourceStore } from "@/lib/source-store";
+import { userStore } from "@/lib/user-store";
 import { PageShell } from "@/app/_components/page-shell";
-import { NearstreamLockup } from "@/app/_components/nearstream-mark";
+import { NearstreamMark } from "@/app/_components/nearstream-mark";
+import { AuthedNavBottom } from "@/app/_components/authed-nav";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
 import { Input } from "@/app/_components/input";
@@ -30,7 +32,11 @@ export default async function FriendsPage({ searchParams }: Props) {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const sources = await sourceStore.list(session.userId);
+  const [sources, user] = await Promise.all([
+    sourceStore.list(session.userId),
+    userStore.getById(session.userId),
+  ]);
+  const handle = user?.handle ?? "";
   const { "friend-error": friendError } = await searchParams;
 
   const navLinkClasses =
@@ -38,14 +44,14 @@ export default async function FriendsPage({ searchParams }: Props) {
 
   return (
     <PageShell
-      leftNav={<NearstreamLockup size={24} className="text-foreground" />}
+      leftNav={<NearstreamMark size={24} className="text-foreground" />}
       rightNav={
         <Link href="/reader" className={navLinkClasses}>
           ← Reader
         </Link>
       }
     >
-      <section className="flex flex-1 justify-center px-6">
+      <section className="flex flex-1 justify-center px-6 pb-24 sm:pb-12">
         <div className="w-full max-w-lg py-12">
           <Kicker>Friends</Kicker>
           <div className="mt-2 flex items-baseline justify-between gap-4">
@@ -182,6 +188,7 @@ export default async function FriendsPage({ searchParams }: Props) {
           </div>
         </div>
       </section>
+      <AuthedNavBottom active="reader" tenantHandle={handle} />
     </PageShell>
   );
 }

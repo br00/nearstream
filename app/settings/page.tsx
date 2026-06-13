@@ -9,7 +9,8 @@ import { getSession, isHostEmail } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
 import { tenantBase } from "@/lib/tenant-domains";
 import { PageShell } from "@/app/_components/page-shell";
-import { NearstreamLockup } from "@/app/_components/nearstream-mark";
+import { NearstreamMark } from "@/app/_components/nearstream-mark";
+import { AuthedNavTop, AuthedNavBottom } from "@/app/_components/authed-nav";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { Input } from "@/app/_components/input";
 import { Kicker } from "@/app/_components/kicker";
@@ -33,33 +34,14 @@ export default async function SettingsPage({ searchParams }: Props) {
 
   const { "profile-error": profileError } = await searchParams;
 
-  const navLinkClasses =
-    "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
-
   return (
     <PageShell
-      leftNav={<NearstreamLockup size={24} className="text-foreground" />}
+      leftNav={<NearstreamMark size={24} className="text-foreground" />}
       rightNav={
-        <>
-          <Link href={tenantBase(user.handle)} className={navLinkClasses}>
-            Site
-          </Link>
-          <Link
-            href={`${tenantBase(user.handle)}/library`}
-            className={navLinkClasses}
-          >
-            Library
-          </Link>
-          <Link href="/studio" className={navLinkClasses}>
-            Studio
-          </Link>
-          <Link href="/reader" className={navLinkClasses}>
-            Reader
-          </Link>
-        </>
+        <AuthedNavTop active="settings" tenantHandle={user.handle} />
       }
     >
-      <section className="flex flex-1 justify-center px-6">
+      <section className="flex flex-1 justify-center px-6 pb-24 sm:pb-12">
         <div className="w-full max-w-lg py-12">
           <Kicker>Settings</Kicker>
           <h1 className="mt-2 text-2xl font-normal tracking-tight text-foreground">
@@ -191,6 +173,7 @@ export default async function SettingsPage({ searchParams }: Props) {
           </form>
         </div>
       </section>
+      <AuthedNavBottom active="settings" tenantHandle={user.handle} />
     </PageShell>
   );
 }
