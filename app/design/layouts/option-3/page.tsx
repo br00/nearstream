@@ -85,13 +85,13 @@ export default function Option3MobileFirstPage() {
         <Variant
           n="M1"
           name="Sub-page"
-          summary="/reader is feed only. A small 'Following · 4 →' pill below the kicker links to /reader/sources, a separate page with the list + add form. Server-rendered, no JS, fully URL-addressable on both screen sizes."
+          summary="/reader is feed only. A small 'Friends · 4 →' pill below the kicker links to /reader/friends, a separate page with the list + add form. Server-rendered, no JS, fully URL-addressable on both screen sizes."
           best="Cleanest and most aligned with the codebase. Each intent has its own URL — bookmarkable, sharable, no overlay state to manage."
         >
           <Frame size="phone" path="/reader" title="Reader">
             <ReaderFeedWithPill compact />
           </Frame>
-          <Frame size="phone" path="/reader/sources" title="Following">
+          <Frame size="phone" path="/reader/friends" title="Friends">
             <SourcesPage compact />
           </Frame>
           <Frame size="desktop" path="/reader">
@@ -102,13 +102,13 @@ export default function Option3MobileFirstPage() {
         <Variant
           n="M2"
           name="Tabs"
-          summary="/reader has FEED | SOURCES tabs below the kicker. Tap to switch — same URL with ?tab=sources. Identical on mobile and desktop."
-          best="Single URL, single page. Minimal navigation. Cost: tabs split the page's purpose in two and some readers won't notice the sources tab exists."
+          summary="/reader has FEED | FRIENDS tabs below the kicker. Tap to switch — same URL with ?tab=friends. Identical on mobile and desktop."
+          best="Single URL, single page. Minimal navigation. Cost: tabs split the page's purpose in two and some readers won't notice the friends tab exists."
         >
           <Frame size="phone" path="/reader" title="Reader · feed">
             <ReaderTabsView active="feed" compact />
           </Frame>
-          <Frame size="phone" path="/reader?tab=sources" title="Reader · sources">
+          <Frame size="phone" path="/reader?tab=friends" title="Reader · friends">
             <ReaderTabsView active="sources" compact />
           </Frame>
           <Frame size="desktop" path="/reader">
@@ -119,7 +119,7 @@ export default function Option3MobileFirstPage() {
         <Variant
           n="M3"
           name="Bottom sheet"
-          summary="/reader is feed only. A sticky 'Manage sources ·' chip at the bottom of the screen opens a bottom sheet (mobile) or side panel (desktop) with the full source list + add form."
+          summary="/reader is feed only. A sticky 'Manage friends ·' chip at the bottom of the screen opens a bottom sheet (mobile) or side panel (desktop) with the full friends list + add form."
           best="Most native-app-feeling on a phone — sheets are the iOS/Android pattern for secondary surfaces. Cost: needs client JS for the overlay, and the back button no longer closes it without a custom history shim."
           warning="Needs JS — departs from the codebase's server-first norm."
         >
@@ -286,7 +286,7 @@ function FollowingPill() {
         ))}
       </span>
       <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground">
-        Following · {FAKE_SOURCES.length} →
+        Friends · {FAKE_SOURCES.length} →
       </span>
     </div>
   );
@@ -461,7 +461,7 @@ function AddSourceBlock({ compact = false }: { compact?: boolean }) {
             compact ? "px-3 py-1.5 text-[9px]" : "px-3 py-2 text-[10px]"
           } font-mono uppercase tracking-[0.22em] text-foreground transition-colors hover:bg-foreground hover:text-background`}
         >
-          Add source →
+          Add friend →
         </button>
       </div>
     </div>
@@ -473,14 +473,14 @@ function SourcesPage({ compact = false }: { compact?: boolean }) {
     <>
       <TopNav rightLink="← Reader" />
       <div className={`${compact ? "px-4 pt-5" : "px-6 pt-8"}`}>
-        <Kicker>Following</Kicker>
+        <Kicker>Friends</Kicker>
         <div className="mt-3 flex items-baseline justify-between">
           <h2
             className={`${
               compact ? "text-[17px]" : "text-xl"
             } font-normal tracking-tight text-foreground`}
           >
-            {FAKE_SOURCES.length} friends
+            {FAKE_SOURCES.length} people
           </h2>
           <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-muted-soft">
             Refresh all
@@ -543,7 +543,7 @@ function ReaderTabsView({
         <div className="mt-4 flex gap-1 border-b border-border">
           <TabPill label="Feed" active={active === "feed"} />
           <TabPill
-            label={`Sources · ${FAKE_SOURCES.length}`}
+            label={`Friends · ${FAKE_SOURCES.length}`}
             active={active === "sources"}
           />
         </div>
@@ -613,7 +613,7 @@ function ReaderWithChip({ compact = false }: { compact?: boolean }) {
               </span>
             ))}
           </span>
-          Manage sources · {FAKE_SOURCES.length}
+          Manage friends · {FAKE_SOURCES.length}
         </span>
       </div>
     </div>
@@ -633,7 +633,7 @@ function ReaderWithSheet({ compact = false }: { compact?: boolean }) {
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
         <div className="flex items-baseline justify-between">
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-foreground">
-            Following · {FAKE_SOURCES.length}
+            Friends · {FAKE_SOURCES.length}
           </p>
           <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
             ✕
