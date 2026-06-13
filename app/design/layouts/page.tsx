@@ -123,6 +123,7 @@ export default function LayoutLabPage() {
           pros="Sources sit with consumption. Settings stays tiny and rare."
           cons="/reader carries more UI; settings becomes nearly empty."
           highlighted
+          deepLink={{ href: "/design/layouts/option-3", label: "See 3a / 3b / 3c →" }}
         >
           <Browser path="/studio">
             <Nav links={["Studio", "Reader", "Settings"]} active="Studio" />
@@ -285,6 +286,7 @@ function Option({
   pros,
   cons,
   highlighted,
+  deepLink,
   children,
 }: {
   n: string;
@@ -293,6 +295,7 @@ function Option({
   pros: string;
   cons: string;
   highlighted?: boolean;
+  deepLink?: { href: string; label: string };
   children: React.ReactNode;
 }) {
   return (
@@ -329,6 +332,16 @@ function Option({
         </dt>
         <dd className="text-sm text-muted">{cons}</dd>
       </dl>
+      {deepLink && (
+        <div className="mt-3">
+          <Link
+            href={deepLink.href}
+            className="inline-block font-mono text-[10px] uppercase tracking-[0.22em] text-foreground underline underline-offset-4 decoration-muted-soft transition-colors hover:decoration-foreground"
+          >
+            {deepLink.label}
+          </Link>
+        </div>
+      )}
       <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {children}
       </div>
