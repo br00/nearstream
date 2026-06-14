@@ -3,11 +3,10 @@
 // stays focused on consumption. Anything "I do once and forget about" lives
 // here.
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, isHostEmail } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
-import { tenantBase } from "@/lib/tenant-domains";
+import { tenantAbsoluteBase } from "@/lib/tenant-domains";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamMark } from "@/app/_components/nearstream-mark";
 import { AuthedNavTop, AuthedNavBottom } from "@/app/_components/authed-nav";
@@ -15,6 +14,7 @@ import { SubmitButton } from "@/app/_components/submit-button";
 import { Input } from "@/app/_components/input";
 import { Kicker } from "@/app/_components/kicker";
 import { ProfileMarkPicker } from "@/app/_components/site/profile-mark-picker";
+import { ShareUrlButton } from "@/app/_components/share-url-button";
 
 export const metadata = {
   title: "Settings · Nearstream",
@@ -102,17 +102,54 @@ export default async function SettingsPage({ searchParams }: Props) {
 
           <hr className="mt-20 border-border" />
 
-          {/* Your site URL — the address you share with friends. Site +
-              Library are also in the top nav; this section is the canonical
-              "where do I find my URL to send to someone?" answer. */}
+          {/* Your URL — the canonical "where do I find my URL to send to a
+              friend?" answer. The Share button shares the SITE URL because
+              that's an HTML page with OpenGraph metadata, so WhatsApp /
+              iMessage render a proper preview card (mark + display name +
+              tagline). The feed URL is shown below for friends who want to
+              paste it directly into a reader instead of clicking through. */}
           <div className="mt-12">
             <Kicker>Your URL</Kicker>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Share this with friends so they can add you as a source.
+              Send this to a friend so they can add you to their Nearstream
+              reader. Tap Share — your phone&rsquo;s share sheet opens
+              (WhatsApp, Messages, Mail, anything) with the link ready to
+              send, complete with a preview card.
             </p>
-            <p className="mt-4 font-mono text-[13px] text-foreground">
-              {tenantBase(user.handle).replace(/^https?:\/\//, "")}
-            </p>
+
+            {(() => {
+              const instanceUrl =
+                process.env.NEARSTREAM_SITE_URL ?? "https://www.nearstream.app";
+              const siteUrl = tenantAbsoluteBase(user.handle, instanceUrl);
+              const feedUrl = `${siteUrl}/rss.xml`;
+              const firstName = user.displayName.split(" ")[0] || user.handle;
+              const shareMessage = `Add me on Nearstream →`;
+              return (
+                <>
+                  <dl className="mt-6 grid grid-cols-[max-content_1fr] gap-x-5 gap-y-3 text-[13px]">
+                    <dt className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft pt-1">
+                      Site
+                    </dt>
+                    <dd className="font-mono text-foreground break-all">
+                      {siteUrl.replace(/^https?:\/\//, "")}
+                    </dd>
+                    <dt className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft pt-1">
+                      Feed
+                    </dt>
+                    <dd className="font-mono text-foreground break-all">
+                      {feedUrl.replace(/^https?:\/\//, "")}
+                    </dd>
+                  </dl>
+                  <div className="mt-6">
+                    <ShareUrlButton
+                      url={siteUrl}
+                      title={`Add ${firstName} on Nearstream`}
+                      message={shareMessage}
+                    />
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           <hr className="mt-20 border-border" />
