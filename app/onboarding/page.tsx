@@ -40,8 +40,12 @@ export default async function OnboardingPage({ searchParams }: Props) {
           <p className="mt-3 text-sm leading-relaxed text-muted">
             Your site will live at{" "}
             <code className="font-mono text-foreground">/your-handle</code>.
-            Choose carefully &mdash; this is your address on the instance and
-            can&rsquo;t be changed later.
+            Pick something you&rsquo;re happy with — your handle is the only
+            permanent thing here.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-muted-soft">
+            Your display name and profile mark can be changed anytime from
+            Settings.
           </p>
 
           {error && (

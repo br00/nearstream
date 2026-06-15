@@ -34,6 +34,48 @@ export default function ManifestoPage() {
     >
       <DocHeader />
       <main className="mx-auto w-full max-w-3xl px-6 pt-16 pb-24">
+        {/*
+          Reader's notice — the manifesto is the long working document.
+          Tester round 1 (Gosia) loved the first sections but bounced
+          because she didn't realise this was a deep-dive, not the intro.
+          A small "what this is + where to start" banner up front gives
+          the casual reader an honest expectation and an exit ramp back
+          to /about if they want the short version.
+        */}
+        <aside className="mb-16 border border-border p-6">
+          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-soft">
+            Heads up
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-muted">
+            This is the long version &mdash; the working doc behind
+            Nearstream. It gets technical fast. If you just want the
+            human-readable why and how, the{" "}
+            <Link
+              href="/about"
+              className="text-foreground underline underline-offset-4 decoration-muted-soft hover:decoration-foreground"
+            >
+              About page
+            </Link>{" "}
+            is a one-minute read.
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-muted">
+            Jump around: {" "}
+            {SECTION_NAV.map((s, i) => (
+              <span key={s.num}>
+                <a
+                  href={`#sec-${s.num}`}
+                  className="text-foreground/80 underline underline-offset-4 decoration-muted-soft hover:text-foreground hover:decoration-foreground"
+                >
+                  {s.title}
+                </a>
+                {i < SECTION_NAV.length - 1 ? (
+                  <span className="text-muted-soft"> · </span>
+                ) : null}
+              </span>
+            ))}
+            .
+          </p>
+        </aside>
         <Section number="00" title="Concept">
           <Philosophy>
             A small group of close friends each own a personal site. Each site
@@ -382,7 +424,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-20 first:mt-0">
+    <section id={`sec-${number}`} className="mt-20 scroll-mt-16 first:mt-0">
       <div className="flex items-center gap-3 mb-6">
         <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-soft">
           {number} — {title}
@@ -395,6 +437,19 @@ function Section({
     </section>
   );
 }
+
+const SECTION_NAV: { num: string; title: string }[] = [
+  { num: "00", title: "Concept" },
+  { num: "01", title: "Lexicon" },
+  { num: "02", title: "Architecture" },
+  { num: "03", title: "Content model" },
+  { num: "04", title: "Anti-aspirations" },
+  { num: "05", title: "Decisions log" },
+  { num: "06", title: "Open questions" },
+  { num: "07", title: "Build phases" },
+  { num: "08", title: "Stack" },
+  { num: "09", title: "Nearbox" },
+];
 
 function Subhead({ children }: { children: React.ReactNode }) {
   return (

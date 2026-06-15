@@ -5,11 +5,12 @@ import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { letterStore } from "@/lib/letter-store";
 import { userStore } from "@/lib/user-store";
+import { sourceStore } from "@/lib/source-store";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
 import { ProfileMark } from "@/app/_components/site/profile-mark";
 import { isHostEmail, getSession } from "@/lib/auth";
-import { tenantBase } from "@/lib/tenant-domains";
+import { tenantBase, tenantAbsoluteBase } from "@/lib/tenant-domains";
 import { visibilityOf } from "@/schemas/visibility";
 
 export const dynamic = "force-dynamic";
@@ -88,10 +89,12 @@ function formatLetterDate(iso: string): string {
 
 type Props = {
   params: Promise<{ handle: string }>;
+  searchParams: Promise<{ friend?: string; "friend-error"?: string }>;
 };
 
-export default async function TenantHome({ params }: Props) {
+export default async function TenantHome({ params, searchParams }: Props) {
   const { handle } = await params;
+  const { friend, "friend-error": friendError } = await searchParams;
   const user = await userStore.getByHandle(handle);
   if (!user) notFound();
 
@@ -110,6 +113,33 @@ export default async function TenantHome({ params }: Props) {
   // only sees public ones. Letter has no per-entry visibility yet — it's the
   // host's broadcast slot.
   const isOwner = session?.userId === user.id;
+
+  // "Add as friend" CTA — only shown to signed-in visitors who aren't the
+  // owner. We probe their reader for an existing source pointing at this
+  // tenant so we can render the already-following confirmation instead.
+  let friendState: "none" | "self" | "signed-out" | "following" | "not-following" =
+    "signed-out";
+  if (session) {
+    if (isOwner) {
+      friendState = "self";
+    } else {
+      const sources = await sourceStore.list(session.userId);
+      const targetSite = tenantAbsoluteBase(
+        user.handle,
+        process.env.NEARSTREAM_SITE_URL ?? "",
+      );
+      const targetFeed = `${targetSite}/rss.xml`;
+      const alreadyFollowing = sources.some(
+        (s) =>
+          s.feedUrl === targetFeed ||
+          s.siteUrl === targetSite ||
+          // Also match instance-relative paths, in case a source was added
+          // before tenantAbsoluteBase was wired in.
+          s.siteUrl === `/${user.handle}`,
+      );
+      friendState = alreadyFollowing ? "following" : "not-following";
+    }
+  }
   const entries = isOwner
     ? allEntries
     : allEntries.filter((e) => visibilityOf(e) === "public");
@@ -172,6 +202,13 @@ export default async function TenantHome({ params }: Props) {
             <h1 className="mt-6 text-[17px] font-normal text-foreground">
               {user.displayName || handle}
             </h1>
+            <FriendAffordance
+              state={friendState}
+              handle={user.handle}
+              displayName={user.displayName || user.handle}
+              flash={friend === "added" ? "added" : friendError ? "error" : null}
+              flashMessage={friendError}
+            />
           </div>
 
           {letter ? (
@@ -358,5 +395,69 @@ export default async function TenantHome({ params }: Props) {
         </div>
       </section>
     </PageShell>
+  );
+}
+
+type FriendAffordanceProps = {
+  state: "none" | "self" | "signed-out" | "following" | "not-following";
+  handle: string;
+  displayName: string;
+  flash: "added" | "error" | null;
+  flashMessage?: string;
+};
+
+// Tiny CTA strip under the hero. Signed-out visitors see nothing — Nearstream
+// is opt-in, not a discovery surface. The owner sees nothing either; this is
+// their own page. Everyone else gets one of two states:
+//   - not following → "Add as friend" form (POSTs to /api/friends/follow)
+//   - already following → "Following · Open reader" link
+// The `flash` slot reuses the same chrome to confirm "added" or surface an
+// error after the POST redirect.
+function FriendAffordance({
+  state,
+  handle,
+  displayName,
+  flash,
+  flashMessage,
+}: FriendAffordanceProps) {
+  if (state === "self" || state === "signed-out" || state === "none") {
+    return null;
+  }
+  if (flash === "added" || state === "following") {
+    return (
+      <div className="mt-6 flex flex-col items-center gap-2">
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
+          ✓ {flash === "added" ? "Added" : "Following"}
+          <span className="text-border"> · </span>
+          <Link
+            href="/reader"
+            className="text-muted transition-colors hover:text-foreground"
+          >
+            Open reader →
+          </Link>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-6 flex flex-col items-center gap-2">
+      <form action="/api/friends/follow" method="POST">
+        <input type="hidden" name="handle" value={handle} />
+        <button
+          type="submit"
+          className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.22em] text-foreground transition-colors hover:border-foreground hover:bg-foreground hover:text-background"
+        >
+          Add {displayName.split(" ")[0]} as friend
+        </button>
+      </form>
+      {flash === "error" && flashMessage ? (
+        <p
+          role="alert"
+          className="font-mono text-[10px] uppercase tracking-[0.18em] text-foreground/80"
+        >
+          {flashMessage}
+        </p>
+      ) : null}
+    </div>
   );
 }

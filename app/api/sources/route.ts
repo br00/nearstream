@@ -62,11 +62,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const trimmedSiteUrl =
+  const providedSiteUrl =
     typeof siteUrl === "string" && siteUrl.trim().length > 0
       ? siteUrl.trim()
       : undefined;
-  if (trimmedSiteUrl && !isValidFeedUrl(trimmedSiteUrl)) {
+  if (providedSiteUrl && !isValidFeedUrl(providedSiteUrl)) {
     return errorResponse(
       request,
       isJson,
@@ -74,11 +74,18 @@ export async function POST(request: Request) {
       "siteUrl must be an http(s) URL",
     );
   }
+  // Auto-derive siteUrl from feedUrl when the field is left empty and the
+  // feed sits at a recognisable `/rss.xml`. Tester round 1: nobody filled
+  // siteUrl, so the reader had nowhere to link back to the friend's home.
+  // Stripping the suffix gives us a working "visit site" link for free.
+  const trimmedFeedUrl = feedUrl.trim();
+  const trimmedSiteUrl =
+    providedSiteUrl ?? deriveSiteUrlFromFeed(trimmedFeedUrl);
 
   let source;
   try {
     const existing = await sourceStore.list(session.userId);
-    if (existing.some((s) => s.feedUrl === feedUrl.trim())) {
+    if (existing.some((s) => s.feedUrl === trimmedFeedUrl)) {
       return errorResponse(
         request,
         isJson,
@@ -89,7 +96,7 @@ export async function POST(request: Request) {
 
     source = await sourceStore.add(session.userId, {
       name: name.trim(),
-      feedUrl: feedUrl.trim(),
+      feedUrl: trimmedFeedUrl,
       siteUrl: trimmedSiteUrl,
     });
   } catch (err) {
@@ -125,4 +132,13 @@ function errorResponse(
   const url = new URL("/reader/friends", request.url);
   url.searchParams.set("friend-error", message);
   return Response.redirect(url, 303);
+}
+
+function deriveSiteUrlFromFeed(feedUrl: string): string | undefined {
+  // Strip a trailing `/rss.xml` (or `/feed.xml`, `/feed`, `/atom.xml`) so the
+  // site URL points at the friend's home, not the feed file. Anything that
+  // doesn't match these conventions stays undefined — better an empty
+  // siteUrl than a guess that 404s in the reader.
+  const m = feedUrl.match(/^(.+?)\/(?:rss|feed|atom)(?:\.xml)?\/?$/i);
+  return m ? m[1] : undefined;
 }
