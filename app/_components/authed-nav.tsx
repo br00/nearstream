@@ -50,36 +50,41 @@ export function AuthedNavTop({ active, tenantHandle }: NavProps) {
 }
 
 /** Fixed bottom tab bar for mobile. Render outside or inside PageShell —
- *  it's `position: fixed` so it floats over the page. Hidden at sm and up. */
+ *  it's `position: fixed` so it floats over the page. Hidden at sm and up.
+ *
+ *  Slice 29 (mobile lab → real): label up to 11px and tracking-[0.22em],
+ *  tap target py-4 so the row clears the 44pt iOS minimum, indicator is a
+ *  2px bar above the active tab (replaces the dot), and the bar pads
+ *  pb-[28px] for the iOS home-indicator safe area so labels aren't sitting
+ *  on top of the gesture bar. */
 export function AuthedNavBottom({ active, tenantHandle }: NavProps) {
   const tabs = buildTabs(tenantHandle);
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 pb-[28px] backdrop-blur sm:hidden"
     >
       <ul className="grid grid-cols-4">
         {tabs.map((t) => {
           const isActive = active === t.key;
           return (
-            <li key={t.key}>
+            <li key={t.key} className="relative">
+              {isActive && (
+                <span
+                  aria-hidden
+                  className="absolute inset-x-6 top-0 h-[2px] bg-foreground"
+                />
+              )}
               <Link
                 href={t.href}
                 className={
-                  "flex flex-col items-center justify-center gap-1.5 py-3 font-mono text-[9.5px] uppercase tracking-[0.2em] " +
+                  "flex items-center justify-center py-4 font-mono text-[11px] uppercase tracking-[0.22em] " +
                   (isActive
                     ? "text-foreground"
                     : "text-muted-soft transition-colors hover:text-foreground")
                 }
                 aria-current={isActive ? "page" : undefined}
               >
-                <span
-                  aria-hidden
-                  className={
-                    "block h-1 w-1 rounded-full " +
-                    (isActive ? "bg-foreground" : "bg-transparent")
-                  }
-                />
                 {t.label}
               </Link>
             </li>

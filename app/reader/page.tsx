@@ -4,7 +4,6 @@ import { getSession } from "@/lib/auth";
 import { sourceStore } from "@/lib/source-store";
 import { feedEntryStore } from "@/lib/feed-entry-store";
 import { userStore } from "@/lib/user-store";
-import { tenantBase } from "@/lib/tenant-domains";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamMark } from "@/app/_components/nearstream-mark";
 import { NearstreamMarkAnimated } from "@/app/_components/site/nearstream-mark-animated";
@@ -51,9 +50,6 @@ export default async function ReaderPage() {
 
   const sourceById = new Map(sources.map((s) => [s.id, s]));
 
-  const navLinkClasses =
-    "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
-
   return (
     <PageShell
       leftNav={<NearstreamMark size={24} className="text-foreground" />}
@@ -82,7 +78,7 @@ export default async function ReaderPage() {
                 </form>
               </div>
 
-              <ul className="mt-12 flex flex-col">
+              <ul className="mt-10 flex flex-col">
                 {entries.map((entry) => {
                   const source = sourceById.get(entry.sourceId);
                   const authorName =
@@ -91,26 +87,28 @@ export default async function ReaderPage() {
                   return (
                     <li
                       key={entry.id}
-                      className="border-t border-border py-12 first:border-t-0 first:pt-0"
+                      className="border-t border-border py-9 first:border-t-0 first:pt-0"
                     >
-                      <div className="mb-5 flex items-baseline justify-between gap-4">
+                      <div className="mb-4 flex items-center justify-between gap-3">
                         <a
                           href={authorHref}
                           rel="noopener noreferrer"
                           target="_blank"
-                          className="text-[13px] text-foreground transition-colors hover:text-white"
+                          className="text-[15px] font-medium text-foreground transition-colors hover:text-white"
                         >
                           {authorName}
                         </a>
-                        <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.22em] tabular-nums text-muted-soft">
-                          {formatRelative(entry.publishedAt)}
-                          {entry.type !== "unknown" && entry.type !== "note" ? (
-                            <>
-                              <span className="text-border"> · </span>
-                              {entry.type}
-                            </>
-                          ) : null}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {entry.type !== "unknown" &&
+                            entry.type !== "note" && (
+                              <span className="border border-border px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-muted">
+                                {entry.type}
+                              </span>
+                            )}
+                          <span className="whitespace-nowrap font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-muted-soft">
+                            {formatRelative(entry.publishedAt)}
+                          </span>
+                        </div>
                       </div>
 
                       {entry.type === "picture" ? (
@@ -226,7 +224,7 @@ function NoteBody({ entry }: EntryPropsBase) {
       href={entry.url}
       rel="noopener noreferrer"
       target="_blank"
-      className="block whitespace-pre-wrap text-[15px] leading-relaxed text-foreground transition-colors hover:text-white"
+      className="block whitespace-pre-wrap text-[17px] leading-[1.55] text-foreground/95 transition-colors hover:text-white"
     >
       {text}
     </a>
@@ -235,21 +233,24 @@ function NoteBody({ entry }: EntryPropsBase) {
 
 function EssayBody({ entry }: EntryPropsBase) {
   return (
-    <div className="border-l border-border pl-5">
-      <a
-        href={entry.url}
-        rel="noopener noreferrer"
-        target="_blank"
-        className="block text-[22px] leading-snug tracking-tight text-foreground transition-colors hover:text-white"
-      >
-        {entry.title ?? "Untitled"} →
-      </a>
+    <a
+      href={entry.url}
+      rel="noopener noreferrer"
+      target="_blank"
+      className="group block"
+    >
+      <p className="text-[20px] font-medium leading-snug tracking-tight text-foreground transition-colors group-hover:text-white">
+        {entry.title ?? "Untitled"}
+      </p>
       {entry.excerpt ? (
-        <p className="mt-3 text-[13.5px] leading-relaxed text-muted">
+        <p className="mt-2 text-[14px] leading-relaxed text-muted">
           {entry.excerpt}
         </p>
       ) : null}
-    </div>
+      <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.22em] text-foreground">
+        Read essay →
+      </p>
+    </a>
   );
 }
 
@@ -262,7 +263,10 @@ function PictureBody({ entry }: EntryPropsBase) {
       className="group block"
     >
       {entry.image ? (
-        <div className="aspect-[4/3] overflow-hidden border border-border bg-foreground/5">
+        // Negative-margin bleed past the page padding so pictures feel like
+        // the room is built around them. On mobile (px-6 outer) this hits
+        // edge-to-edge; on desktop it bleeds to the column edge.
+        <div className="-mx-6 aspect-[4/3] overflow-hidden bg-foreground/5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={entry.image.url}
@@ -273,7 +277,7 @@ function PictureBody({ entry }: EntryPropsBase) {
         </div>
       ) : null}
       {entry.title ? (
-        <div className="mt-4 text-[14px] text-foreground transition-colors group-hover:text-white">
+        <div className="mt-4 text-[15px] text-foreground/95 transition-colors group-hover:text-white">
           {entry.title}
         </div>
       ) : null}
