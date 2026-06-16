@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { Button } from "@/app/_components/button";
@@ -38,6 +39,20 @@ export default function DesignPage() {
               every Nearstream instance carries them. The user’s site (Phase 2)
               gets its own palette and templates, separate from this layer.
             </p>
+            <nav className="mt-6 flex flex-wrap gap-3">
+              <Link
+                href="/design/logo-lab"
+                className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted transition-colors hover:border-foreground hover:text-foreground"
+              >
+                Logo lab →
+              </Link>
+              <Link
+                href="/design/mobile-lab"
+                className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted transition-colors hover:border-foreground hover:text-foreground"
+              >
+                Mobile lab →
+              </Link>
+            </nav>
           </header>
 
           <Section title="Colors">
