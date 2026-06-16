@@ -91,9 +91,20 @@ export default async function FriendsPage({ searchParams }: Props) {
                   className="flex items-start justify-between gap-4 border-t border-border py-5 first:border-t-0 first:pt-0"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm text-foreground">
-                      {source.name}
-                    </div>
+                    {source.siteUrl ? (
+                      <a
+                        href={source.siteUrl}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                        className="text-sm text-foreground underline underline-offset-4 decoration-muted-soft transition-colors hover:decoration-foreground"
+                      >
+                        {source.name}
+                      </a>
+                    ) : (
+                      <div className="text-sm text-foreground">
+                        {source.name}
+                      </div>
+                    )}
                     <div className="mt-1 truncate font-mono text-[11px] text-muted-soft">
                       {source.feedUrl}
                     </div>
