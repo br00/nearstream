@@ -41,6 +41,27 @@ function deriveTitle(text: string): string {
   return firstLine.slice(0, 77).trimEnd() + "…";
 }
 
+// Matches THUMB_MAX_DIM in app/_components/inventory-upload-form.tsx.
+const THUMB_MAX_DIM = 600;
+
+function thumbnailElement(
+  item: InventoryItem,
+  instanceUrl: string,
+): string | null {
+  const thumbKey = item.image.thumbKey;
+  if (!thumbKey) return null;
+  const url = `${instanceUrl}/api/media/${thumbKey}`;
+  const w = item.image.width;
+  const h = item.image.height;
+  if (!w || !h) {
+    return `<nearstream:thumbnail url="${escapeXml(url)}" />`;
+  }
+  const ratio = Math.min(THUMB_MAX_DIM / w, THUMB_MAX_DIM / h, 1);
+  const tw = Math.max(1, Math.round(w * ratio));
+  const th = Math.max(1, Math.round(h * ratio));
+  return `<nearstream:thumbnail url="${escapeXml(url)}" width="${tw}" height="${th}" />`;
+}
+
 function htmlEscape(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -171,6 +192,13 @@ export async function GET(_req: Request, { params }: Props) {
     const body = await renderInventoryBody(item, INSTANCE_URL);
     const imageUrl = `${INSTANCE_URL}/api/media/${item.image.key}`;
     const enclosure = `<enclosure url="${escapeXml(imageUrl)}" length="${item.image.sizeBytes}" type="${escapeXml(item.image.contentType)}" />`;
+    // Nearstream extension: emit the reader-sized thumbnail so other
+    // instances don't pull the full-res JPEG into the feed. Dimensions
+    // are derived from the original by capping the longest edge at
+    // THUMB_MAX_DIM (matches the in-browser thumbnailing in
+    // inventory-upload-form.tsx); a missing thumbKey or missing original
+    // dims short-circuits the element so older items stay valid.
+    const thumb = thumbnailElement(item, INSTANCE_URL);
     feedItems.push({
       publishedAt: item.publishedAt,
       toXml: () => `    <item>
@@ -180,7 +208,7 @@ export async function GET(_req: Request, { params }: Props) {
       <pubDate>${toRfc822(item.publishedAt)}</pubDate>
       <category>Inventory</category>
       <nearstream:type>picture</nearstream:type>
-      ${enclosure}
+      ${enclosure}${thumb ? `\n      ${thumb}` : ""}
       <description><![CDATA[${escapeCdata(body)}]]></description>
     </item>`,
     });

@@ -103,3 +103,21 @@ body {
   border-top: 1px solid var(--border);
   margin: 2.5em 0;
 }
+
+/* Subtle white sweep across a placeholder while feed images are loading.
+   Pure-mono palette friendly — 4% white is high enough to read as motion,
+   low enough to disappear the moment the image fades in over it. */
+@keyframes shimmer-sweep {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer-sweep {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-sweep 1.6s ease-in-out infinite;
+}

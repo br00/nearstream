@@ -50,14 +50,20 @@ class InMemoryFeedEntryStore implements FeedEntryStore {
 
   async upsertMany(userId: string, entries: NewFeedEntry[]): Promise<number> {
     const b = this.bucket(userId);
-    let added = 0;
+    let written = 0;
     for (const input of entries) {
       const id = await makeEntryId(input.sourceId, input.guid);
-      if (b.has(id)) continue;
+      // Always overwrite. The original "skip if exists" semantic meant
+      // schema additions (e.g. slice 30's thumbUrl) never reached existing
+      // entries — friends had to delete + repost for the change to take.
+      // Overwriting on each refresh keeps the local mirror in sync with
+      // the friend's current RSS for the cost of a re-PUT per entry.
+      // Return value is now "wrote N" rather than "added N new", but the
+      // only consumer is the refresh logger.
       b.set(id, { ...input, id, fetchedAt: new Date().toISOString() });
-      added++;
+      written++;
     }
-    return added;
+    return written;
   }
 
   async syncBySource(
@@ -158,18 +164,18 @@ class R2FeedEntryStore implements FeedEntryStore {
   }
 
   async upsertMany(userId: string, entries: NewFeedEntry[]): Promise<number> {
-    let added = 0;
+    // Always overwrite. The previous HEAD-then-skip pattern saved a PUT per
+    // already-mirrored entry but meant schema additions (e.g. slice 30's
+    // thumbUrl) never reached entries we'd already stored. The R2 PUT is
+    // a Class A op at ~$4.50/million — negligible for the small-instance
+    // scale Nearstream targets — and dropping the HEAD removes a round
+    // trip per entry, partially offsetting the new write cost. Return
+    // value is now "wrote N" rather than "added N new"; the only consumer
+    // is the refresh logger.
+    let written = 0;
     for (const input of entries) {
       const id = await makeEntryId(input.sourceId, input.guid);
       const objKey = this.key(userId, input.sourceId, id);
-      try {
-        const head = await this.client.fetch(`${this.base}/${objKey}`, {
-          method: "HEAD",
-        });
-        if (head.ok) continue;
-      } catch {
-        // network/signing hiccup on HEAD — fall through to PUT
-      }
       const entry: FeedEntry = {
         ...input,
         id,
@@ -185,9 +191,9 @@ class R2FeedEntryStore implements FeedEntryStore {
           `R2 PUT ${objKey} failed (${res.status} ${res.statusText}): ${await res.text()}`,
         );
       }
-      added++;
+      written++;
     }
-    return added;
+    return written;
   }
 
   async syncBySource(

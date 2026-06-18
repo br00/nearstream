@@ -9,13 +9,29 @@ import { NearstreamMark } from "@/app/_components/nearstream-mark";
 import { NearstreamMarkAnimated } from "@/app/_components/site/nearstream-mark-animated";
 import { AuthedNavTop, AuthedNavBottom } from "@/app/_components/authed-nav";
 import { Kicker } from "@/app/_components/kicker";
-import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
+import { ReaderRefresh } from "@/app/_components/reader-refresh";
+import { ReaderPicture } from "@/app/_components/reader-picture";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Reader · Nearstream",
 };
+
+const STALE_MS = 5 * 60 * 1000;
+
+// Pulled out of the page body so React's purity lint stays happy — server
+// components only render once per request, but the rule doesn't know that.
+function computeNeedsRefresh(
+  sources: { lastFetchedAt?: string }[],
+): boolean {
+  const now = Date.now();
+  return sources.some((s) => {
+    if (!s.lastFetchedAt) return true;
+    const age = now - new Date(s.lastFetchedAt).getTime();
+    return Number.isNaN(age) || age > STALE_MS;
+  });
+}
 
 // Quiet relative format for the reader stamp. We keep timestamps lowercase
 // (mono-uppercased by CSS later) and never show seconds — the reader is for
@@ -50,6 +66,12 @@ export default async function ReaderPage() {
 
   const sourceById = new Map(sources.map((s) => [s.id, s]));
 
+  // Five-minute staleness window. If any source hasn't been fetched in
+  // that long (or never has been), the reader auto-refreshes on visit.
+  // Picked so an open reader tab doesn't hammer friends' feeds, but a
+  // first visit of the morning always lands fresh.
+  const needsRefresh = computeNeedsRefresh(sources);
+
   return (
     <PageShell
       leftNav={<NearstreamMark size={24} className="text-foreground" />}
@@ -71,11 +93,7 @@ export default async function ReaderPage() {
                 <h1 className="text-2xl font-normal tracking-tight text-foreground">
                   Today
                 </h1>
-                <form action="/api/sources/refresh" method="POST">
-                  <MonoSubmitButton pendingLabel="Refreshing…">
-                    Refresh all
-                  </MonoSubmitButton>
-                </form>
+                <ReaderRefresh needsRefresh={needsRefresh} />
               </div>
 
               <ul className="mt-10 flex flex-col">
@@ -209,7 +227,14 @@ type EntryPropsBase = {
     title?: string;
     body?: string;
     excerpt?: string;
-    image?: { url: string };
+    image?: {
+      url: string;
+      width?: number;
+      height?: number;
+      thumbUrl?: string;
+      thumbWidth?: number;
+      thumbHeight?: number;
+    };
   };
 };
 
@@ -255,6 +280,13 @@ function EssayBody({ entry }: EntryPropsBase) {
 }
 
 function PictureBody({ entry }: EntryPropsBase) {
+  // Prefer the reader-sized thumbnail (Nearstream feeds emit a 600px-cap
+  // JPEG via the `<nearstream:thumbnail>` extension) so we're not pulling
+  // a 4032×3024 iPhone photo just to render a 4:3 card. Fall back to the
+  // full-res original for arbitrary RSS feeds that don't expose a thumb.
+  const src = entry.image?.thumbUrl ?? entry.image?.url;
+  const w = entry.image?.thumbWidth ?? entry.image?.width;
+  const h = entry.image?.thumbHeight ?? entry.image?.height;
   return (
     <a
       href={entry.url}
@@ -262,19 +294,8 @@ function PictureBody({ entry }: EntryPropsBase) {
       target="_blank"
       className="group block"
     >
-      {entry.image ? (
-        // Negative-margin bleed past the page padding so pictures feel like
-        // the room is built around them. On mobile (px-6 outer) this hits
-        // edge-to-edge; on desktop it bleeds to the column edge.
-        <div className="-mx-6 aspect-[4/3] overflow-hidden bg-foreground/5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={entry.image.url}
-            alt={entry.title ?? ""}
-            loading="lazy"
-            className="h-full w-full object-cover"
-          />
-        </div>
+      {src ? (
+        <ReaderPicture src={src} width={w} height={h} alt={entry.title ?? ""} />
       ) : null}
       {entry.title ? (
         <div className="mt-4 text-[15px] text-foreground/95 transition-colors group-hover:text-white">
