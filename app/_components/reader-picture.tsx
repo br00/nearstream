@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // Picture card body for the reader feed. Three jobs:
 //   - reserve the layout slot before bytes arrive (width/height attrs +
@@ -11,6 +11,13 @@ import { useState } from "react";
 //
 // Bleed `-mx-6` past the page gutter so on mobile the image goes
 // edge-to-edge. On desktop it bleeds to the reader column edge.
+//
+// Slice 31 fix: when iOS Safari pull-to-refresh reloads /reader, the
+// browser serves images from cache and fires the `load` event before
+// React's `onLoad` handler is even attached during hydration. Without the
+// mount-time `complete` check, those images stayed behind the shimmer
+// forever. We poke `imgRef.current.complete` once on mount (and whenever
+// `src` changes) to catch the race.
 
 type Props = {
   src: string;
@@ -21,6 +28,14 @@ type Props = {
 
 export function ReaderPicture({ src, width, height, alt }: Props) {
   const [loaded, setLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    if (imgRef.current?.complete) {
+      setLoaded(true);
+    }
+  }, [src]);
+
   return (
     <div className="relative -mx-6 aspect-[4/3] overflow-hidden bg-foreground/5">
       <span
@@ -32,6 +47,7 @@ export function ReaderPicture({ src, width, height, alt }: Props) {
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
+        ref={imgRef}
         src={src}
         width={width}
         height={height}

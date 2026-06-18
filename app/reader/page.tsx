@@ -75,7 +75,7 @@ export default async function ReaderPage() {
   return (
     <PageShell
       leftNav={<NearstreamMark size={24} className="text-foreground" />}
-      rightNav={<AuthedNavTop active="reader" tenantHandle={handle} />}
+      rightNav={<AuthedNavTop tenantHandle={handle} />}
     >
       <section className="flex flex-1 justify-center px-6 pb-24 sm:pb-12">
         <div className="w-full max-w-[32rem] py-12">
@@ -144,7 +144,7 @@ export default async function ReaderPage() {
           )}
         </div>
       </section>
-      <AuthedNavBottom active="reader" tenantHandle={handle} />
+      <AuthedNavBottom tenantHandle={handle} />
     </PageShell>
   );
 }

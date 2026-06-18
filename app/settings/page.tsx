@@ -38,7 +38,7 @@ export default async function SettingsPage({ searchParams }: Props) {
     <PageShell
       leftNav={<NearstreamMark size={24} className="text-foreground" />}
       rightNav={
-        <AuthedNavTop active="settings" tenantHandle={user.handle} />
+        <AuthedNavTop tenantHandle={user.handle} />
       }
     >
       <section className="flex flex-1 justify-center px-6 pb-24 sm:pb-12">
@@ -210,7 +210,7 @@ export default async function SettingsPage({ searchParams }: Props) {
           </form>
         </div>
       </section>
-      <AuthedNavBottom active="settings" tenantHandle={user.handle} />
+      <AuthedNavBottom tenantHandle={user.handle} />
     </PageShell>
   );
 }

@@ -7,24 +7,23 @@ import { useRouter } from "next/navigation";
 // Replaces the old POST-form button that required the user to tap before
 // any feed fetch would happen.
 //
-// Two roles in one button:
-//   - On mount, if `needsRefresh` is true (server side decided at least one
-//     source's `lastFetchedAt` is missing or older than 5 min), kick off
-//     `/api/sources/refresh` in the background and `router.refresh()` once
-//     it lands. iOS Safari's pull-to-refresh gesture reloads the page,
-//     which re-runs this same flow — so PTR works for free.
-//   - On click, do the same work explicitly.
+// Slice 30 originally tied a single `busy` state to both auto-refresh and
+// click-refresh, but `refreshAllSources` is sequential — a slow friend
+// feed could leave the label stuck on "Refreshing…" for 10+ seconds while
+// the actual page contents (served from local R2) were already there. That
+// looked broken even though it was honest. Slice 31 splits the two:
 //
-// The label flips to "Refreshing…" while in flight so the user knows the
-// gesture they pulled (or the auto-fetch on visit) is doing something.
+//   - Auto-refresh on mount runs silently. The user sees what's in the
+//     store right now; if the background fetch finds new entries, they
+//     just appear when `router.refresh()` lands.
+//   - Click (or pull-to-refresh, which is a page reload) shows "Refreshing…"
+//     so the user gesture has an obvious response.
 
 type Props = { needsRefresh: boolean };
 
 export function ReaderRefresh({ needsRefresh }: Props) {
   const router = useRouter();
-  // Start busy if the server flagged anything stale — otherwise the button
-  // would flash "Refresh all" for a frame before the effect kicks in.
-  const [busy, setBusy] = useState(needsRefresh);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!needsRefresh) return;
@@ -33,7 +32,6 @@ export function ReaderRefresh({ needsRefresh }: Props) {
       await postRefresh();
       if (cancelled) return;
       router.refresh();
-      setBusy(false);
     })();
     return () => {
       cancelled = true;

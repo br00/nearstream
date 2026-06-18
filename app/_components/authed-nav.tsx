@@ -1,10 +1,18 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { tenantBase } from "@/lib/tenant-domains";
 
 // Authed nav across /studio, /reader, /settings — one component, two
 // layouts. Desktop renders an inline horizontal nav in PageShell's rightNav
 // slot. Mobile renders a fixed bottom tab bar, iOS/Android style, so the
 // thumb-reach pattern matches what friends expect from a phone-first app.
+//
+// Slice 31: nav is a client component so the active tab updates synchronously
+// from `usePathname()` the moment the user taps, not after the next page's
+// server render lands. The old `active` prop made tabs feel laggy on slow
+// pages because the highlight waited on the next route's data.
 //
 // Five surfaces collapse to four tabs because Library is reachable in one
 // click from Site (the tenant home links it in its own nav). Four tabs is
@@ -13,7 +21,6 @@ import { tenantBase } from "@/lib/tenant-domains";
 export type AuthedTab = "site" | "studio" | "reader" | "settings";
 
 type NavProps = {
-  active: AuthedTab;
   tenantHandle: string;
 };
 
@@ -26,9 +33,22 @@ function buildTabs(handle: string) {
   ];
 }
 
+// Pathname-driven active resolution. The three authed surfaces have stable
+// top-level paths; anything else (including custom-domain tenant pages where
+// the proxy rewrites internally but the browser pathname stays root-relative)
+// falls through to "site".
+function activeFor(pathname: string): AuthedTab {
+  if (pathname.startsWith("/studio")) return "studio";
+  if (pathname.startsWith("/reader")) return "reader";
+  if (pathname.startsWith("/settings")) return "settings";
+  return "site";
+}
+
 /** Inline horizontal nav for desktop. Passed into PageShell's rightNav slot.
  *  Hidden below the sm breakpoint so the mobile bottom bar takes over. */
-export function AuthedNavTop({ active, tenantHandle }: NavProps) {
+export function AuthedNavTop({ tenantHandle }: NavProps) {
+  const pathname = usePathname();
+  const active = activeFor(pathname);
   const tabs = buildTabs(tenantHandle);
   return (
     <div className="hidden items-center gap-5 sm:flex">
@@ -54,10 +74,12 @@ export function AuthedNavTop({ active, tenantHandle }: NavProps) {
  *
  *  Slice 29 (mobile lab → real): label up to 11px and tracking-[0.22em],
  *  tap target py-4 so the row clears the 44pt iOS minimum, indicator is a
- *  2px bar above the active tab (replaces the dot), and the bar pads
- *  pb-[28px] for the iOS home-indicator safe area so labels aren't sitting
- *  on top of the gesture bar. */
-export function AuthedNavBottom({ active, tenantHandle }: NavProps) {
+ *  2px bar above the active tab, and the bar pads pb-[28px] for the iOS
+ *  home-indicator safe area so labels aren't sitting on top of the gesture
+ *  bar. */
+export function AuthedNavBottom({ tenantHandle }: NavProps) {
+  const pathname = usePathname();
+  const active = activeFor(pathname);
   const tabs = buildTabs(tenantHandle);
   return (
     <nav

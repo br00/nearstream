@@ -201,7 +201,7 @@ export default async function FriendsPage({ searchParams }: Props) {
           </div>
         </div>
       </section>
-      <AuthedNavBottom active="reader" tenantHandle={handle} />
+      <AuthedNavBottom tenantHandle={handle} />
     </PageShell>
   );
 }
