@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { tenantBase } from "@/lib/tenant-domains";
 
 // Authed nav across /studio, /reader, /settings — one component, two
@@ -9,10 +10,14 @@ import { tenantBase } from "@/lib/tenant-domains";
 // slot. Mobile renders a fixed bottom tab bar, iOS/Android style, so the
 // thumb-reach pattern matches what friends expect from a phone-first app.
 //
-// Slice 31: nav is a client component so the active tab updates synchronously
-// from `usePathname()` the moment the user taps, not after the next page's
-// server render lands. The old `active` prop made tabs feel laggy on slow
-// pages because the highlight waited on the next route's data.
+// Slice 31 had a "make the nav a client component reading usePathname" fix
+// that didn't actually solve the lag. `usePathname` returns the *current*
+// path, which in App Router doesn't update until the navigation transition
+// commits — so a tap still waited on the next page's server render before
+// the highlight moved. Slice 32 layers optimistic state on top: tapping a
+// tab immediately sets an `intended` key; once pathname catches up the
+// intent clears and pathname is source of truth again. Active state moves
+// the instant the user taps, regardless of how slow the next page is.
 //
 // Five surfaces collapse to four tabs because Library is reachable in one
 // click from Site (the tenant home links it in its own nav). Four tabs is
@@ -33,22 +38,42 @@ function buildTabs(handle: string) {
   ];
 }
 
-// Pathname-driven active resolution. The three authed surfaces have stable
-// top-level paths; anything else (including custom-domain tenant pages where
-// the proxy rewrites internally but the browser pathname stays root-relative)
-// falls through to "site".
-function activeFor(pathname: string): AuthedTab {
+function activeFromPathname(pathname: string): AuthedTab {
   if (pathname.startsWith("/studio")) return "studio";
   if (pathname.startsWith("/reader")) return "reader";
   if (pathname.startsWith("/settings")) return "settings";
   return "site";
 }
 
+// Shared by AuthedNavTop and AuthedNavBottom. Active state is derived
+// purely from { intent, pathname }: the intent is only honored while the
+// user is still on the pathname they tapped from, so once navigation
+// commits to a new path the pathname-derived value takes over without us
+// having to clear state. No effect, no extra render — fixes the lint rule
+// against setting state in effect and gives us the instant tap response.
+function useAuthedActive(): {
+  active: AuthedTab;
+  setIntent: (key: AuthedTab) => void;
+} {
+  const pathname = usePathname();
+  const real = activeFromPathname(pathname);
+  const [intent, setIntent] = useState<{ key: AuthedTab; from: string } | null>(
+    null,
+  );
+  const active =
+    intent && intent.from === pathname ? intent.key : real;
+
+  function tap(key: AuthedTab) {
+    setIntent({ key, from: pathname });
+  }
+
+  return { active, setIntent: tap };
+}
+
 /** Inline horizontal nav for desktop. Passed into PageShell's rightNav slot.
  *  Hidden below the sm breakpoint so the mobile bottom bar takes over. */
 export function AuthedNavTop({ tenantHandle }: NavProps) {
-  const pathname = usePathname();
-  const active = activeFor(pathname);
+  const { active, setIntent } = useAuthedActive();
   const tabs = buildTabs(tenantHandle);
   return (
     <div className="hidden items-center gap-5 sm:flex">
@@ -56,6 +81,7 @@ export function AuthedNavTop({ tenantHandle }: NavProps) {
         <Link
           key={t.key}
           href={t.href}
+          onClick={() => setIntent(t.key)}
           className={
             active === t.key
               ? "font-mono text-[11px] uppercase tracking-[0.2em] text-foreground"
@@ -78,8 +104,7 @@ export function AuthedNavTop({ tenantHandle }: NavProps) {
  *  home-indicator safe area so labels aren't sitting on top of the gesture
  *  bar. */
 export function AuthedNavBottom({ tenantHandle }: NavProps) {
-  const pathname = usePathname();
-  const active = activeFor(pathname);
+  const { active, setIntent } = useAuthedActive();
   const tabs = buildTabs(tenantHandle);
   return (
     <nav
@@ -99,6 +124,7 @@ export function AuthedNavBottom({ tenantHandle }: NavProps) {
               )}
               <Link
                 href={t.href}
+                onClick={() => setIntent(t.key)}
                 className={
                   "flex items-center justify-center py-4 font-mono text-[11px] uppercase tracking-[0.22em] " +
                   (isActive
