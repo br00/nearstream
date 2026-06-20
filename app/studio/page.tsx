@@ -81,7 +81,7 @@ export default async function StudioPage({ searchParams }: Props) {
   return (
     <PageShell
       leftNav={<NearstreamMark size={24} className="text-foreground" />}
-      rightNav={<AuthedNavTop active="studio" tenantHandle={user.handle} />}
+      rightNav={<AuthedNavTop tenantHandle={user.handle} />}
     >
       <section className="flex flex-1 justify-center px-6 pb-24 sm:pb-12">
         <div className="w-full max-w-lg py-12">
@@ -124,7 +124,7 @@ export default async function StudioPage({ searchParams }: Props) {
           </div>
         </div>
       </section>
-      <AuthedNavBottom active="studio" tenantHandle={user.handle} />
+      <AuthedNavBottom tenantHandle={user.handle} />
     </PageShell>
   );
 }

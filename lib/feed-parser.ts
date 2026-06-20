@@ -114,13 +114,19 @@ function pickRssGuid(item: any): string | undefined {
 }
 
 function pickRssImage(item: any): FeedEntryImage | undefined {
+  // Nearstream extension — captured first so we hold onto the thumb URL
+  // even when the picture itself comes from an enclosure or media:content
+  // below. The thumb stays optional on FeedEntryImage; the reader uses it
+  // when present and falls back to the original.
+  const thumb = pickNearstreamThumb(item);
+
   // <enclosure url="..." length="..." type="image/jpeg" />
   const encs = asArray(item.enclosure);
   for (const e of encs) {
     const type = e?.["@_type"];
     const url = e?.["@_url"];
     if (url && (!type || type.startsWith("image/"))) {
-      return { url, contentType: type };
+      return { url, contentType: type, ...thumb };
     }
   }
   // <media:content url="..." />
@@ -136,10 +142,33 @@ function pickRssImage(item: any): FeedEntryImage | undefined {
         contentType: type,
         width: Number.isFinite(w) ? w : undefined,
         height: Number.isFinite(h) ? h : undefined,
+        ...thumb,
       };
     }
   }
   return undefined;
+}
+
+function pickNearstreamThumb(item: any): {
+  thumbUrl?: string;
+  thumbWidth?: number;
+  thumbHeight?: number;
+} {
+  // fast-xml-parser surfaces namespaced elements with the prefix preserved.
+  const tags = asArray(item["nearstream:thumbnail"]);
+  for (const t of tags) {
+    const url = t?.["@_url"];
+    if (typeof url === "string" && url.length > 0) {
+      const w = parseInt(t?.["@_width"] ?? "", 10);
+      const h = parseInt(t?.["@_height"] ?? "", 10);
+      return {
+        thumbUrl: url,
+        thumbWidth: Number.isFinite(w) ? w : undefined,
+        thumbHeight: Number.isFinite(h) ? h : undefined,
+      };
+    }
+  }
+  return {};
 }
 
 // ── Atom 1.0 ───────────────────────────────────────────────────────────────

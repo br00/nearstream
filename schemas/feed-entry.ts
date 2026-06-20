@@ -12,10 +12,17 @@
 export type FeedEntryType = "note" | "essay" | "picture" | "unknown";
 
 export type FeedEntryImage = {
+  /** Full-resolution permalink. Fallback when no thumb is available. */
   url: string;
   width?: number;
   height?: number;
   contentType?: string;
+  /** Reader-sized variant. Nearstream feeds emit a 600px-cap JPEG via the
+   *  `<nearstream:thumbnail>` extension. Arbitrary RSS feeds rarely do, so
+   *  this stays optional — `url` is the load-bearing field. */
+  thumbUrl?: string;
+  thumbWidth?: number;
+  thumbHeight?: number;
 };
 
 export type FeedEntry = {
