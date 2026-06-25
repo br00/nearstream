@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
@@ -13,8 +13,18 @@ const THUMB_QUALITY = 0.85;
 
 type FlowState = "idle" | "thumbnailing" | "uploading" | "saving";
 
+// What `generateThumbnail` produces. We hold this in state so the same blob
+// renders as the preview *and* gets uploaded on submit — no regenerating.
+type Prepared = {
+  thumb: Blob;
+  width: number;
+  height: number;
+};
+
 export function InventoryUploadForm() {
   const [file, setFile] = useState<File | null>(null);
+  const [prepared, setPrepared] = useState<Prepared | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dimensions, setDimensions] = useState("");
@@ -28,6 +38,44 @@ export function InventoryUploadForm() {
   const [error, setError] = useState<string | null>(null);
 
   const sizeMB = file ? file.size / (1024 * 1024) : 0;
+
+  // Unmount cleanup so an in-progress preview URL doesn't leak if the user
+  // navigates away mid-form. Pick-time cleanup happens inside the handler.
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Build the thumbnail the moment a file is picked. Two wins: the preview
+  // appears without waiting on submit, and we don't have to re-decode +
+  // re-encode the image when the form is posted. Lives in the change
+  // handler (not a useEffect on `file`) because React's purity rules don't
+  // allow setting state from inside an effect — and we have a clean
+  // imperative moment to do the work here anyway.
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const next = e.target.files?.[0] ?? null;
+    setError(null);
+    setFile(next);
+    setPrepared(null);
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+
+    if (!next) return;
+    try {
+      const result = await generateThumbnail(next);
+      setPrepared(result);
+      setPreviewUrl(URL.createObjectURL(result.thumb));
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `could not preview: ${err.message}`
+          : "could not preview image",
+      );
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,8 +99,15 @@ export function InventoryUploadForm() {
     setProgress(0);
 
     try {
-      setState("thumbnailing");
-      const { thumb, width, height } = await generateThumbnail(file);
+      // The thumbnail was prepared on file pick so the preview could show
+      // immediately. Re-run on the fly only if something went wrong then
+      // (rare: format the browser refuses to decode).
+      let pre = prepared;
+      if (!pre) {
+        setState("thumbnailing");
+        pre = await generateThumbnail(file);
+      }
+      const { thumb, width, height } = pre;
 
       setState("uploading");
       const urlRes = await fetch("/api/inventory/upload-url", {
@@ -146,22 +201,43 @@ export function InventoryUploadForm() {
 
   return (
     <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-8">
-      <label className="flex flex-col gap-2">
+      <label className="flex flex-col gap-3">
         <Kicker>Image</Kicker>
         <input
           type="file"
           accept={ACCEPTED_MIME}
-          onChange={(e) => {
-            setFile(e.target.files?.[0] ?? null);
-            setError(null);
-          }}
+          onChange={onFileChange}
           disabled={disabled}
           className="text-sm text-foreground/80 file:mr-4 file:border file:border-border file:bg-transparent file:px-3 file:py-1.5 file:font-mono file:text-[10px] file:uppercase file:tracking-[0.2em] file:text-muted file:transition-colors hover:file:border-foreground hover:file:text-foreground file:cursor-pointer disabled:opacity-50"
         />
         {file && (
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
-            {file.name} · {sizeMB.toFixed(1)} MB
-          </span>
+          // Preview block: thumbnail on the left, filename + size +
+          // dimensions on the right. Empty placeholder slot while the
+          // browser is still decoding (rare, but iPhone HEIC→JPEG
+          // conversion can be slow on first pick).
+          <div className="flex items-start gap-4 border border-border p-3">
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden border border-border bg-foreground/5">
+              {previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={previewUrl}
+                  alt="preview"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span aria-hidden className="absolute inset-0 shimmer-sweep" />
+              )}
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5 text-[12px] leading-snug">
+              <span className="truncate text-foreground">{file.name}</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
+                {sizeMB.toFixed(1)} MB
+                {prepared
+                  ? ` · ${prepared.width}×${prepared.height}`
+                  : " · preparing…"}
+              </span>
+            </div>
+          </div>
         )}
       </label>
 
