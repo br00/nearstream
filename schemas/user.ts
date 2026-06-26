@@ -22,8 +22,31 @@ export type User = {
    * users created before profile marks shipped (treated as variant 0).
    */
   profileMark?: number;
+  /**
+   * Per-user rendering preferences. The instance ships strong primitives
+   * (Stream / Letter / Library / Inventory) and a curated set of "modes" for
+   * how each surface renders them. The user picks. Open-shape so adding a
+   * new surface later is one field, not a migration. See lib/preferences.ts
+   * for the canonical defaults + valid values per surface.
+   */
+  preferences?: UserPreferences;
   createdAt: string;
 };
+
+export type UserPreferences = {
+  /** Mode for the reader feed at /reader. */
+  readerLayout?: ReaderLayout;
+};
+
+export const READER_LAYOUTS = ["default", "broadsheet"] as const;
+export type ReaderLayout = (typeof READER_LAYOUTS)[number];
+
+export function isReaderLayout(value: unknown): value is ReaderLayout {
+  return (
+    typeof value === "string" &&
+    (READER_LAYOUTS as readonly string[]).includes(value)
+  );
+}
 
 export type NewUser = Pick<User, "email">;
 

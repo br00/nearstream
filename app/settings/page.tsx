@@ -15,13 +15,37 @@ import { Input } from "@/app/_components/input";
 import { Kicker } from "@/app/_components/kicker";
 import { ProfileMarkPicker } from "@/app/_components/site/profile-mark-picker";
 import { ShareUrlButton } from "@/app/_components/share-url-button";
+import type { ReaderLayout } from "@/schemas/user";
+
+// Display modes shipped on this surface. Adding a new one is: define it
+// here, render it in app/reader/page.tsx (and the broadsheet entry helpers
+// nearby), append it to READER_LAYOUTS in schemas/user.ts.
+const READER_LAYOUT_OPTIONS: {
+  key: ReaderLayout;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    key: "default",
+    label: "Default — app-dense",
+    hint: "Larger author names, mode pills, full-width pictures. The phone-first take.",
+  },
+  {
+    key: "broadsheet",
+    label: "Broadsheet — quiet",
+    hint: "Serif headlines, generous margins, mono meta. The newspaper-on-a-phone take.",
+  },
+];
 
 export const metadata = {
   title: "Settings · Nearstream",
 };
 
 type Props = {
-  searchParams: Promise<{ "profile-error"?: string }>;
+  searchParams: Promise<{
+    "profile-error"?: string;
+    "prefs-error"?: string;
+  }>;
 };
 
 export default async function SettingsPage({ searchParams }: Props) {
@@ -32,7 +56,8 @@ export default async function SettingsPage({ searchParams }: Props) {
   if (!user) redirect("/login");
   if (!user.handle) redirect("/onboarding");
 
-  const { "profile-error": profileError } = await searchParams;
+  const { "profile-error": profileError, "prefs-error": prefsError } =
+    await searchParams;
 
   return (
     <PageShell
@@ -99,6 +124,82 @@ export default async function SettingsPage({ searchParams }: Props) {
               Save
             </SubmitButton>
           </form>
+
+          <hr className="mt-20 border-border" />
+
+          {/* Display — the user owns rendering. Slice 33 ships this with one
+              surface wired (the reader). Adding more surfaces later is one
+              entry in schemas/user.ts + one form here. */}
+          <div id="display" className="mt-12 scroll-mt-6">
+            <Kicker>Display</Kicker>
+            <h2 className="mt-2 text-2xl font-normal tracking-tight text-foreground">
+              How things look to you
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Nearstream ships strong primitives &mdash; Stream, Letter,
+              Library, Inventory, Friends &mdash; and a small set of curated
+              modes for how each surface renders. You pick. More surfaces will
+              get modes over time.
+            </p>
+
+            {prefsError && (
+              <div
+                role="alert"
+                className="mt-8 border-l-2 border-foreground/50 pl-4 py-2"
+              >
+                <Kicker>Could not save</Kicker>
+                <p className="mt-1 text-sm text-muted">{prefsError}</p>
+              </div>
+            )}
+
+            <form
+              action="/api/preferences"
+              method="POST"
+              className="mt-10 flex flex-col gap-8"
+            >
+              <fieldset className="flex flex-col gap-3">
+                <legend>
+                  <Kicker>Reader layout</Kicker>
+                </legend>
+                <p className="text-sm leading-relaxed text-muted-soft">
+                  How the feed at <code className="font-mono">/reader</code>{" "}
+                  renders.
+                </p>
+                <div className="mt-2 flex flex-col gap-3">
+                  {READER_LAYOUT_OPTIONS.map((opt) => {
+                    const isActive =
+                      (user.preferences?.readerLayout ?? "default") === opt.key;
+                    return (
+                      <label
+                        key={opt.key}
+                        className="flex cursor-pointer items-baseline gap-3 border border-border p-4 hover:border-foreground/60"
+                      >
+                        <input
+                          type="radio"
+                          name="readerLayout"
+                          value={opt.key}
+                          defaultChecked={isActive}
+                          className="accent-foreground"
+                        />
+                        <span className="flex flex-col gap-1">
+                          <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-foreground">
+                            {opt.label}
+                          </span>
+                          <span className="text-[12.5px] text-muted-soft">
+                            {opt.hint}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              <SubmitButton pendingLabel="Saving…" className="self-start">
+                Save display
+              </SubmitButton>
+            </form>
+          </div>
 
           <hr className="mt-20 border-border" />
 

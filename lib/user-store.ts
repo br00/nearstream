@@ -1,5 +1,5 @@
 import { R2Client } from "@/lib/r2-client";
-import type { User, NewUser } from "@/schemas/user";
+import type { User, NewUser, UserPreferences } from "@/schemas/user";
 
 // Users live at R2 key `users-meta/{id}.json` — distinct from the per-tenant
 // content prefix `users/{id}/...` so a list of tenants doesn't have to walk
@@ -19,6 +19,12 @@ export interface UserStore {
   ): Promise<User | null>;
   setDisplayName(id: string, displayName: string): Promise<User | null>;
   setProfileMark(id: string, profileMark: number): Promise<User | null>;
+  /** Merge `patch` into the user's preferences. Undefined keys are skipped
+   *  so callers can update one surface at a time without dropping others. */
+  setPreferences(
+    id: string,
+    patch: Partial<UserPreferences>,
+  ): Promise<User | null>;
 }
 
 const PREFIX = "users-meta/";
@@ -76,6 +82,15 @@ class InMemoryUserStore implements UserStore {
     const i = this.users.findIndex((u) => u.id === id);
     if (i === -1) return null;
     this.users[i] = { ...this.users[i], profileMark };
+    return this.users[i];
+  }
+  async setPreferences(id: string, patch: Partial<UserPreferences>) {
+    const i = this.users.findIndex((u) => u.id === id);
+    if (i === -1) return null;
+    this.users[i] = {
+      ...this.users[i],
+      preferences: mergePreferences(this.users[i].preferences, patch),
+    };
     return this.users[i];
   }
 }
@@ -216,6 +231,49 @@ class R2UserStore implements UserStore {
     }
     return updated;
   }
+
+  async setPreferences(
+    id: string,
+    patch: Partial<UserPreferences>,
+  ): Promise<User | null> {
+    const current = await this.getById(id);
+    if (!current) return null;
+    const updated: User = {
+      ...current,
+      preferences: mergePreferences(current.preferences, patch),
+    };
+    const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(updated),
+      headers: { "content-type": "application/json" },
+    });
+    if (!res.ok) {
+      throw new Error(`R2 PUT failed (${res.status} ${res.statusText})`);
+    }
+    return updated;
+  }
+}
+
+// Shallow merge with explicit undefined-pruning so a caller passing
+// `{ readerLayout: undefined }` resets the surface to its default rather
+// than persisting the literal undefined value into JSON.
+function mergePreferences(
+  current: UserPreferences | undefined,
+  patch: Partial<UserPreferences>,
+): UserPreferences {
+  const next: UserPreferences = { ...(current ?? {}) };
+  for (const key of Object.keys(patch) as (keyof UserPreferences)[]) {
+    const v = patch[key];
+    if (v === undefined) {
+      delete next[key];
+    } else {
+      // TS can't narrow patch[key] against next[key] generically; safe at
+      // runtime because we just walked the keyof set.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (next as any)[key] = v;
+    }
+  }
+  return next;
 }
 
 function parseListKeys(xml: string): string[] {

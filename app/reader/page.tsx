@@ -11,6 +11,8 @@ import { AuthedNavTop, AuthedNavBottom } from "@/app/_components/authed-nav";
 import { Kicker } from "@/app/_components/kicker";
 import { ReaderRefresh } from "@/app/_components/reader-refresh";
 import { ReaderPicture } from "@/app/_components/reader-picture";
+import type { FeedEntry } from "@/schemas/feed-entry";
+import type { Source } from "@/schemas/source";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +74,12 @@ export default async function ReaderPage() {
   // first visit of the morning always lands fresh.
   const needsRefresh = computeNeedsRefresh(sources);
 
+  // Slice 33: the user picks how the room renders. Default is the
+  // app-density take (slice 29); "broadsheet" is the quieter, more
+  // newspaper-on-a-phone take from the mobile lab. Adding a new mode is one
+  // value in schemas/user.ts + a branch here.
+  const readerLayout = user?.preferences?.readerLayout ?? "default";
+
   return (
     <PageShell
       leftNav={<NearstreamMark size={24} className="text-foreground" />}
@@ -87,60 +95,18 @@ export default async function ReaderPage() {
             <EmptySourcesState />
           ) : entries.length === 0 ? (
             <EmptyFeedState />
+          ) : readerLayout === "broadsheet" ? (
+            <BroadsheetFeed
+              entries={entries}
+              sourceById={sourceById}
+              needsRefresh={needsRefresh}
+            />
           ) : (
-            <>
-              <div className="mt-8 flex items-center justify-between">
-                <h1 className="text-2xl font-normal tracking-tight text-foreground">
-                  Today
-                </h1>
-                <ReaderRefresh needsRefresh={needsRefresh} />
-              </div>
-
-              <ul className="mt-10 flex flex-col">
-                {entries.map((entry) => {
-                  const source = sourceById.get(entry.sourceId);
-                  const authorName =
-                    entry.authorName ?? source?.name ?? "unknown";
-                  const authorHref = source?.siteUrl ?? entry.url;
-                  return (
-                    <li
-                      key={entry.id}
-                      className="border-t border-border py-9 first:border-t-0 first:pt-0"
-                    >
-                      <div className="mb-4 flex items-center justify-between gap-3">
-                        <a
-                          href={authorHref}
-                          rel="noopener noreferrer"
-                          target="_blank"
-                          className="text-[15px] font-medium text-foreground transition-colors hover:text-white"
-                        >
-                          {authorName}
-                        </a>
-                        <div className="flex items-center gap-2">
-                          {entry.type !== "unknown" &&
-                            entry.type !== "note" && (
-                              <span className="border border-border px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-muted">
-                                {entry.type}
-                              </span>
-                            )}
-                          <span className="whitespace-nowrap font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-muted-soft">
-                            {formatRelative(entry.publishedAt)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {entry.type === "picture" ? (
-                        <PictureBody entry={entry} />
-                      ) : entry.type === "essay" ? (
-                        <EssayBody entry={entry} />
-                      ) : (
-                        <NoteBody entry={entry} />
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
+            <DefaultFeed
+              entries={entries}
+              sourceById={sourceById}
+              needsRefresh={needsRefresh}
+            />
           )}
         </div>
       </section>
@@ -301,6 +267,199 @@ function PictureBody({ entry }: EntryPropsBase) {
         <div className="mt-4 text-[15px] text-foreground/95 transition-colors group-hover:text-white">
           {entry.title}
         </div>
+      ) : null}
+    </a>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Mode: default (the slice-29 app-density layout)
+   ───────────────────────────────────────────────────────────────────────── */
+
+type FeedProps = {
+  entries: FeedEntry[];
+  sourceById: Map<string, Source>;
+  needsRefresh: boolean;
+};
+
+function DefaultFeed({ entries, sourceById, needsRefresh }: FeedProps) {
+  return (
+    <>
+      <div className="mt-8 flex items-center justify-between">
+        <h1 className="text-2xl font-normal tracking-tight text-foreground">
+          Today
+        </h1>
+        <ReaderRefresh needsRefresh={needsRefresh} />
+      </div>
+
+      <ul className="mt-10 flex flex-col">
+        {entries.map((entry) => {
+          const source = sourceById.get(entry.sourceId);
+          const authorName = entry.authorName ?? source?.name ?? "unknown";
+          const authorHref = source?.siteUrl ?? entry.url;
+          return (
+            <li
+              key={entry.id}
+              className="border-t border-border py-9 first:border-t-0 first:pt-0"
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <a
+                  href={authorHref}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                  className="text-[15px] font-medium text-foreground transition-colors hover:text-white"
+                >
+                  {authorName}
+                </a>
+                <div className="flex items-center gap-2">
+                  {entry.type !== "unknown" && entry.type !== "note" && (
+                    <span className="border border-border px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-muted">
+                      {entry.type}
+                    </span>
+                  )}
+                  <span className="whitespace-nowrap font-mono text-[10.5px] uppercase tracking-[0.18em] tabular-nums text-muted-soft">
+                    {formatRelative(entry.publishedAt)}
+                  </span>
+                </div>
+              </div>
+
+              {entry.type === "picture" ? (
+                <PictureBody entry={entry} />
+              ) : entry.type === "essay" ? (
+                <EssayBody entry={entry} />
+              ) : (
+                <NoteBody entry={entry} />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Mode: broadsheet (newspaper-on-a-phone — V3 from mobile-lab)
+   - 28–32px header set in the serif body face used by /prose-essay
+   - dated kicker "Mon, 16 Jun" instead of "Today"
+   - notes set as pulled quotes
+   - essay titles set serif large
+   - picture entries get more breathing room (mt before bleed)
+   ───────────────────────────────────────────────────────────────────────── */
+function BroadsheetFeed({ entries, sourceById, needsRefresh }: FeedProps) {
+  const today = new Date();
+  const dateKicker = today.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  return (
+    <>
+      <div className="mt-8 flex items-end justify-between">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-soft">
+            {dateKicker}
+          </p>
+          <h1 className="mt-3 text-[32px] leading-[1.05] tracking-tight text-foreground">
+            Today
+          </h1>
+        </div>
+        <ReaderRefresh needsRefresh={needsRefresh} />
+      </div>
+
+      <ul className="mt-10 flex flex-col">
+        {entries.map((entry) => {
+          const source = sourceById.get(entry.sourceId);
+          const authorName = entry.authorName ?? source?.name ?? "unknown";
+          const authorHref = source?.siteUrl ?? entry.url;
+          return (
+            <li
+              key={entry.id}
+              className="border-t border-border py-10 first:border-t-0 first:pt-0"
+            >
+              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-soft">
+                <a
+                  href={authorHref}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                  className="text-muted-soft transition-colors hover:text-foreground"
+                >
+                  {authorName}
+                </a>
+                <span className="text-border"> · </span>
+                {formatRelative(entry.publishedAt)}
+              </p>
+
+              {entry.type === "picture" ? (
+                <BroadsheetPicture entry={entry} />
+              ) : entry.type === "essay" ? (
+                <BroadsheetEssay entry={entry} />
+              ) : (
+                <BroadsheetNote entry={entry} />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+function BroadsheetNote({ entry }: EntryPropsBase) {
+  const text = entry.excerpt ?? entry.title ?? "";
+  return (
+    <a
+      href={entry.url}
+      rel="noopener noreferrer"
+      target="_blank"
+      className="mt-4 block whitespace-pre-wrap text-[19px] leading-[1.55] text-foreground transition-colors hover:text-white"
+    >
+      &ldquo;{text}&rdquo;
+    </a>
+  );
+}
+
+function BroadsheetEssay({ entry }: EntryPropsBase) {
+  return (
+    <a
+      href={entry.url}
+      rel="noopener noreferrer"
+      target="_blank"
+      className="group block"
+    >
+      <h2 className="mt-4 text-[26px] leading-[1.15] tracking-tight text-foreground transition-colors group-hover:text-white">
+        {entry.title ?? "Untitled"}
+      </h2>
+      {entry.excerpt ? (
+        <p className="mt-3 text-[14px] leading-relaxed text-muted">
+          {entry.excerpt}
+        </p>
+      ) : null}
+      <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.3em] text-foreground">
+        Read &rarr;
+      </p>
+    </a>
+  );
+}
+
+function BroadsheetPicture({ entry }: EntryPropsBase) {
+  const src = entry.image?.thumbUrl ?? entry.image?.url;
+  const w = entry.image?.thumbWidth ?? entry.image?.width;
+  const h = entry.image?.thumbHeight ?? entry.image?.height;
+  return (
+    <a
+      href={entry.url}
+      rel="noopener noreferrer"
+      target="_blank"
+      className="mt-5 block group"
+    >
+      {src ? (
+        <ReaderPicture src={src} width={w} height={h} alt={entry.title ?? ""} />
+      ) : null}
+      {entry.title ? (
+        <p className="mt-4 text-[17px] italic leading-snug text-foreground transition-colors group-hover:text-white">
+          {entry.title}
+        </p>
       ) : null}
     </a>
   );
