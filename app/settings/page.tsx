@@ -189,7 +189,7 @@ export default async function SettingsPage({ searchParams }: Props) {
                     return (
                       <label
                         key={opt.key}
-                        className="flex cursor-pointer items-baseline gap-3 border border-border p-4 hover:border-foreground/60"
+                        className="flex cursor-pointer items-baseline gap-3 border border-border p-4 transition-colors hover:border-foreground/60 has-[:checked]:border-foreground has-[:checked]:bg-foreground/5"
                       >
                         <input
                           type="radio"
@@ -228,7 +228,7 @@ export default async function SettingsPage({ searchParams }: Props) {
                     return (
                       <label
                         key={opt.key}
-                        className="flex cursor-pointer items-baseline gap-3 border border-border p-4 hover:border-foreground/60"
+                        className="flex cursor-pointer items-baseline gap-3 border border-border p-4 transition-colors hover:border-foreground/60 has-[:checked]:border-foreground has-[:checked]:bg-foreground/5"
                       >
                         <input
                           type="radio"

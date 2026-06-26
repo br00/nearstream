@@ -24,9 +24,12 @@ export function VisibilityRadio({
       </legend>
       <div className="flex flex-col gap-2">
         {VISIBILITY_LEVELS.map((level) => (
+          // Bordered card pattern: selected state lives on the row, not on
+          // the radio dot. `has-[:checked]` brightens the border + adds a
+          // faint fill so the choice reads at a glance.
           <label
             key={level}
-            className="flex items-baseline gap-3 cursor-pointer"
+            className="flex items-baseline gap-3 cursor-pointer border border-border p-3 transition-colors hover:border-foreground/60 has-[:checked]:border-foreground has-[:checked]:bg-foreground/5"
           >
             <input
               type="radio"

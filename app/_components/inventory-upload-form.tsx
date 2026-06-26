@@ -114,6 +114,20 @@ export function InventoryUploadForm() {
     });
   }
 
+  // Promote any tile to position 0 (the cover). The cover badge follows
+  // because it's rendered against `i === 0`. We splice rather than sort so
+  // the relative order of the rest stays as the user picked it.
+  function makeCover(id: string) {
+    setTiles((curr) => {
+      const i = curr.findIndex((t) => t.id === id);
+      if (i <= 0) return curr;
+      const next = [...curr];
+      const [pulled] = next.splice(i, 1);
+      next.unshift(pulled);
+      return next;
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (tiles.length === 0) {
@@ -310,10 +324,20 @@ export function InventoryUploadForm() {
                       className="absolute inset-0 shimmer-sweep"
                     />
                   )}
-                  {i === 0 && (
-                    <span className="absolute left-1 top-1 border border-foreground bg-background/85 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-foreground">
+                  {i === 0 ? (
+                    <span className="absolute left-1 top-1 border border-foreground bg-foreground px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-background">
                       cover
                     </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => makeCover(t.id)}
+                      disabled={disabled}
+                      aria-label={`Make image ${i + 1} the cover`}
+                      className="absolute left-1 top-1 border border-border bg-background/85 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-muted transition-colors hover:border-foreground hover:text-foreground disabled:opacity-50"
+                    >
+                      make cover
+                    </button>
                   )}
                   <button
                     type="button"
@@ -445,7 +469,7 @@ export function InventoryUploadForm() {
           {(["public", "private"] as const).map((level) => (
             <label
               key={level}
-              className="flex items-baseline gap-3 cursor-pointer"
+              className="flex items-baseline gap-3 cursor-pointer border border-border p-3 transition-colors hover:border-foreground/60 has-[:checked]:border-foreground has-[:checked]:bg-foreground/5"
             >
               <input
                 type="radio"
