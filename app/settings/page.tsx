@@ -15,7 +15,7 @@ import { Input } from "@/app/_components/input";
 import { Kicker } from "@/app/_components/kicker";
 import { ProfileMarkPicker } from "@/app/_components/site/profile-mark-picker";
 import { ShareUrlButton } from "@/app/_components/share-url-button";
-import type { ReaderLayout } from "@/schemas/user";
+import type { ReaderLayout, GalleryLayout } from "@/schemas/user";
 
 // Display modes shipped on this surface. Adding a new one is: define it
 // here, render it in app/reader/page.tsx (and the broadsheet entry helpers
@@ -34,6 +34,23 @@ const READER_LAYOUT_OPTIONS: {
     key: "broadsheet",
     label: "Broadsheet — quiet",
     hint: "Serif headlines, generous margins, mono meta. The newspaper-on-a-phone take.",
+  },
+];
+
+const GALLERY_LAYOUT_OPTIONS: {
+  key: GalleryLayout;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    key: "contact-sheet",
+    label: "Contact sheet — modal viewer",
+    hint: "Square tile grid on the detail page; tap a tile to open a full-bleed viewer with swipe between images.",
+  },
+  {
+    key: "stack",
+    label: "Stack — scroll",
+    hint: "Every image at its native ratio, full-width, top-to-bottom. No modal, no tap-to-open. The reading-room take.",
   },
 ];
 
@@ -177,6 +194,45 @@ export default async function SettingsPage({ searchParams }: Props) {
                         <input
                           type="radio"
                           name="readerLayout"
+                          value={opt.key}
+                          defaultChecked={isActive}
+                          className="accent-foreground"
+                        />
+                        <span className="flex flex-col gap-1">
+                          <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-foreground">
+                            {opt.label}
+                          </span>
+                          <span className="text-[12.5px] text-muted-soft">
+                            {opt.hint}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              <fieldset className="flex flex-col gap-3">
+                <legend>
+                  <Kicker>Inventory gallery</Kicker>
+                </legend>
+                <p className="text-sm leading-relaxed text-muted-soft">
+                  How a multi-image inventory item renders on your tenant
+                  page at <code className="font-mono">/{user.handle}/library/inventory/[slug]</code>.
+                </p>
+                <div className="mt-2 flex flex-col gap-3">
+                  {GALLERY_LAYOUT_OPTIONS.map((opt) => {
+                    const isActive =
+                      (user.preferences?.galleryLayout ?? "contact-sheet") ===
+                      opt.key;
+                    return (
+                      <label
+                        key={opt.key}
+                        className="flex cursor-pointer items-baseline gap-3 border border-border p-4 hover:border-foreground/60"
+                      >
+                        <input
+                          type="radio"
+                          name="galleryLayout"
                           value={opt.key}
                           defaultChecked={isActive}
                           className="accent-foreground"

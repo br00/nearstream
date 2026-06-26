@@ -13,7 +13,11 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
-import { isReaderLayout, type UserPreferences } from "@/schemas/user";
+import {
+  isReaderLayout,
+  isGalleryLayout,
+  type UserPreferences,
+} from "@/schemas/user";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -25,12 +29,18 @@ export async function POST(request: Request) {
   }
 
   let readerLayoutRaw: unknown;
+  let galleryLayoutRaw: unknown;
   if (isJson) {
     const json = await request.json().catch(() => null);
     readerLayoutRaw = json?.readerLayout;
+    galleryLayoutRaw = json?.galleryLayout;
   } else {
     const form = await request.formData();
-    readerLayoutRaw = form.get("readerLayout");
+    // Form submissions only include the field that fieldset was submitted
+    // for, so missing keys come back as null. We only patch the surfaces
+    // the form actually carried.
+    readerLayoutRaw = form.has("readerLayout") ? form.get("readerLayout") : undefined;
+    galleryLayoutRaw = form.has("galleryLayout") ? form.get("galleryLayout") : undefined;
   }
 
   const patch: Partial<UserPreferences> = {};
@@ -47,6 +57,19 @@ export async function POST(request: Request) {
       isJson,
       400,
       `unknown readerLayout: ${String(readerLayoutRaw)}`,
+    );
+  }
+
+  if (galleryLayoutRaw === "" || galleryLayoutRaw === null) {
+    patch.galleryLayout = undefined;
+  } else if (isGalleryLayout(galleryLayoutRaw)) {
+    patch.galleryLayout = galleryLayoutRaw;
+  } else if (galleryLayoutRaw !== undefined) {
+    return errorResponse(
+      request,
+      isJson,
+      400,
+      `unknown galleryLayout: ${String(galleryLayoutRaw)}`,
     );
   }
 

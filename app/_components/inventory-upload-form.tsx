@@ -10,21 +10,29 @@ import { INVENTORY_STATUSES } from "@/schemas/inventory";
 const ACCEPTED_MIME = "image/jpeg,image/png,image/webp,image/gif";
 const THUMB_MAX_DIM = 600;
 const THUMB_QUALITY = 0.85;
+// Mirror of the server-side cap in /api/inventory/route.ts. If you bump
+// one, bump the other.
+const MAX_IMAGES = 12;
+const MAX_TOTAL_BYTES = 100 * 1024 * 1024; // 100 MB across the whole series
 
 type FlowState = "idle" | "thumbnailing" | "uploading" | "saving";
 
-// What `generateThumbnail` produces. We hold this in state so the same blob
-// renders as the preview *and* gets uploaded on submit — no regenerating.
-type Prepared = {
-  thumb: Blob;
-  width: number;
-  height: number;
+// A picked file paired with its decoded thumbnail + the blob URL we render
+// in the preview tile. We hold the prepared thumbnail in state so submit
+// reuses the same blob — no decode + re-encode round trip.
+type Tile = {
+  /** Stable across renders. Used as the React key + to identify a tile in
+   *  the remove handler. crypto.randomUUID() since multiple "IMG_1234.HEIC"
+   *  picks from a phone collide on filename. */
+  id: string;
+  file: File;
+  prepared?: { thumb: Blob; width: number; height: number };
+  previewUrl?: string;
+  error?: string;
 };
 
 export function InventoryUploadForm() {
-  const [file, setFile] = useState<File | null>(null);
-  const [prepared, setPrepared] = useState<Prepared | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [tiles, setTiles] = useState<Tile[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dimensions, setDimensions] = useState("");
@@ -37,60 +45,94 @@ export function InventoryUploadForm() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const sizeMB = file ? file.size / (1024 * 1024) : 0;
+  const totalBytes = tiles.reduce((acc, t) => acc + t.file.size, 0);
+  const totalMB = totalBytes / (1024 * 1024);
 
-  // Unmount cleanup so an in-progress preview URL doesn't leak if the user
-  // navigates away mid-form. Pick-time cleanup happens inside the handler.
+  // Revoke any blob URLs we created when the form unmounts. The per-tile
+  // remove handler does the same when a tile is dropped.
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      for (const t of tiles) {
+        if (t.previewUrl) URL.revokeObjectURL(t.previewUrl);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Build the thumbnail the moment a file is picked. Two wins: the preview
-  // appears without waiting on submit, and we don't have to re-decode +
-  // re-encode the image when the form is posted. Lives in the change
-  // handler (not a useEffect on `file`) because React's purity rules don't
-  // allow setting state from inside an effect — and we have a clean
-  // imperative moment to do the work here anyway.
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const next = e.target.files?.[0] ?? null;
-    setError(null);
-    setFile(next);
-    setPrepared(null);
-
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
-
-    if (!next) return;
+  // Prepare a new tile: decode → thumb → blob URL → patch the tile in
+  // state. Done outside the change handler so we can run it on each newly
+  // appended file without blocking the picker UI.
+  async function prepareTile(id: string, file: File) {
     try {
-      const result = await generateThumbnail(next);
-      setPrepared(result);
-      setPreviewUrl(URL.createObjectURL(result.thumb));
+      const prepared = await generateThumbnail(file);
+      const previewUrl = URL.createObjectURL(prepared.thumb);
+      setTiles((curr) =>
+        curr.map((t) =>
+          t.id === id ? { ...t, prepared, previewUrl, error: undefined } : t,
+        ),
+      );
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? `could not preview: ${err.message}`
-          : "could not preview image",
+      const message =
+        err instanceof Error ? err.message : "could not preview image";
+      setTiles((curr) =>
+        curr.map((t) => (t.id === id ? { ...t, error: message } : t)),
       );
     }
   }
 
+  function onFilesPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = ""; // let the user pick the same file twice if they removed it
+    setError(null);
+    if (picked.length === 0) return;
+    const room = MAX_IMAGES - tiles.length;
+    if (room <= 0) {
+      setError(`max ${MAX_IMAGES} images per item`);
+      return;
+    }
+    const accepted = picked.slice(0, room);
+    if (picked.length > room) {
+      setError(
+        `only added the first ${room} (max ${MAX_IMAGES} images per item)`,
+      );
+    }
+    const newTiles: Tile[] = accepted.map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+    }));
+    setTiles((curr) => [...curr, ...newTiles]);
+    // Fire off the prepare for each new tile. Doesn't matter if state
+    // change above hasn't committed yet — `prepareTile` patches by id.
+    for (const t of newTiles) prepareTile(t.id, t.file);
+  }
+
+  function removeTile(id: string) {
+    setTiles((curr) => {
+      const target = curr.find((t) => t.id === id);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return curr.filter((t) => t.id !== id);
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!file) {
-      setError("please pick an image");
+    if (tiles.length === 0) {
+      setError("please pick at least one image");
       return;
     }
-    if (file.size > 100 * 1024 * 1024) {
-      setError("file too large (100 MB max for v1)");
+    if (tiles.some((t) => t.error)) {
+      setError("some images failed to preview — remove them and try again");
       return;
     }
-
-    if (sizeMB > 5 && isOnCellular()) {
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      setError(
+        `total size ${totalMB.toFixed(1)} MB exceeds ${Math.round(MAX_TOTAL_BYTES / 1024 / 1024)} MB cap`,
+      );
+      return;
+    }
+    if (totalMB > 5 && isOnCellular()) {
       const ok = confirm(
-        `This file is ${sizeMB.toFixed(1)} MB and you appear to be on cellular data. Upload anyway?`,
+        `Total upload is ${totalMB.toFixed(1)} MB and you appear to be on cellular data. Upload anyway?`,
       );
       if (!ok) return;
     }
@@ -99,61 +141,82 @@ export function InventoryUploadForm() {
     setProgress(0);
 
     try {
-      // The thumbnail was prepared on file pick so the preview could show
-      // immediately. Re-run on the fly only if something went wrong then
-      // (rare: format the browser refuses to decode).
-      let pre = prepared;
-      if (!pre) {
-        setState("thumbnailing");
-        pre = await generateThumbnail(file);
-      }
-      const { thumb, width, height } = pre;
+      // Every tile should have its thumbnail prepared by now (the picker
+      // kicks off prepareTile per file). For safety, regenerate any that
+      // somehow slipped through — rare, but the alternative is a confusing
+      // "no thumbnail" failure mid-submit.
+      setState("thumbnailing");
+      const ready = await Promise.all(
+        tiles.map(async (t) =>
+          t.prepared
+            ? { tile: t, prepared: t.prepared }
+            : { tile: t, prepared: await generateThumbnail(t.file) },
+        ),
+      );
 
       setState("uploading");
       const urlRes = await fetch("/api/inventory/upload-url", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ contentType: file.type, sizeBytes: file.size }),
+        body: JSON.stringify({
+          images: ready.map((r) => ({ contentType: r.tile.file.type })),
+        }),
       });
       if (!urlRes.ok) {
-        const err = await urlRes.json().catch(() => ({ error: "upload-url failed" }));
+        const err = await urlRes
+          .json()
+          .catch(() => ({ error: "upload-url failed" }));
         throw new Error(err.error ?? "upload-url failed");
       }
       const urls = (await urlRes.json()) as {
-        upload: { uploadUrl: string; key: string };
-        thumb: { uploadUrl: string; key: string };
+        uploads: {
+          upload: { uploadUrl: string; key: string };
+          thumb: { uploadUrl: string; key: string };
+        }[];
       };
 
-      const totalBytes = file.size + thumb.size;
-      let originalLoaded = 0;
-      let thumbLoaded = 0;
+      // Aggregate byte counter across all originals + all thumbs.
+      const totalUpBytes = ready.reduce(
+        (acc, r) => acc + r.tile.file.size + r.prepared.thumb.size,
+        0,
+      );
+      const loadedPer = new Map<string, number>();
       const updateProgress = () => {
-        const loaded = originalLoaded + thumbLoaded;
+        const loaded = Array.from(loadedPer.values()).reduce(
+          (a, b) => a + b,
+          0,
+        );
         setProgress(
-          totalBytes > 0 ? Math.round((loaded / totalBytes) * 100) : 0,
+          totalUpBytes > 0 ? Math.round((loaded / totalUpBytes) * 100) : 0,
         );
       };
 
-      await Promise.all([
-        putWithProgress(
-          urls.upload.uploadUrl,
-          file,
-          file.type,
-          (loaded) => {
-            originalLoaded = loaded;
+      // Upload every original + every thumb in parallel. The browser will
+      // queue beyond its concurrent-connection budget; we don't manually
+      // throttle because R2 handles it fine and the alternative would
+      // serialize on a slow first file.
+      const ops: Promise<void>[] = [];
+      ready.forEach((r, i) => {
+        const u = urls.uploads[i];
+        const origKey = `o:${r.tile.id}`;
+        const thumbKey = `t:${r.tile.id}`;
+        ops.push(
+          putWithProgress(u.upload.uploadUrl, r.tile.file, r.tile.file.type, (n) => {
+            loadedPer.set(origKey, n);
             updateProgress();
-          },
-        ),
-        putWithProgress(
-          urls.thumb.uploadUrl,
-          thumb,
-          "image/jpeg",
-          (loaded) => {
-            thumbLoaded = loaded;
-            updateProgress();
-          },
-        ),
-      ]);
+          }),
+          putWithProgress(
+            u.thumb.uploadUrl,
+            r.prepared.thumb,
+            "image/jpeg",
+            (n) => {
+              loadedPer.set(thumbKey, n);
+              updateProgress();
+            },
+          ),
+        );
+      });
+      await Promise.all(ops);
 
       setState("saving");
 
@@ -162,14 +225,14 @@ export function InventoryUploadForm() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
-          image: {
-            key: urls.upload.key,
-            thumbKey: urls.thumb.key,
-            contentType: file.type,
-            sizeBytes: file.size,
-            width,
-            height,
-          },
+          images: ready.map((r, i) => ({
+            key: urls.uploads[i].upload.key,
+            thumbKey: urls.uploads[i].thumb.key,
+            contentType: r.tile.file.type,
+            sizeBytes: r.tile.file.size,
+            width: r.prepared.width,
+            height: r.prepared.height,
+          })),
           description: description.trim() || undefined,
           dimensions: dimensions.trim() || undefined,
           materials: materials.trim() || undefined,
@@ -180,7 +243,9 @@ export function InventoryUploadForm() {
         }),
       });
       if (!metaRes.ok) {
-        const err = await metaRes.json().catch(() => ({ error: "save failed" }));
+        const err = await metaRes
+          .json()
+          .catch(() => ({ error: "save failed" }));
         throw new Error(err.error ?? "save failed");
       }
       const { redirectTo } = (await metaRes.json()) as {
@@ -201,45 +266,86 @@ export function InventoryUploadForm() {
 
   return (
     <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-8">
-      <label className="flex flex-col gap-3">
-        <Kicker>Image</Kicker>
+      <fieldset className="flex flex-col gap-3">
+        <legend>
+          <Kicker>
+            {tiles.length === 0
+              ? "Images"
+              : `Images (${tiles.length}${tiles.length === 1 ? "" : ""} · first is the cover)`}
+          </Kicker>
+        </legend>
+
         <input
           type="file"
           accept={ACCEPTED_MIME}
-          onChange={onFileChange}
-          disabled={disabled}
+          multiple
+          onChange={onFilesPicked}
+          disabled={disabled || tiles.length >= MAX_IMAGES}
           className="text-sm text-foreground/80 file:mr-4 file:border file:border-border file:bg-transparent file:px-3 file:py-1.5 file:font-mono file:text-[10px] file:uppercase file:tracking-[0.2em] file:text-muted file:transition-colors hover:file:border-foreground hover:file:text-foreground file:cursor-pointer disabled:opacity-50"
         />
-        {file && (
-          // Preview block: thumbnail on the left, filename + size +
-          // dimensions on the right. Empty placeholder slot while the
-          // browser is still decoding (rare, but iPhone HEIC→JPEG
-          // conversion can be slow on first pick).
-          <div className="flex items-start gap-4 border border-border p-3">
-            <div className="relative h-20 w-20 shrink-0 overflow-hidden border border-border bg-foreground/5">
-              {previewUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={previewUrl}
-                  alt="preview"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <span aria-hidden className="absolute inset-0 shimmer-sweep" />
-              )}
-            </div>
-            <div className="flex min-w-0 flex-col gap-1.5 text-[12px] leading-snug">
-              <span className="truncate text-foreground">{file.name}</span>
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
-                {sizeMB.toFixed(1)} MB
-                {prepared
-                  ? ` · ${prepared.width}×${prepared.height}`
-                  : " · preparing…"}
-              </span>
-            </div>
-          </div>
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
+          {tiles.length === 0
+            ? `Pick one or more · max ${MAX_IMAGES} · ${Math.round(MAX_TOTAL_BYTES / 1024 / 1024)} MB total`
+            : `${tiles.length} / ${MAX_IMAGES} · ${totalMB.toFixed(1)} MB total`}
+        </p>
+
+        {tiles.length > 0 && (
+          <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {tiles.map((t, i) => (
+              <li
+                key={t.id}
+                className="relative flex flex-col gap-2 border border-border p-2"
+              >
+                <div className="relative aspect-square overflow-hidden border border-border bg-foreground/5">
+                  {t.previewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={t.previewUrl}
+                      alt={`preview ${i + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 shimmer-sweep"
+                    />
+                  )}
+                  {i === 0 && (
+                    <span className="absolute left-1 top-1 border border-foreground bg-background/85 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.2em] text-foreground">
+                      cover
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeTile(t.id)}
+                    disabled={disabled}
+                    aria-label={`remove image ${i + 1}`}
+                    className="absolute right-1 top-1 border border-border bg-background/85 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted transition-colors hover:border-foreground hover:text-foreground disabled:opacity-50"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="flex min-w-0 flex-col text-[11px] leading-snug">
+                  <span className="truncate text-foreground" title={t.file.name}>
+                    {t.file.name}
+                  </span>
+                  <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-soft">
+                    {(t.file.size / 1024 / 1024).toFixed(1)} MB
+                    {t.prepared
+                      ? ` · ${t.prepared.width}×${t.prepared.height}`
+                      : " · preparing…"}
+                  </span>
+                  {t.error && (
+                    <span className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-foreground/80">
+                      {t.error}
+                    </span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
-      </label>
+      </fieldset>
 
       <label className="flex flex-col gap-2">
         <Kicker>Title</Kicker>
@@ -366,10 +472,7 @@ export function InventoryUploadForm() {
       </fieldset>
 
       {error && (
-        <div
-          role="alert"
-          className="border-l-2 border-foreground/50 pl-4 py-2"
-        >
+        <div role="alert" className="border-l-2 border-foreground/50 pl-4 py-2">
           <Kicker>Could not publish</Kicker>
           <p className="mt-1 text-sm text-muted">{error}</p>
         </div>
@@ -377,7 +480,7 @@ export function InventoryUploadForm() {
 
       {state === "thumbnailing" && (
         <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
-          Generating thumbnail…
+          Preparing thumbnails…
         </div>
       )}
       {state === "uploading" && (
@@ -393,11 +496,13 @@ export function InventoryUploadForm() {
 
       <button
         type="submit"
-        disabled={disabled || !file || title.trim().length === 0}
+        disabled={disabled || tiles.length === 0 || title.trim().length === 0}
         className={`${buttonClasses} self-start disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         {state === "idle"
-          ? "Publish"
+          ? tiles.length > 1
+            ? `Publish ${tiles.length} images`
+            : "Publish"
           : state === "thumbnailing"
             ? "Preparing…"
             : state === "uploading"

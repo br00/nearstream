@@ -35,6 +35,7 @@ export async function POST(request: Request) {
   const {
     title,
     image,
+    images,
     description,
     dimensions,
     materials,
@@ -58,9 +59,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const validatedImage = validateImage(image);
-  if (typeof validatedImage === "string") {
-    return Response.json({ error: validatedImage }, { status: 400 });
+  // Multi-image is the new shape (slice 33). Single `image` is still
+  // accepted from any client that hasn't been updated; we normalize to
+  // an array so the store sees one path. images[0] is the cover.
+  const validatedImages = validateImages(images, image);
+  if (typeof validatedImages === "string") {
+    return Response.json({ error: validatedImages }, { status: 400 });
   }
 
   const trimmedTitle = title.trim();
@@ -131,7 +135,11 @@ export async function POST(request: Request) {
 
   const item = await inventoryStore.add(session.userId, {
     title: trimmedTitle,
-    image: validatedImage,
+    // Mirror images[0] into the legacy `image` field for one release so
+    // any older read path that still touches `image` directly keeps
+    // working. The read-side `imagesOf()` helper is the canonical path.
+    image: validatedImages[0],
+    images: validatedImages,
     description: fields.description,
     dimensions: fields.dimensions,
     materials: fields.materials,
@@ -151,6 +159,35 @@ export async function POST(request: Request) {
 
   const redirectTo = `${tenantBase(handle)}/library/inventory/${item.slug}`;
   return Response.json({ item, redirectTo }, { status: 201 });
+}
+
+// Validate the cover + extras as a single canonical array. Accepts the
+// new `images` field (array of image objects) or the legacy `image`
+// field (a single object); rejects both being missing. Cap matches the
+// upload-url route's MAX_IMAGES so the two limits don't drift.
+const MAX_IMAGES = 12;
+function validateImages(
+  imagesValue: unknown,
+  legacyImage: unknown,
+): InventoryImage[] | string {
+  let raw: unknown[];
+  if (Array.isArray(imagesValue) && imagesValue.length > 0) {
+    raw = imagesValue;
+  } else if (legacyImage && typeof legacyImage === "object") {
+    raw = [legacyImage];
+  } else {
+    return "at least one image is required";
+  }
+  if (raw.length > MAX_IMAGES) {
+    return `too many images (max ${MAX_IMAGES} per item)`;
+  }
+  const out: InventoryImage[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const r = validateImage(raw[i]);
+    if (typeof r === "string") return `images[${i}]: ${r.replace(/^image\./, "")}`;
+    out.push(r);
+  }
+  return out;
 }
 
 function validateImage(value: unknown): InventoryImage | string {

@@ -1,6 +1,6 @@
 import { R2Client } from "@/lib/r2-client";
 import type { InventoryItem, NewInventoryItem } from "@/schemas/inventory";
-import { slugify } from "@/schemas/inventory";
+import { slugify, imagesOf } from "@/schemas/inventory";
 import { mediaStore } from "@/lib/media-store";
 
 /** Edit-time patch: everything except the image (set at upload time) and
@@ -206,10 +206,16 @@ class R2InventoryStore implements InventoryStore {
     if (!target) return false;
 
     if (mediaStore) {
+      // Cascade-delete every original + thumb. Multi-image items (slice 33)
+      // can have N pairs; legacy items have one. imagesOf() coalesces both
+      // shapes so the loop runs uniformly.
+      const all = imagesOf(target);
       try {
-        await mediaStore.deleteImage(target.image.key);
-        if (target.image.thumbKey) {
-          await mediaStore.deleteImage(target.image.thumbKey);
+        for (const img of all) {
+          await mediaStore.deleteImage(img.key);
+          if (img.thumbKey) {
+            await mediaStore.deleteImage(img.thumbKey);
+          }
         }
       } catch (err) {
         console.warn(

@@ -7,7 +7,8 @@ import { userStore } from "@/lib/user-store";
 import { tenantAbsoluteBase } from "@/lib/tenant-domains";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { visibilityOf } from "@/schemas/visibility";
-import type { InventoryItem } from "@/schemas/inventory";
+import type { InventoryItem, InventoryImage } from "@/schemas/inventory";
+import { imagesOf } from "@/schemas/inventory";
 
 export const dynamic = "force-dynamic";
 
@@ -45,14 +46,14 @@ function deriveTitle(text: string): string {
 const THUMB_MAX_DIM = 600;
 
 function thumbnailElement(
-  item: InventoryItem,
+  cover: InventoryImage,
   instanceUrl: string,
 ): string | null {
-  const thumbKey = item.image.thumbKey;
+  const thumbKey = cover.thumbKey;
   if (!thumbKey) return null;
   const url = `${instanceUrl}/api/media/${thumbKey}`;
-  const w = item.image.width;
-  const h = item.image.height;
+  const w = cover.width;
+  const h = cover.height;
   if (!w || !h) {
     return `<nearstream:thumbnail url="${escapeXml(url)}" />`;
   }
@@ -74,15 +75,20 @@ async function renderInventoryBody(
   item: InventoryItem,
   siteUrl: string,
 ): Promise<string> {
-  const imageUrl = `${siteUrl}/api/media/${item.image.key}`;
-  const dims =
-    item.image.width && item.image.height
-      ? ` width="${item.image.width}" height="${item.image.height}"`
-      : "";
-
-  const parts: string[] = [
-    `<p><img src="${htmlEscape(imageUrl)}" alt="${htmlEscape(item.title)}"${dims} style="max-width: 100%; height: auto;" /></p>`,
-  ];
+  // Multi-image: emit every image as a <p><img>. The first is the cover
+  // (what a reader without inline-image support uses for the card). Order
+  // mirrors the order on the tenant detail page. Each image keeps native
+  // width/height so the reader-side layout doesn't jump.
+  const all = imagesOf(item);
+  const parts: string[] = all.map((img, i) => {
+    const imageUrl = `${siteUrl}/api/media/${img.key}`;
+    const dims =
+      img.width && img.height
+        ? ` width="${img.width}" height="${img.height}"`
+        : "";
+    const alt = i === 0 ? item.title : `${item.title} — image ${i + 1}`;
+    return `<p><img src="${htmlEscape(imageUrl)}" alt="${htmlEscape(alt)}"${dims} style="max-width: 100%; height: auto;" /></p>`;
+  });
 
   if (item.description) {
     parts.push(await marked.parse(item.description, { async: true }));
@@ -190,15 +196,22 @@ export async function GET(_req: Request, { params }: Props) {
   for (const item of items) {
     const link = `${siteUrl}/library/inventory/${item.slug}`;
     const body = await renderInventoryBody(item, INSTANCE_URL);
-    const imageUrl = `${INSTANCE_URL}/api/media/${item.image.key}`;
-    const enclosure = `<enclosure url="${escapeXml(imageUrl)}" length="${item.image.sizeBytes}" type="${escapeXml(item.image.contentType)}" />`;
-    // Nearstream extension: emit the reader-sized thumbnail so other
-    // instances don't pull the full-res JPEG into the feed. Dimensions
-    // are derived from the original by capping the longest edge at
-    // THUMB_MAX_DIM (matches the in-browser thumbnailing in
-    // inventory-upload-form.tsx); a missing thumbKey or missing original
-    // dims short-circuits the element so older items stay valid.
-    const thumb = thumbnailElement(item, INSTANCE_URL);
+    const all = imagesOf(item);
+    // One <enclosure> per image (RSS 2.0 permits multiple). Most readers
+    // act on the first; the rest are there for archival fidelity. The body
+    // <img> tags above are what visual readers actually render.
+    const enclosures = all
+      .map((img) => {
+        const imageUrl = `${INSTANCE_URL}/api/media/${img.key}`;
+        return `<enclosure url="${escapeXml(imageUrl)}" length="${img.sizeBytes}" type="${escapeXml(img.contentType)}" />`;
+      })
+      .join("\n      ");
+    // Nearstream extension: thumbnail of the cover so other instances
+    // don't pull the full-res JPEG into the feed. Dimensions derived from
+    // the original × the 600px cap (matches inventory-upload-form.tsx).
+    // Missing thumbKey or missing original dims short-circuits the
+    // element so older items stay valid.
+    const thumb = thumbnailElement(all[0], INSTANCE_URL);
     feedItems.push({
       publishedAt: item.publishedAt,
       toXml: () => `    <item>
@@ -208,7 +221,7 @@ export async function GET(_req: Request, { params }: Props) {
       <pubDate>${toRfc822(item.publishedAt)}</pubDate>
       <category>Inventory</category>
       <nearstream:type>picture</nearstream:type>
-      ${enclosure}${thumb ? `\n      ${thumb}` : ""}
+      ${enclosures}${thumb ? `\n      ${thumb}` : ""}
       <description><![CDATA[${escapeCdata(body)}]]></description>
     </item>`,
     });

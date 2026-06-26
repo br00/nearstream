@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
+import { imagesOf } from "@/schemas/inventory";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
@@ -45,6 +46,9 @@ type LibraryEntry =
       href: string;
       publishedAt: string;
       imageKey: string;
+      /** Count of images in the inventory item — drives the "· N" badge
+       *  on the cover thumb when > 1. */
+      imageCount: number;
       isPrivate: boolean;
     };
 
@@ -88,18 +92,24 @@ export default async function LibraryPage({ params }: Props) {
         isPrivate: visibilityOf(e) === "private",
       }),
     ),
-    ...items.map(
-      (i): LibraryEntry => ({
-        type: "inventory",
-        id: i.id,
-        slug: i.slug,
-        title: i.title,
-        href: `${base}/library/inventory/${i.slug}`,
-        publishedAt: i.publishedAt,
-        imageKey: i.image.thumbKey ?? i.image.key,
-        isPrivate: visibilityOf(i) === "private",
-      }),
-    ),
+    ...items
+      .map((i): LibraryEntry | null => {
+        const all = imagesOf(i);
+        const cover = all[0];
+        if (!cover) return null;
+        return {
+          type: "inventory",
+          id: i.id,
+          slug: i.slug,
+          title: i.title,
+          href: `${base}/library/inventory/${i.slug}`,
+          publishedAt: i.publishedAt,
+          imageKey: cover.thumbKey ?? cover.key,
+          imageCount: all.length,
+          isPrivate: visibilityOf(i) === "private",
+        };
+      })
+      .filter((e): e is LibraryEntry => e !== null),
   ].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
 
   const navLinkClasses =
@@ -155,7 +165,7 @@ export default async function LibraryPage({ params }: Props) {
                     className="group flex flex-1 items-start gap-4"
                   >
                     {entry.type === "inventory" ? (
-                      <div className="h-16 w-16 flex-shrink-0 overflow-hidden border border-border bg-foreground/5">
+                      <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden border border-border bg-foreground/5">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={`/api/media/${entry.imageKey}`}
@@ -163,6 +173,11 @@ export default async function LibraryPage({ params }: Props) {
                           className="h-full w-full object-cover"
                           loading="lazy"
                         />
+                        {entry.imageCount > 1 && (
+                          <span className="absolute right-0.5 bottom-0.5 border border-border bg-background/85 px-1 py-0.5 font-mono text-[8px] tabular-nums text-foreground">
+                            · {entry.imageCount}
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <div className="h-16 w-16 flex-shrink-0 border border-border bg-foreground/5" />

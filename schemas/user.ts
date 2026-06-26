@@ -36,6 +36,8 @@ export type User = {
 export type UserPreferences = {
   /** Mode for the reader feed at /reader. */
   readerLayout?: ReaderLayout;
+  /** Mode for the inventory detail page gallery. */
+  galleryLayout?: GalleryLayout;
 };
 
 export const READER_LAYOUTS = ["default", "broadsheet"] as const;
@@ -45,6 +47,16 @@ export function isReaderLayout(value: unknown): value is ReaderLayout {
   return (
     typeof value === "string" &&
     (READER_LAYOUTS as readonly string[]).includes(value)
+  );
+}
+
+export const GALLERY_LAYOUTS = ["contact-sheet", "stack"] as const;
+export type GalleryLayout = (typeof GALLERY_LAYOUTS)[number];
+
+export function isGalleryLayout(value: unknown): value is GalleryLayout {
+  return (
+    typeof value === "string" &&
+    (GALLERY_LAYOUTS as readonly string[]).includes(value)
   );
 }
 
