@@ -141,10 +141,11 @@ function GalleryTile({
   onOpen: () => void;
   full?: boolean;
 }) {
-  const src = `/api/media/${img.thumbKey ?? img.key}`;
-  // Tiles in the contact-sheet grid get a fixed square aspect so the grid
-  // reads as a grid. The pair / single layout keeps native aspect so the
-  // image breathes.
+  // `full` layout (single image, or one of a pair) is shown full-width on
+  // desktop too — the 600px thumb would scale up and read as low-quality
+  // there. Use the full-res original instead. Square grid tiles (3+ images)
+  // are small enough that the thumb is the right choice — saves bytes.
+  const src = `/api/media/${full ? img.key : img.thumbKey ?? img.key}`;
   return (
     <button
       type="button"
@@ -189,10 +190,23 @@ function GalleryModal({
 }) {
   const img = images[activeIndex];
   const total = images.length;
-  // Original (not thumb) inside the modal — this is the "look at the
-  // picture" surface, not the browse surface. Reader-side thumbnails
-  // already saved us bytes elsewhere.
+  // Full-res inside the modal — this is the "look at the picture" surface.
   const src = `/api/media/${img.key}`;
+
+  // Tap the image to toggle between "fit" (whole image inside the
+  // viewport, object-contain) and "actual" (100% native, scrollable in
+  // both axes). Pinch-zoom doesn't reliably reach an <img> inside a
+  // body-scroll-locked dialog on iOS Safari, so this is the deterministic
+  // escape hatch.
+  //
+  // We store the *index* the user zoomed into rather than a boolean — that
+  // way navigating to the next image auto-resets zoom without an effect
+  // (the equality check naturally returns false against the new index).
+  const [zoomedIndex, setZoomedIndex] = useState<number | null>(null);
+  const zoomed = zoomedIndex === activeIndex;
+  const toggleZoom = () =>
+    setZoomedIndex((curr) => (curr === activeIndex ? null : activeIndex));
+
   return (
     <div
       role="dialog"
@@ -204,6 +218,8 @@ function GalleryModal({
         <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
           {String(activeIndex + 1).padStart(2, "0")} /{" "}
           {String(total).padStart(2, "0")}
+          <span className="text-border"> · </span>
+          <span className="text-muted">{zoomed ? "tap to fit" : "tap to zoom"}</span>
         </span>
         <button
           type="button"
@@ -215,15 +231,35 @@ function GalleryModal({
         </button>
       </div>
 
-      <div className="flex flex-1 items-center justify-center px-4 py-4">
+      {/* The image stage. `min-h-0` is the load-bearing fix: flex children
+          default to `min-height: auto` which prevents them from shrinking
+          below their content's intrinsic size, so a 4080px-tall portrait
+          photo was forcing the flex item to be 4080px tall and overflowing
+          the viewport. With `min-h-0` the flex item can shrink to the
+          available space and the img's `max-h-full` correctly fits. We
+          also drop the explicit width/height HTML attrs in fit mode for
+          the same reason — they bias the browser's sizing toward the
+          intrinsic dimensions. */}
+      <div
+        className={
+          "flex flex-1 min-h-0 px-4 py-4 " +
+          (zoomed
+            ? "items-start justify-start overflow-auto"
+            : "items-center justify-center")
+        }
+        onClick={toggleZoom}
+        role="button"
+        tabIndex={-1}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
           alt={`${title} — image ${activeIndex + 1}`}
-          className="max-h-full max-w-full object-contain"
-          {...(img.width && img.height
-            ? { width: img.width, height: img.height }
-            : {})}
+          className={
+            zoomed
+              ? "max-w-none cursor-zoom-out"
+              : "max-h-full max-w-full object-contain cursor-zoom-in"
+          }
         />
       </div>
 
