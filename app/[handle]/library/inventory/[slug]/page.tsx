@@ -6,9 +6,11 @@ import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
 import { visibilityOf } from "@/schemas/visibility";
+import { imagesOf } from "@/schemas/inventory";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { DeleteButton } from "@/app/_components/delete-button";
+import { InventoryGallery } from "@/app/_components/inventory-gallery";
 
 export const dynamic = "force-dynamic";
 
@@ -94,17 +96,15 @@ export default async function InventoryItemPage({ params }: Props) {
         <article className="w-full max-w-2xl py-12">
           <Kicker>Library / Inventory</Kicker>
 
-          <div className="mt-6 border border-border bg-foreground/5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/api/media/${item.image.key}`}
-              alt={item.title}
-              className="block w-full"
-              {...(item.image.width && item.image.height
-                ? { width: item.image.width, height: item.image.height }
-                : {})}
-            />
-          </div>
+          {/* Gallery layout is the tenant's pick (slice 33 "user owns
+              rendering"). Visitors don't get a choice here — they're on
+              someone else's site. Contact-sheet is the default and adapts
+              its own layout for N=1, N=2, N≥3. */}
+          <InventoryGallery
+            images={imagesOf(item)}
+            title={item.title}
+            mode={user.preferences?.galleryLayout ?? "contact-sheet"}
+          />
 
           <h1 className="mt-8 text-3xl font-normal leading-tight tracking-tight text-foreground">
             {item.title}

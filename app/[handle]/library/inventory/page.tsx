@@ -5,6 +5,7 @@ import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
 import { visibilityOf } from "@/schemas/visibility";
+import { imagesOf } from "@/schemas/inventory";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { DeleteButton } from "@/app/_components/delete-button";
@@ -84,20 +85,29 @@ export default async function InventoryArchivePage({ params }: Props) {
             </p>
           ) : (
             <ul className="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-3">
-              {items.map((item) => (
+              {items.map((item) => {
+                const all = imagesOf(item);
+                const cover = all[0];
+                if (!cover) return null;
+                return (
                 <li key={item.id}>
                   <Link
                     href={`${base}/library/inventory/${item.slug}`}
                     className="group block"
                   >
-                    <div className="aspect-square w-full overflow-hidden border border-border bg-foreground/5">
+                    <div className="relative aspect-square w-full overflow-hidden border border-border bg-foreground/5">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={`/api/media/${item.image.thumbKey ?? item.image.key}`}
+                        src={`/api/media/${cover.thumbKey ?? cover.key}`}
                         alt={item.title}
                         className="h-full w-full object-cover transition-opacity group-hover:opacity-90"
                         loading="lazy"
                       />
+                      {all.length > 1 && (
+                        <span className="absolute right-1.5 bottom-1.5 border border-border bg-background/85 px-1.5 py-0.5 font-mono text-[9px] tabular-nums text-foreground">
+                          · {all.length}
+                        </span>
+                      )}
                     </div>
                     <h2 className="mt-3 text-sm font-normal tracking-tight text-foreground/90 transition-colors group-hover:text-foreground">
                       {item.title}
@@ -117,7 +127,8 @@ export default async function InventoryArchivePage({ params }: Props) {
                     </div>
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </div>

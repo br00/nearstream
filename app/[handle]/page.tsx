@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { store } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
+import { imagesOf } from "@/schemas/inventory";
 import { letterStore } from "@/lib/letter-store";
 import { userStore } from "@/lib/user-store";
 import { sourceStore } from "@/lib/source-store";
@@ -279,20 +280,29 @@ export default async function TenantHome({ params, searchParams }: Props) {
                 Pictures
               </Link>
               <ul className="mt-8 flex flex-col gap-5">
-                {recentPictures.map((item) => (
+                {recentPictures.map((item) => {
+                  const all = imagesOf(item);
+                  const cover = all[0];
+                  if (!cover) return null;
+                  return (
                   <li key={item.id}>
                     <Link
                       href={`${base}/library/inventory/${item.slug}`}
                       className="group flex items-center gap-5 text-foreground transition-colors hover:text-white"
                     >
-                      <div className="aspect-[4/3] w-24 flex-shrink-0 overflow-hidden border border-border bg-foreground/5">
+                      <div className="relative aspect-[4/3] w-24 flex-shrink-0 overflow-hidden border border-border bg-foreground/5">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={`/api/media/${item.image.thumbKey ?? item.image.key}`}
+                          src={`/api/media/${cover.thumbKey ?? cover.key}`}
                           alt={item.title}
                           className="h-full w-full object-cover"
                           loading="lazy"
                         />
+                        {all.length > 1 && (
+                          <span className="absolute right-1 bottom-1 border border-border bg-background/85 px-1 py-0.5 font-mono text-[9px] tabular-nums text-foreground">
+                            · {all.length}
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-1 items-baseline justify-between gap-4">
                         <span className="text-[15px] leading-snug">
@@ -307,7 +317,8 @@ export default async function TenantHome({ params, searchParams }: Props) {
                       </div>
                     </Link>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </section>
           )}

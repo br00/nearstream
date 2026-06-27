@@ -52,6 +52,12 @@ export default function DesignPage() {
               >
                 Mobile lab →
               </Link>
+              <Link
+                href="/design/multi-image-lab"
+                className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted transition-colors hover:border-foreground hover:text-foreground"
+              >
+                Multi-image lab →
+              </Link>
             </nav>
           </header>
 
