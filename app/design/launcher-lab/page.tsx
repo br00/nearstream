@@ -2,42 +2,37 @@ import Link from "next/link";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamLockup } from "@/app/_components/nearstream-mark";
 import { Kicker } from "@/app/_components/kicker";
-import { NearstreamMarkAnimated } from "@/app/_components/site/nearstream-mark-animated";
+import { HumanCircle, AnimatedMark } from "@/app/_components/site/human-circle";
 
 export const metadata = {
   title: "Launcher lab · Nearstream",
   robots: { index: false, follow: false },
 };
 
-// A minimal Android launcher with the Nearstream visual DNA — moving
-// points, pure mono palette, tiny type, generous emptiness. Not a
-// Nearstream-content launcher (no reader / letter / friends). The
-// interesting design problem is *how do you represent apps* when an icon
-// grid is the thing you're trying not to be.
+// Minimal Android launcher with the Nearstream visual DNA — moving
+// points, mono palette, tiny type, generous emptiness. Round 2: the
+// chevron mark is out, the *human-circle* (Alessandro's moving.points
+// signature) is in. It reads as more organic — a breathing cloud rather
+// than a chevron shape — which suits the launcher's role as ambient
+// chrome.
 //
-// Four directions, each takes a different swing at that:
+// Three takes on representing apps without an icon grid, each using the
+// human-circle in a different structural role:
 //
-//   V1 — Apps as constellation. Home is a sparse sky of dots. Each dot
-//        is an app; size = use frequency. Tap a dot, the label fades in,
-//        tap again to launch. The animated mark anchors the corner so the
-//        whole screen reads as one drifting field.
+//   V1 — Terminal. Big mono clock + a single underscore cursor. Start
+//        typing → apps filter as a list. The human-circle is a tiny
+//        signature stamp in the bottom corner.
 //
-//   V2 — Apps as orbit. The Nearstream `>` mark is centred and animated.
-//        Apps live as satellites in slow orbital rings around it.
-//        Selecting a ring reveals the apps in that orbit. The launcher
-//        *is* the mark, just zoomed out.
+//   V2 — Filmstrip. Vertical column of app names in mono caps,
+//        scroll-snaps one at a time. The "tuned in" app gets a big
+//        name and a live signal line. The human-circle plays the role
+//        of a tuning indicator on the right edge.
 //
-//   V3 — Apps as terminal. No grid, no icons, no orbit. The home screen
-//        is mono time + a single underline cursor. Start typing → apps
-//        filter as a list. Empty input = clock. Most ascetic.
-//
-//   V4 — Apps as filmstrip. A single vertical column of app names in
-//        mono caps, scroll-snap one per page. Each app gets a full screen
-//        when "tuned in" — name + a tiny live signal (last opened, last
-//        notification). The animated mark sits as a tuning needle.
-//
-// All four share the chrome: status bar, gesture bar, mono time. None
-// show app icons. None use color beyond the foreground/border tokens.
+//   V3 — Field. The human-circle takes over the whole screen — softly,
+//        as a breathing cloud behind everything. Clock and a small list
+//        of recents float above. The "apps" emerge from the cloud the
+//        way they would from looking at a real landscape: ambient until
+//        you focus on one.
 
 export default function LauncherLabPage() {
   return (
@@ -56,57 +51,47 @@ export default function LauncherLabPage() {
         <div className="w-full max-w-6xl">
           <Kicker>Launcher lab</Kicker>
           <h1 className="mt-2 text-2xl font-normal tracking-tight text-foreground">
-            Minimal Android launcher &mdash; moving points DNA
+            Minimal Android launcher &mdash; human-circle DNA
           </h1>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted">
-            A launcher with the Nearstream aesthetic, not Nearstream
-            content. Same identity (mono palette, moving points, tiny
-            type) applied to the universal launcher problem. The
-            interesting question is how to represent apps when an icon
-            grid is the thing you&rsquo;re trying not to be.
+            Round 2: the chevron mark is out, the human-circle (the
+            moving.points signature) is in. It&rsquo;s more organic at
+            launcher scale &mdash; reads as a breathing cloud rather than
+            a logo, which is the right vibe for ambient chrome.
           </p>
 
           <div className="mt-12 flex gap-6 overflow-x-auto pb-6">
             <Variant
               tag="V1"
-              name="Apps as constellation"
-              note="Home is a sparse sky of dots. Each dot is an app — size encodes how often you use it. Tap to reveal label, tap to launch. The animated `>` mark anchors the bottom-right corner."
-            >
-              <Constellation />
-            </Variant>
-
-            <Variant
-              tag="V2"
-              name="Apps as orbit"
-              note="The animated mark is centred and big. Apps orbit it on slow rings — closer ring = more used. Tap a satellite to highlight; tap again to launch. The launcher *is* the mark, expanded."
-            >
-              <Orbit />
-            </Variant>
-
-            <Variant
-              tag="V3"
-              name="Apps as terminal"
-              note="No grid, no icons. Big mono clock and a single underscore cursor. Start typing — apps filter in as a list. Empty input = clock. Most ascetic of the four; most useful if you have ~50 apps."
+              name="Terminal"
+              note="No grid, no icons. Big mono clock + single underscore cursor. Type → apps filter as a list. The human-circle is a tiny signature stamp in the corner. Most ascetic; most useful for power users."
             >
               <Terminal />
             </Variant>
 
             <Variant
-              tag="V4"
-              name="Apps as filmstrip"
-              note="A vertical column of app names in mono caps. Scroll-snaps one per page; each app gets the full screen when tuned in. The mark plays the role of a tuning needle on the right edge."
+              tag="V2"
+              name="Filmstrip"
+              note="Vertical column of app names in mono caps, scroll-snaps one per page. The tuned-in app gets a big name + a live signal line. The human-circle floats on the right edge as a tuning indicator that breathes with the active app."
             >
               <Filmstrip />
+            </Variant>
+
+            <Variant
+              tag="V3"
+              name="Field"
+              note="The human-circle takes over the whole screen, softly, as a breathing cloud behind everything. Clock + a small list of recent apps float above. Apps emerge from the cloud the way they would from a landscape: ambient until you focus on one."
+            >
+              <Field />
             </Variant>
           </div>
 
           <p className="mt-12 max-w-xl text-sm leading-relaxed text-muted">
-            <strong className="text-foreground">My read:</strong> V2 (orbit)
-            is the strongest visual hook for a LinkedIn post &mdash; the
-            mark is the personality, and orbiting apps is a literal
-            translation of &ldquo;moving points.&rdquo; V3 is the most
-            usable. V1 is the most ambient. V4 is the most genuinely
-            different from any launcher you&rsquo;ve seen.
+            <strong className="text-foreground">My read:</strong> V3 Field
+            is the strongest LinkedIn hero shot &mdash; it&rsquo;s the
+            most &ldquo;moving.points&rdquo; in pure form. V2 Filmstrip is
+            the most usable as a real launcher. V1 Terminal is the most
+            different from anything else on the market.
           </p>
         </div>
       </section>
@@ -158,7 +143,7 @@ function PhoneFrame({ children }: { children: React.ReactNode }) {
 
 function StatusBar() {
   return (
-    <div className="absolute inset-x-0 top-0 z-10 flex h-[28px] items-center justify-between px-5 font-mono text-[10px] tabular-nums text-foreground/85">
+    <div className="absolute inset-x-0 top-0 z-20 flex h-[28px] items-center justify-between px-5 font-mono text-[10px] tabular-nums text-foreground/85">
       <span>09:41</span>
       <span aria-hidden>5G &middot; 87%</span>
     </div>
@@ -167,7 +152,7 @@ function StatusBar() {
 
 function HomeIndicator() {
   return (
-    <div className="absolute inset-x-0 bottom-2 z-10 flex justify-center">
+    <div className="absolute inset-x-0 bottom-2 z-20 flex justify-center">
       <span
         aria-hidden
         className="block h-[3px] w-24 rounded-full bg-foreground/40"
@@ -177,192 +162,7 @@ function HomeIndicator() {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   V1 — Constellation
-   ───────────────────────────────────────────────────────────────────────── */
-
-// Hand-placed constellation. Each entry is (x%, y%, sizeIdx) — size 0..3,
-// 0 = whisper (rarely used), 3 = "highlighted" (most used). One entry per
-// app slot in this mock; in production we'd derive these from usage stats.
-const CONSTELLATION: { x: number; y: number; size: 0 | 1 | 2 | 3; label?: string }[] = [
-  { x: 22, y: 18, size: 1, label: "Maps" },
-  { x: 48, y: 12, size: 2, label: "Notes" },
-  { x: 74, y: 22, size: 3, label: "Camera" },
-  { x: 18, y: 36, size: 0 },
-  { x: 56, y: 40, size: 2, label: "Phone" },
-  { x: 80, y: 48, size: 1, label: "Music" },
-  { x: 38, y: 52, size: 3, label: "Messages" },
-  { x: 12, y: 60, size: 2, label: "Calendar" },
-  { x: 64, y: 64, size: 1, label: "Mail" },
-  { x: 32, y: 72, size: 0 },
-  { x: 50, y: 80, size: 1, label: "Files" },
-  { x: 76, y: 78, size: 2, label: "Reader" },
-];
-
-function Constellation() {
-  return (
-    <div className="relative h-full">
-      <div className="absolute inset-x-0 top-3 px-6">
-        <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-muted-soft">
-          Mon &middot; 29 Jun
-        </p>
-        <h1 className="mt-2 font-mono text-[44px] leading-none tracking-tight tabular-nums text-foreground">
-          09:41
-        </h1>
-      </div>
-
-      {/* The sky. Dots positioned by %; sizes encode use-frequency. */}
-      <div className="absolute inset-0 top-[110px] bottom-[80px]">
-        {CONSTELLATION.map((p, i) => {
-          const dim =
-            p.size === 0
-              ? "h-1 w-1 bg-foreground/30"
-              : p.size === 1
-                ? "h-1.5 w-1.5 bg-foreground/55"
-                : p.size === 2
-                  ? "h-2 w-2 bg-foreground/80"
-                  : "h-2.5 w-2.5 bg-foreground";
-          return (
-            <span
-              key={i}
-              aria-hidden
-              className={`absolute rounded-full ${dim}`}
-              style={{ left: `${p.x}%`, top: `${p.y}%` }}
-            />
-          );
-        })}
-        {/* Label for the currently-selected app (mock: the highlighted one). */}
-        <p
-          className="absolute font-mono text-[10px] uppercase tracking-[0.22em] text-foreground"
-          style={{ left: "44%", top: "53%" }}
-        >
-          Messages →
-        </p>
-      </div>
-
-      {/* The animated mark — anchored bottom-right corner. */}
-      <div className="absolute bottom-12 right-5">
-        <NearstreamMarkAnimated size={64} />
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   V2 — Orbit
-   ───────────────────────────────────────────────────────────────────────── */
-
-const ORBIT_RINGS: { radius: number; apps: { angle: number; label: string }[] }[] = [
-  {
-    radius: 70,
-    apps: [
-      { angle: -30, label: "Phone" },
-      { angle: 60, label: "Messages" },
-      { angle: 150, label: "Camera" },
-      { angle: 230, label: "Music" },
-    ],
-  },
-  {
-    radius: 110,
-    apps: [
-      { angle: 10, label: "Notes" },
-      { angle: 95, label: "Mail" },
-      { angle: 180, label: "Calendar" },
-      { angle: 275, label: "Maps" },
-    ],
-  },
-  {
-    radius: 150,
-    apps: [
-      { angle: -10, label: "Files" },
-      { angle: 70, label: "Photos" },
-      { angle: 145, label: "Settings" },
-      { angle: 215, label: "Reader" },
-      { angle: 290, label: "Wallet" },
-    ],
-  },
-];
-
-function Orbit() {
-  return (
-    <div className="relative flex h-full flex-col">
-      <div className="px-6 pt-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-muted-soft">
-          Mon &middot; 29 Jun
-        </p>
-      </div>
-
-      {/* Centre: the animated mark + orbits. Position relative so absolute
-          children (rings, app dots) can be hung off centre. */}
-      <div className="relative flex flex-1 items-center justify-center">
-        <div className="relative" style={{ width: 320, height: 320 }}>
-          {/* Orbit rings — drawn at the centre of this box. */}
-          {ORBIT_RINGS.map((r) => (
-            <span
-              key={r.radius}
-              aria-hidden
-              className="absolute left-1/2 top-1/2 rounded-full border border-foreground/15"
-              style={{
-                width: r.radius * 2,
-                height: r.radius * 2,
-                marginLeft: -r.radius,
-                marginTop: -r.radius,
-              }}
-            />
-          ))}
-
-          {/* App dots — each orbit places its apps around the ring. */}
-          {ORBIT_RINGS.map((r) =>
-            r.apps.map((app, i) => {
-              const rad = (app.angle * Math.PI) / 180;
-              const ax = Math.cos(rad) * r.radius;
-              const ay = Math.sin(rad) * r.radius;
-              return (
-                <div
-                  key={`${r.radius}-${i}`}
-                  className="absolute flex flex-col items-center"
-                  style={{
-                    left: `calc(50% + ${ax}px)`,
-                    top: `calc(50% + ${ay}px)`,
-                    transform: "translate(-50%, -50%)",
-                  }}
-                >
-                  <span
-                    aria-hidden
-                    className="block h-1.5 w-1.5 rounded-full bg-foreground/85"
-                  />
-                  <span className="mt-1 whitespace-nowrap font-mono text-[8px] uppercase tracking-[0.18em] text-muted-soft">
-                    {app.label}
-                  </span>
-                </div>
-              );
-            }),
-          )}
-
-          {/* The mark — centred. The orbit dots are explicitly NOT
-              animated in this mock; the animation lives in the mark
-              itself. In a real launcher each orbit would also spin
-              slowly. */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <NearstreamMarkAnimated size={120} />
-          </div>
-        </div>
-      </div>
-
-      {/* Tuned-in app + clock as a soft bottom strip. */}
-      <div className="px-6 pb-12">
-        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
-          09:41 &middot; Phone selected
-        </p>
-        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-foreground">
-          tap again to launch
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   V3 — Terminal
+   V1 — Terminal
    ───────────────────────────────────────────────────────────────────────── */
 
 function Terminal() {
@@ -411,16 +211,16 @@ function Terminal() {
 
       <div className="flex-1" />
 
-      {/* Tiny mark in the corner so the launcher still has its identity. */}
+      {/* Tiny human-circle stamp in the corner — the launcher signature. */}
       <div className="px-6 pb-12">
-        <NearstreamMarkAnimated size={32} />
+        <HumanCircle size={48} />
       </div>
     </div>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   V4 — Filmstrip
+   V2 — Filmstrip
    ───────────────────────────────────────────────────────────────────────── */
 
 const FILMSTRIP_APPS = [
@@ -433,7 +233,6 @@ const FILMSTRIP_APPS = [
 ];
 
 function Filmstrip() {
-  // Mock the "tuned in" position — the middle item is the active one.
   const activeIndex = 2;
   return (
     <div className="relative flex h-full flex-col">
@@ -443,10 +242,7 @@ function Filmstrip() {
         </p>
       </div>
 
-      {/* The strip — vertical, each entry gets a "tuning frame". The
-          centre one is large + has a signal line; the rest fade to
-          mute. */}
-      <div className="mt-8 flex flex-1 flex-col justify-center pl-8 pr-16">
+      <div className="mt-8 flex flex-1 flex-col justify-center pl-8 pr-20">
         {FILMSTRIP_APPS.map((app, i) => {
           const distance = Math.abs(i - activeIndex);
           if (distance === 0) {
@@ -478,17 +274,80 @@ function Filmstrip() {
         })}
       </div>
 
-      {/* Tuning needle — the mark sits on the right edge, vertically
-          centred. In a real launcher it would line up with whatever is
-          centred on the strip. */}
+      {/* Tuning indicator — the human-circle on the right edge,
+          vertically centred against the tuned-in app. Slightly slowed
+          and densified vs the default params so it reads as ambient
+          rather than busy. */}
       <div className="absolute right-3 top-1/2 -translate-y-1/2">
-        <NearstreamMarkAnimated size={48} />
+        <AnimatedMark
+          size={72}
+          params={{ seedSpeed: 0.0014, angleStep: 0.018 }}
+          ariaLabel="Tuning indicator"
+        />
       </div>
 
       <div className="pb-12 pl-8">
         <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
           scroll &middot; tap to launch
         </p>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   V3 — Field
+   The human-circle fills the screen as a slow breathing cloud; apps and
+   clock float on top in mono, faintly bordered so they read against the
+   field without fighting it.
+   ───────────────────────────────────────────────────────────────────────── */
+
+function Field() {
+  return (
+    <div className="relative h-full">
+      {/* The cloud. Bigger than the frame, centred, slower morph — so it
+          fills the negative space without distracting from the content
+          on top. */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <AnimatedMark
+          size={520}
+          params={{
+            seedSpeed: 0.0012,
+            angleStep: 0.009,
+            baseRadiusFrac: 0.55,
+            radiusRangeFrac: 0.18,
+          }}
+          ariaLabel="Field"
+        />
+      </div>
+
+      {/* Foreground — clock + small list of recents. Floats on top. The
+          inner box uses no fill so the cloud reads through it. */}
+      <div className="relative z-10 flex h-full flex-col">
+        <div className="px-6 pt-6">
+          <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-foreground/70">
+            Mon &middot; 29 Jun
+          </p>
+          <h1 className="mt-2 font-mono text-[56px] leading-none tracking-tight tabular-nums text-foreground mix-blend-normal">
+            09:41
+          </h1>
+        </div>
+
+        <div className="flex-1" />
+
+        {/* Recents — a quiet list, mono caps. The 'cloud' is loudest
+            here so the text needs the strongest contrast. */}
+        <div className="px-6 pb-12">
+          <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-foreground/70">
+            Recent
+          </p>
+          <ul className="mt-3 flex flex-col gap-1.5 font-mono text-[14px] uppercase tracking-[0.22em] text-foreground">
+            <li>Messages</li>
+            <li className="text-foreground/70">Notes</li>
+            <li className="text-foreground/50">Camera</li>
+            <li className="text-foreground/30">Maps</li>
+          </ul>
+        </div>
       </div>
     </div>
   );
