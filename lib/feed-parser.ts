@@ -65,7 +65,8 @@ function parseRssChannel(channel: any, sourceId: string): ParseResult {
       textOf(item.description) ??
       undefined;
 
-    const image = pickRssImage(item);
+    const images = pickRssImages(item);
+    const image = images[0];
     const authorName =
       textOf(item["dc:creator"]) ?? textOf(item.author) ?? undefined;
 
@@ -79,7 +80,11 @@ function parseRssChannel(channel: any, sourceId: string): ParseResult {
       body,
       excerpt: makeExcerpt(body),
       type: detectRssType(item, { title, body, image }),
+      // Mirror images[0] into the legacy `image` field for one release so
+      // older read paths don't break. The reader uses feedImagesOf() to
+      // coalesce both shapes.
       image,
+      images: images.length > 0 ? images : undefined,
     });
   }
 
@@ -113,22 +118,34 @@ function pickRssGuid(item: any): string | undefined {
   return undefined;
 }
 
-function pickRssImage(item: any): FeedEntryImage | undefined {
-  // Nearstream extension — captured first so we hold onto the thumb URL
-  // even when the picture itself comes from an enclosure or media:content
-  // below. The thumb stays optional on FeedEntryImage; the reader uses it
-  // when present and falls back to the original.
+function pickRssImages(item: any): FeedEntryImage[] {
+  // Preferred: Nearstream's per-image extension. One <nearstream:image>
+  // element per image with both original and thumbnail URLs. Friends'
+  // instances emit this for inventory items (slice 34+). When present,
+  // it's the authoritative list and we don't fall through to enclosure /
+  // media:content — those are also emitted for non-Nearstream readers
+  // but would duplicate.
+  const nearstreamImages = pickNearstreamImages(item);
+  if (nearstreamImages.length > 0) return nearstreamImages;
+
+  // Cover-only fallback for legacy Nearstream feeds (slice 30–33): single
+  // <nearstream:thumbnail> applied to the first <enclosure> / media:content.
   const thumb = pickNearstreamThumb(item);
 
-  // <enclosure url="..." length="..." type="image/jpeg" />
+  // <enclosure url="..." length="..." type="image/jpeg" />. RSS 2.0 allows
+  // multiple, so we collect them all — but only the first inherits the
+  // cover-thumb because that's all the older extension carries.
+  const out: FeedEntryImage[] = [];
   const encs = asArray(item.enclosure);
   for (const e of encs) {
     const type = e?.["@_type"];
     const url = e?.["@_url"];
     if (url && (!type || type.startsWith("image/"))) {
-      return { url, contentType: type, ...thumb };
+      out.push({ url, contentType: type, ...(out.length === 0 ? thumb : {}) });
     }
   }
+  if (out.length > 0) return out;
+
   // <media:content url="..." />
   const media = asArray(item["media:content"]);
   for (const m of media) {
@@ -137,16 +154,39 @@ function pickRssImage(item: any): FeedEntryImage | undefined {
     const w = parseInt(m?.["@_width"] ?? "", 10);
     const h = parseInt(m?.["@_height"] ?? "", 10);
     if (url && (!type || type.startsWith("image/"))) {
-      return {
+      out.push({
         url,
         contentType: type,
         width: Number.isFinite(w) ? w : undefined,
         height: Number.isFinite(h) ? h : undefined,
-        ...thumb,
-      };
+        ...(out.length === 0 ? thumb : {}),
+      });
     }
   }
-  return undefined;
+  return out;
+}
+
+function pickNearstreamImages(item: any): FeedEntryImage[] {
+  const tags = asArray(item["nearstream:image"]);
+  const out: FeedEntryImage[] = [];
+  for (const t of tags) {
+    const url = t?.["@_url"];
+    if (typeof url !== "string" || url.length === 0) continue;
+    const w = parseInt(t?.["@_width"] ?? "", 10);
+    const h = parseInt(t?.["@_height"] ?? "", 10);
+    const thumbUrl = t?.["@_thumbUrl"];
+    const tw = parseInt(t?.["@_thumbWidth"] ?? "", 10);
+    const th = parseInt(t?.["@_thumbHeight"] ?? "", 10);
+    out.push({
+      url,
+      width: Number.isFinite(w) ? w : undefined,
+      height: Number.isFinite(h) ? h : undefined,
+      thumbUrl: typeof thumbUrl === "string" ? thumbUrl : undefined,
+      thumbWidth: Number.isFinite(tw) ? tw : undefined,
+      thumbHeight: Number.isFinite(th) ? th : undefined,
+    });
+  }
+  return out;
 }
 
 function pickNearstreamThumb(item: any): {
