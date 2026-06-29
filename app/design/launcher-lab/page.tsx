@@ -9,28 +9,35 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-// Mockups for an Android home-screen launcher with the Nearstream identity.
-// Not wired to anything — these are visual prototypes for the LinkedIn post
-// + the eventual native Android project. Each prototype is rendered inside
-// a 360×760 phone frame at life size so they read as they would on a real
-// device.
+// A minimal Android launcher with the Nearstream visual DNA — moving
+// points, pure mono palette, tiny type, generous emptiness. Not a
+// Nearstream-content launcher (no reader / letter / friends). The
+// interesting design problem is *how do you represent apps* when an icon
+// grid is the thing you're trying not to be.
 //
-// Three directional takes:
+// Four directions, each takes a different swing at that:
 //
-//   V1 — Mark + Clock: minimal home, the room is mostly empty. The mark
-//        is the personality. Dock at bottom. App grid hidden behind swipe.
+//   V1 — Apps as constellation. Home is a sparse sky of dots. Each dot
+//        is an app; size = use frequency. Tap a dot, the label fades in,
+//        tap again to launch. The animated mark anchors the corner so the
+//        whole screen reads as one drifting field.
 //
-//   V2 — Reader-as-home: the launcher *is* the feed. The most recent
-//        friend post fills the upper half; mono apps live as a tiny dock.
-//        Home screen = "what are my friends up to right now."
+//   V2 — Apps as orbit. The Nearstream `>` mark is centred and animated.
+//        Apps live as satellites in slow orbital rings around it.
+//        Selecting a ring reveals the apps in that orbit. The launcher
+//        *is* the mark, just zoomed out.
 //
-//   V3 — Notebook: not a computer, more a notebook. Date in serif, today's
-//        letter prominent, friend snippets as small cards. Apps as text
-//        labels in the dock — no icons.
+//   V3 — Apps as terminal. No grid, no icons, no orbit. The home screen
+//        is mono time + a single underline cursor. Start typing → apps
+//        filter as a list. Empty input = clock. Most ascetic.
 //
-// The actual Android launcher is a multi-week native project (Kotlin /
-// React Native + HOME intent). These mockups are the design conversation
-// before any of that.
+//   V4 — Apps as filmstrip. A single vertical column of app names in
+//        mono caps, scroll-snap one per page. Each app gets a full screen
+//        when "tuned in" — name + a tiny live signal (last opened, last
+//        notification). The animated mark sits as a tuning needle.
+//
+// All four share the chrome: status bar, gesture bar, mono time. None
+// show app icons. None use color beyond the foreground/border tokens.
 
 export default function LauncherLabPage() {
   return (
@@ -49,47 +56,57 @@ export default function LauncherLabPage() {
         <div className="w-full max-w-6xl">
           <Kicker>Launcher lab</Kicker>
           <h1 className="mt-2 text-2xl font-normal tracking-tight text-foreground">
-            Android home, Nearstream identity
+            Minimal Android launcher &mdash; moving points DNA
           </h1>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted">
-            What a Nearstream launcher could look like. Mockups, not code —
-            the real launcher is a separate native project. Rendered inside
-            phone frames at life size (360 × 760, roughly Pixel 7 logical).
+            A launcher with the Nearstream aesthetic, not Nearstream
+            content. Same identity (mono palette, moving points, tiny
+            type) applied to the universal launcher problem. The
+            interesting question is how to represent apps when an icon
+            grid is the thing you&rsquo;re trying not to be.
           </p>
 
           <div className="mt-12 flex gap-6 overflow-x-auto pb-6">
             <Variant
               tag="V1"
-              name="Mark + clock"
-              note="Minimal home. The animated `>` mark is the personality. Big mono clock, sparse date below, dock at bottom. App drawer hidden behind swipe-up. The room is mostly empty — that's the point."
+              name="Apps as constellation"
+              note="Home is a sparse sky of dots. Each dot is an app — size encodes how often you use it. Tap to reveal label, tap to launch. The animated `>` mark anchors the bottom-right corner."
             >
-              <MarkAndClock />
+              <Constellation />
             </Variant>
 
             <Variant
               tag="V2"
-              name="Reader-as-home"
-              note="The launcher *is* the feed. Most recent friend post fills the upper half. Below: a strip of tiny cards from the rest of today. Mono app dock at bottom. Home screen answers `what are my friends up to right now`."
+              name="Apps as orbit"
+              note="The animated mark is centred and big. Apps orbit it on slow rings — closer ring = more used. Tap a satellite to highlight; tap again to launch. The launcher *is* the mark, expanded."
             >
-              <ReaderAsHome />
+              <Orbit />
             </Variant>
 
             <Variant
               tag="V3"
-              name="Notebook"
-              note="Less computer, more notebook. Date in serif at top, today's letter (your own) underneath. Two small friend snippets below. Apps as mono text labels in the dock — no icons. The launcher reads like a page from a journal."
+              name="Apps as terminal"
+              note="No grid, no icons. Big mono clock and a single underscore cursor. Start typing — apps filter in as a list. Empty input = clock. Most ascetic of the four; most useful if you have ~50 apps."
             >
-              <Notebook />
+              <Terminal />
+            </Variant>
+
+            <Variant
+              tag="V4"
+              name="Apps as filmstrip"
+              note="A vertical column of app names in mono caps. Scroll-snaps one per page; each app gets the full screen when tuned in. The mark plays the role of a tuning needle on the right edge."
+            >
+              <Filmstrip />
             </Variant>
           </div>
 
           <p className="mt-12 max-w-xl text-sm leading-relaxed text-muted">
-            <strong className="text-foreground">My read:</strong> V1 is the
-            cleanest pitch &mdash; the animated mark + sparse chrome is the
-            visual identity, and a launcher is the most ambient surface to
-            put it on. V2 is the most useful (you literally see your
-            friends when you unlock your phone). V3 is the most Nearstream
-            (it reads like a notebook, not an OS).
+            <strong className="text-foreground">My read:</strong> V2 (orbit)
+            is the strongest visual hook for a LinkedIn post &mdash; the
+            mark is the personality, and orbiting apps is a literal
+            translation of &ldquo;moving points.&rdquo; V3 is the most
+            usable. V1 is the most ambient. V4 is the most genuinely
+            different from any launcher you&rsquo;ve seen.
           </p>
         </div>
       </section>
@@ -126,288 +143,353 @@ function Variant({
   );
 }
 
-// 360 × 760 — Pixel 7 logical resolution, minus a sliver for chrome. We
-// keep the bezel intentionally faint so the eye reads the launcher, not
-// the frame.
 function PhoneFrame({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="relative w-[360px] overflow-hidden border border-border bg-background"
       style={{ height: 760 }}
     >
-      {/* Status bar — every variant gets it so the comparison stays honest. */}
       <StatusBar />
       <div className="absolute inset-x-0 top-[28px] bottom-0">{children}</div>
+      <HomeIndicator />
     </div>
   );
 }
 
 function StatusBar() {
   return (
-    <div className="absolute inset-x-0 top-0 flex h-[28px] items-center justify-between px-5 font-mono text-[10px] tabular-nums text-foreground/85">
+    <div className="absolute inset-x-0 top-0 z-10 flex h-[28px] items-center justify-between px-5 font-mono text-[10px] tabular-nums text-foreground/85">
       <span>09:41</span>
-      <span className="flex items-center gap-1.5">
-        <span aria-hidden>•</span>
-        <span aria-hidden>5G</span>
-        <span aria-hidden>·</span>
-        <span aria-hidden>87%</span>
-      </span>
+      <span aria-hidden>5G &middot; 87%</span>
+    </div>
+  );
+}
+
+function HomeIndicator() {
+  return (
+    <div className="absolute inset-x-0 bottom-2 z-10 flex justify-center">
+      <span
+        aria-hidden
+        className="block h-[3px] w-24 rounded-full bg-foreground/40"
+      />
     </div>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   V1 — Mark + clock
+   V1 — Constellation
    ───────────────────────────────────────────────────────────────────────── */
 
-function MarkAndClock() {
+// Hand-placed constellation. Each entry is (x%, y%, sizeIdx) — size 0..3,
+// 0 = whisper (rarely used), 3 = "highlighted" (most used). One entry per
+// app slot in this mock; in production we'd derive these from usage stats.
+const CONSTELLATION: { x: number; y: number; size: 0 | 1 | 2 | 3; label?: string }[] = [
+  { x: 22, y: 18, size: 1, label: "Maps" },
+  { x: 48, y: 12, size: 2, label: "Notes" },
+  { x: 74, y: 22, size: 3, label: "Camera" },
+  { x: 18, y: 36, size: 0 },
+  { x: 56, y: 40, size: 2, label: "Phone" },
+  { x: 80, y: 48, size: 1, label: "Music" },
+  { x: 38, y: 52, size: 3, label: "Messages" },
+  { x: 12, y: 60, size: 2, label: "Calendar" },
+  { x: 64, y: 64, size: 1, label: "Mail" },
+  { x: 32, y: 72, size: 0 },
+  { x: 50, y: 80, size: 1, label: "Files" },
+  { x: 76, y: 78, size: 2, label: "Reader" },
+];
+
+function Constellation() {
   return (
-    <div className="flex h-full flex-col">
-      <div className="px-6 pt-12">
+    <div className="relative h-full">
+      <div className="absolute inset-x-0 top-3 px-6">
         <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-muted-soft">
-          Mon · 29 Jun
+          Mon &middot; 29 Jun
         </p>
-        <h1 className="mt-2 font-mono text-[64px] leading-none tracking-tight tabular-nums text-foreground">
+        <h1 className="mt-2 font-mono text-[44px] leading-none tracking-tight tabular-nums text-foreground">
           09:41
         </h1>
       </div>
 
-      <div className="flex flex-1 items-center justify-center">
-        <NearstreamMarkAnimated size={180} />
+      {/* The sky. Dots positioned by %; sizes encode use-frequency. */}
+      <div className="absolute inset-0 top-[110px] bottom-[80px]">
+        {CONSTELLATION.map((p, i) => {
+          const dim =
+            p.size === 0
+              ? "h-1 w-1 bg-foreground/30"
+              : p.size === 1
+                ? "h-1.5 w-1.5 bg-foreground/55"
+                : p.size === 2
+                  ? "h-2 w-2 bg-foreground/80"
+                  : "h-2.5 w-2.5 bg-foreground";
+          return (
+            <span
+              key={i}
+              aria-hidden
+              className={`absolute rounded-full ${dim}`}
+              style={{ left: `${p.x}%`, top: `${p.y}%` }}
+            />
+          );
+        })}
+        {/* Label for the currently-selected app (mock: the highlighted one). */}
+        <p
+          className="absolute font-mono text-[10px] uppercase tracking-[0.22em] text-foreground"
+          style={{ left: "44%", top: "53%" }}
+        >
+          Messages →
+        </p>
       </div>
 
-      {/* The "letter ticker" — your own latest status line, soft underfoot
-          so the launcher has something to say without shouting. */}
-      <div className="px-6 pb-4">
-        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
-          Letter
-        </p>
-        <p className="mt-1.5 text-[13px] leading-snug text-foreground/85">
-          Working on the launcher. Bench is quiet today.
-        </p>
+      {/* The animated mark — anchored bottom-right corner. */}
+      <div className="absolute bottom-12 right-5">
+        <NearstreamMarkAnimated size={64} />
       </div>
-
-      <LauncherDock variant="icon" />
     </div>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   V2 — Reader-as-home
+   V2 — Orbit
    ───────────────────────────────────────────────────────────────────────── */
 
-function ReaderAsHome() {
+const ORBIT_RINGS: { radius: number; apps: { angle: number; label: string }[] }[] = [
+  {
+    radius: 70,
+    apps: [
+      { angle: -30, label: "Phone" },
+      { angle: 60, label: "Messages" },
+      { angle: 150, label: "Camera" },
+      { angle: 230, label: "Music" },
+    ],
+  },
+  {
+    radius: 110,
+    apps: [
+      { angle: 10, label: "Notes" },
+      { angle: 95, label: "Mail" },
+      { angle: 180, label: "Calendar" },
+      { angle: 275, label: "Maps" },
+    ],
+  },
+  {
+    radius: 150,
+    apps: [
+      { angle: -10, label: "Files" },
+      { angle: 70, label: "Photos" },
+      { angle: 145, label: "Settings" },
+      { angle: 215, label: "Reader" },
+      { angle: 290, label: "Wallet" },
+    ],
+  },
+];
+
+function Orbit() {
   return (
-    <div className="flex h-full flex-col">
-      <div className="px-5 pt-4 pb-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-soft">
-          Today &middot; 2 friends posted
+    <div className="relative flex h-full flex-col">
+      <div className="px-6 pt-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-muted-soft">
+          Mon &middot; 29 Jun
         </p>
       </div>
 
-      {/* Most recent post — fills the upper half */}
-      <div className="px-5">
-        <div className="relative aspect-[4/5] w-full overflow-hidden bg-gradient-to-br from-foreground/22 via-foreground/8 to-foreground/3">
-          <span className="absolute right-2 bottom-2 border border-border bg-background/85 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-foreground">
-            · 6
-          </span>
-        </div>
-        <div className="mt-3 flex items-baseline justify-between">
-          <span className="text-[14px] font-medium text-foreground">
-            Federico Gangemi
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
-            today &middot; 09:12
-          </span>
-        </div>
-        <p className="mt-1 text-[13px] text-foreground/85">
-          First two weeks at jewellery school
-        </p>
-      </div>
-
-      {/* Strip of additional cards */}
-      <div className="mt-5 px-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
-          Earlier
-        </p>
-        <div className="mt-2 flex gap-2 overflow-x-auto">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="aspect-square w-24 shrink-0 overflow-hidden border border-border bg-gradient-to-br from-foreground/15 to-foreground/3"
+      {/* Centre: the animated mark + orbits. Position relative so absolute
+          children (rings, app dots) can be hung off centre. */}
+      <div className="relative flex flex-1 items-center justify-center">
+        <div className="relative" style={{ width: 320, height: 320 }}>
+          {/* Orbit rings — drawn at the centre of this box. */}
+          {ORBIT_RINGS.map((r) => (
+            <span
+              key={r.radius}
+              aria-hidden
+              className="absolute left-1/2 top-1/2 rounded-full border border-foreground/15"
+              style={{
+                width: r.radius * 2,
+                height: r.radius * 2,
+                marginLeft: -r.radius,
+                marginTop: -r.radius,
+              }}
             />
           ))}
+
+          {/* App dots — each orbit places its apps around the ring. */}
+          {ORBIT_RINGS.map((r) =>
+            r.apps.map((app, i) => {
+              const rad = (app.angle * Math.PI) / 180;
+              const ax = Math.cos(rad) * r.radius;
+              const ay = Math.sin(rad) * r.radius;
+              return (
+                <div
+                  key={`${r.radius}-${i}`}
+                  className="absolute flex flex-col items-center"
+                  style={{
+                    left: `calc(50% + ${ax}px)`,
+                    top: `calc(50% + ${ay}px)`,
+                    transform: "translate(-50%, -50%)",
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    className="block h-1.5 w-1.5 rounded-full bg-foreground/85"
+                  />
+                  <span className="mt-1 whitespace-nowrap font-mono text-[8px] uppercase tracking-[0.18em] text-muted-soft">
+                    {app.label}
+                  </span>
+                </div>
+              );
+            }),
+          )}
+
+          {/* The mark — centred. The orbit dots are explicitly NOT
+              animated in this mock; the animation lives in the mark
+              itself. In a real launcher each orbit would also spin
+              slowly. */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <NearstreamMarkAnimated size={120} />
+          </div>
         </div>
       </div>
 
-      <div className="flex-1" />
-
-      <LauncherDock variant="mono-icon" />
+      {/* Tuned-in app + clock as a soft bottom strip. */}
+      <div className="px-6 pb-12">
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
+          09:41 &middot; Phone selected
+        </p>
+        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-foreground">
+          tap again to launch
+        </p>
+      </div>
     </div>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   V3 — Notebook
+   V3 — Terminal
    ───────────────────────────────────────────────────────────────────────── */
 
-function Notebook() {
+function Terminal() {
   return (
     <div className="flex h-full flex-col">
-      <div className="px-6 pt-8">
+      <div className="px-6 pt-10">
         <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-muted-soft">
-          Sunday
+          Mon &middot; 29 Jun
         </p>
-        <h1 className="mt-3 text-[34px] leading-none tracking-tight text-foreground">
-          June 29
+        <h1 className="mt-3 font-mono text-[88px] leading-none tracking-tight tabular-nums text-foreground">
+          09:41
         </h1>
       </div>
 
-      <div className="mt-8 px-6">
+      <div className="mt-10 px-6">
         <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
-          Letter
+          Type to find an app
         </p>
-        <p className="mt-2 text-[15px] leading-[1.55] text-foreground">
-          Working on the launcher. Bench is quiet today. The rains held off
-          so I&rsquo;m walking the canal.
-        </p>
-      </div>
-
-      <div className="mt-8 px-6">
-        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
-          Friends &middot; today
-        </p>
-        <div className="mt-3 flex flex-col gap-4 border-t border-border pt-4">
-          <NotebookSnippet
-            author="Federico"
-            when="09:12"
-            text="First two weeks at jewellery school. Six pieces from the bench."
-          />
-          <NotebookSnippet
-            author="Gosia"
-            when="yesterday"
-            text="Bellingham at last light. Wanted you to see this."
+        <div className="mt-3 flex items-baseline gap-2 border-b border-border pb-2">
+          <span className="font-mono text-[24px] tabular-nums text-foreground">
+            mes
+          </span>
+          <span
+            aria-hidden
+            className="block h-6 w-[10px] animate-pulse bg-foreground"
           />
         </div>
       </div>
 
+      <div className="mt-6 px-6">
+        <ul className="flex flex-col gap-2 font-mono text-[14px] uppercase tracking-[0.22em] text-foreground">
+          <li className="flex items-baseline justify-between border border-foreground bg-foreground/5 px-3 py-2">
+            <span>Messages</span>
+            <span className="text-[9px] tracking-[0.18em] text-muted-soft">
+              ↵ launch
+            </span>
+          </li>
+          <li className="px-3 py-2 text-muted">
+            Mes&shy;senger
+          </li>
+          <li className="px-3 py-2 text-muted-soft">
+            Mes&shy;sage&shy;board
+          </li>
+        </ul>
+      </div>
+
       <div className="flex-1" />
 
-      <LauncherDock variant="text-label" />
-    </div>
-  );
-}
-
-function NotebookSnippet({
-  author,
-  when,
-  text,
-}: {
-  author: string;
-  when: string;
-  text: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5 border-l border-border pl-3">
-      <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
-        {author} &middot; {when}
-      </p>
-      <p className="text-[13px] leading-snug text-foreground/90">{text}</p>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Dock — three flavours used by the three variants
-   ───────────────────────────────────────────────────────────────────────── */
-
-function LauncherDock({
-  variant,
-}: {
-  variant: "icon" | "mono-icon" | "text-label";
-}) {
-  // Pixel-launcher convention: 4–5 items, plus gesture hint for the home
-  // bar. We keep four to avoid crowding the mono palette.
-  const items: { label: string; glyph: React.ReactNode }[] = [
-    { label: "Phone", glyph: <PhoneGlyph /> },
-    { label: "Reader", glyph: <ReaderGlyph /> },
-    { label: "Studio", glyph: <StudioGlyph /> },
-    { label: "Camera", glyph: <CameraGlyph /> },
-  ];
-  return (
-    <div className="border-t border-border pt-3 pb-7">
-      <ul className="grid grid-cols-4 px-3">
-        {items.map((it) => (
-          <li key={it.label} className="flex flex-col items-center gap-1.5">
-            {variant === "text-label" ? (
-              <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-foreground">
-                {it.label}
-              </span>
-            ) : (
-              <>
-                <span
-                  className={
-                    "flex h-10 w-10 items-center justify-center " +
-                    (variant === "icon"
-                      ? "rounded-2xl bg-foreground/8 text-foreground"
-                      : "text-foreground")
-                  }
-                >
-                  {it.glyph}
-                </span>
-                <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-soft">
-                  {it.label}
-                </span>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
-      {/* Android home-indicator bar */}
-      <div className="mt-4 flex justify-center">
-        <span aria-hidden className="block h-[3px] w-24 rounded-full bg-foreground/40" />
+      {/* Tiny mark in the corner so the launcher still has its identity. */}
+      <div className="px-6 pb-12">
+        <NearstreamMarkAnimated size={32} />
       </div>
     </div>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Tiny mono glyphs. Hand-rolled SVG so they match the rest of the chrome
-   (mode glyphs / nav icons elsewhere in the codebase use the same line
-   weight + stroke).
+   V4 — Filmstrip
    ───────────────────────────────────────────────────────────────────────── */
 
-function PhoneGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-5 w-5">
-      <path d="M5 4.5l3 .5 1 4-2 1.5c1 2.5 3 4.5 5.5 5.5l1.5-2 4 1 .5 3-2 2c-7 0-13-6-13-13l1.5-2.5z" />
-    </svg>
-  );
-}
+const FILMSTRIP_APPS = [
+  { name: "Phone", signal: "last open · 02:14 today" },
+  { name: "Messages", signal: "3 unread" },
+  { name: "Camera", signal: "last shot · yesterday" },
+  { name: "Music", signal: "paused · Bonobo" },
+  { name: "Notes", signal: "today's note ·  in progress" },
+  { name: "Maps", signal: "last search · Bellingham" },
+];
 
-function ReaderGlyph() {
+function Filmstrip() {
+  // Mock the "tuned in" position — the middle item is the active one.
+  const activeIndex = 2;
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-5 w-5">
-      <path d="M4 6h16M4 11h16M4 16h10" />
-    </svg>
-  );
-}
+    <div className="relative flex h-full flex-col">
+      <div className="px-6 pt-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-muted-soft">
+          Mon &middot; 29 Jun &middot; 09:41
+        </p>
+      </div>
 
-function StudioGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-5 w-5">
-      <path d="M4 20l4-1 10-10-3-3L5 16l-1 4z" />
-      <path d="M14 6l3 3" />
-    </svg>
-  );
-}
+      {/* The strip — vertical, each entry gets a "tuning frame". The
+          centre one is large + has a signal line; the rest fade to
+          mute. */}
+      <div className="mt-8 flex flex-1 flex-col justify-center pl-8 pr-16">
+        {FILMSTRIP_APPS.map((app, i) => {
+          const distance = Math.abs(i - activeIndex);
+          if (distance === 0) {
+            return (
+              <div key={app.name} className="py-3">
+                <p className="font-mono text-[32px] leading-none tracking-tight uppercase text-foreground">
+                  {app.name}
+                </p>
+                <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
+                  {app.signal}
+                </p>
+              </div>
+            );
+          }
+          const opacity =
+            distance === 1
+              ? "text-foreground/50"
+              : distance === 2
+                ? "text-foreground/25"
+                : "text-foreground/10";
+          return (
+            <p
+              key={app.name}
+              className={`py-1.5 font-mono text-[20px] leading-none uppercase tracking-tight ${opacity}`}
+            >
+              {app.name}
+            </p>
+          );
+        })}
+      </div>
 
-function CameraGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-5 w-5">
-      <rect x="3" y="7" width="18" height="13" rx="2" />
-      <circle cx="12" cy="13.5" r="3.5" />
-      <path d="M9 7l1.5-2h3L15 7" />
-    </svg>
+      {/* Tuning needle — the mark sits on the right edge, vertically
+          centred. In a real launcher it would line up with whatever is
+          centred on the strip. */}
+      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+        <NearstreamMarkAnimated size={48} />
+      </div>
+
+      <div className="pb-12 pl-8">
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
+          scroll &middot; tap to launch
+        </p>
+      </div>
+    </div>
   );
 }
