@@ -187,22 +187,31 @@ function EmptyFeedState() {
   );
 }
 
+type ReaderImage = {
+  url: string;
+  width?: number;
+  height?: number;
+  thumbUrl?: string;
+  thumbWidth?: number;
+  thumbHeight?: number;
+};
+
 type EntryPropsBase = {
   entry: {
     url: string;
     title?: string;
     body?: string;
     excerpt?: string;
-    image?: {
-      url: string;
-      width?: number;
-      height?: number;
-      thumbUrl?: string;
-      thumbWidth?: number;
-      thumbHeight?: number;
-    };
+    image?: ReaderImage;
+    images?: ReaderImage[];
   };
 };
+
+function readerImages(entry: EntryPropsBase["entry"]): ReaderImage[] {
+  if (entry.images && entry.images.length > 0) return entry.images;
+  if (entry.image) return [entry.image];
+  return [];
+}
 
 function NoteBody({ entry }: EntryPropsBase) {
   // For notes we show the excerpt (plain text, length-bounded). HTML in
@@ -250,9 +259,24 @@ function PictureBody({ entry }: EntryPropsBase) {
   // JPEG via the `<nearstream:thumbnail>` extension) so we're not pulling
   // a 4032×3024 iPhone photo just to render a 4:3 card. Fall back to the
   // full-res original for arbitrary RSS feeds that don't expose a thumb.
-  const src = entry.image?.thumbUrl ?? entry.image?.url;
-  const w = entry.image?.thumbWidth ?? entry.image?.width;
-  const h = entry.image?.thumbHeight ?? entry.image?.height;
+  const images = readerImages(entry);
+  if (images.length === 0) {
+    return entry.title ? (
+      <a
+        href={entry.url}
+        rel="noopener noreferrer"
+        target="_blank"
+        className="block text-[15px] text-foreground/95 hover:text-white"
+      >
+        {entry.title}
+      </a>
+    ) : null;
+  }
+  const cover = images[0];
+  const coverSrc = cover.thumbUrl ?? cover.url;
+  const coverW = cover.thumbWidth ?? cover.width;
+  const coverH = cover.thumbHeight ?? cover.height;
+  const extras = images.slice(1);
   return (
     <a
       href={entry.url}
@@ -260,9 +284,47 @@ function PictureBody({ entry }: EntryPropsBase) {
       target="_blank"
       className="group block"
     >
-      {src ? (
-        <ReaderPicture src={src} width={w} height={h} alt={entry.title ?? ""} />
-      ) : null}
+      <div className="relative">
+        <ReaderPicture
+          src={coverSrc}
+          width={coverW}
+          height={coverH}
+          alt={entry.title ?? ""}
+        />
+        {images.length > 1 && (
+          // Bottom-right "· N" badge over the cover so you know there's a
+          // gallery without us needing extra chrome above. Same vocabulary
+          // as the tenant home / library grid badges.
+          <span className="absolute right-2 bottom-2 border border-border bg-background/85 px-2 py-1 font-mono text-[10px] tabular-nums text-foreground backdrop-blur">
+            · {images.length}
+          </span>
+        )}
+      </div>
+      {extras.length > 0 && (
+        // Strip of additional thumbs underneath, horizontal scroll past
+        // the page gutter (matches the cover's -mx-6 bleed). Mobile gets
+        // ~3 visible per swipe, desktop fits the full row.
+        <div className="-mx-6 mt-2 flex gap-1 overflow-x-auto px-6">
+          {extras.slice(0, 8).map((img, i) => {
+            const src = img.thumbUrl ?? img.url;
+            return (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={src}
+                alt=""
+                loading="lazy"
+                className="h-20 w-20 shrink-0 border border-border bg-foreground/5 object-cover"
+              />
+            );
+          })}
+          {extras.length > 8 && (
+            <span className="flex h-20 w-20 shrink-0 items-center justify-center border border-border bg-background font-mono text-[11px] tabular-nums text-muted-soft">
+              +{extras.length - 8}
+            </span>
+          )}
+        </div>
+      )}
       {entry.title ? (
         <div className="mt-4 text-[15px] text-foreground/95 transition-colors group-hover:text-white">
           {entry.title}
@@ -443,9 +505,13 @@ function BroadsheetEssay({ entry }: EntryPropsBase) {
 }
 
 function BroadsheetPicture({ entry }: EntryPropsBase) {
-  const src = entry.image?.thumbUrl ?? entry.image?.url;
-  const w = entry.image?.thumbWidth ?? entry.image?.width;
-  const h = entry.image?.thumbHeight ?? entry.image?.height;
+  const images = readerImages(entry);
+  if (images.length === 0) return null;
+  const cover = images[0];
+  const src = cover.thumbUrl ?? cover.url;
+  const w = cover.thumbWidth ?? cover.width;
+  const h = cover.thumbHeight ?? cover.height;
+  const extras = images.slice(1);
   return (
     <a
       href={entry.url}
@@ -453,9 +519,36 @@ function BroadsheetPicture({ entry }: EntryPropsBase) {
       target="_blank"
       className="mt-5 block group"
     >
-      {src ? (
+      <div className="relative">
         <ReaderPicture src={src} width={w} height={h} alt={entry.title ?? ""} />
-      ) : null}
+        {images.length > 1 && (
+          <span className="absolute right-2 bottom-2 border border-border bg-background/85 px-2 py-1 font-mono text-[10px] tabular-nums text-foreground backdrop-blur">
+            · {images.length}
+          </span>
+        )}
+      </div>
+      {extras.length > 0 && (
+        <div className="-mx-6 mt-2 flex gap-1 overflow-x-auto px-6">
+          {extras.slice(0, 8).map((img, i) => {
+            const tsrc = img.thumbUrl ?? img.url;
+            return (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={tsrc}
+                alt=""
+                loading="lazy"
+                className="h-20 w-20 shrink-0 border border-border bg-foreground/5 object-cover"
+              />
+            );
+          })}
+          {extras.length > 8 && (
+            <span className="flex h-20 w-20 shrink-0 items-center justify-center border border-border bg-background font-mono text-[11px] tabular-nums text-muted-soft">
+              +{extras.length - 8}
+            </span>
+          )}
+        </div>
+      )}
       {entry.title ? (
         <p className="mt-4 text-[17px] italic leading-snug text-foreground transition-colors group-hover:text-white">
           {entry.title}
