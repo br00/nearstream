@@ -273,9 +273,14 @@ function PictureBody({ entry }: EntryPropsBase) {
     ) : null;
   }
   const cover = images[0];
-  const coverSrc = cover.thumbUrl ?? cover.url;
-  const coverW = cover.thumbWidth ?? cover.width;
-  const coverH = cover.thumbHeight ?? cover.height;
+  // Cover uses the full-res original. The 600px thumbnail looks blurry on
+  // desktop / retina where the reader column is wider than 300 CSS px and
+  // gets doubled by the device pixel ratio. We pay the bandwidth once per
+  // new post (browser caches; the auto-refresh doesn't re-download).
+  // Strip thumbs below stay on the 600px thumb because they're tiny.
+  const coverSrc = cover.url;
+  const coverW = cover.width;
+  const coverH = cover.height;
   const extras = images.slice(1);
   return (
     <a
@@ -508,9 +513,10 @@ function BroadsheetPicture({ entry }: EntryPropsBase) {
   const images = readerImages(entry);
   if (images.length === 0) return null;
   const cover = images[0];
-  const src = cover.thumbUrl ?? cover.url;
-  const w = cover.thumbWidth ?? cover.width;
-  const h = cover.thumbHeight ?? cover.height;
+  // Same call as PictureBody: cover full-res, strip thumbs.
+  const src = cover.url;
+  const w = cover.width;
+  const h = cover.height;
   const extras = images.slice(1);
   return (
     <a
