@@ -211,11 +211,11 @@ function Terminal() {
 
       <div className="flex-1" />
 
-      {/* Human-circle stamp in the corner — the launcher signature. Sized
-          up from 48 to 96 because the pencil-brush marks are sub-pixel
-          below ~80px and don't render. */}
-      <div className="px-6 pb-12">
-        <HumanCircle size={96} />
+      {/* Human-circle stamp in the corner — the launcher signature.
+          The pencil-brush marks are sub-pixel below ~200px on the
+          default params, so we push to 200 for it to actually read. */}
+      <div className="flex justify-center pb-12">
+        <HumanCircle size={200} />
       </div>
     </div>
   );
@@ -276,14 +276,14 @@ function Filmstrip() {
         })}
       </div>
 
-      {/* Tuning indicator — the human-circle on the right edge,
-          vertically centred against the tuned-in app. Sized up to 128
-          so the pencil-brush marks read (they're sub-pixel below ~80).
-          Slower seedSpeed vs default so it reads as ambient rather than
-          busy. */}
-      <div className="absolute right-2 top-1/2 -translate-y-1/2">
+      {/* Tuning indicator — the human-circle centred on the right edge,
+          vertically aligned with the tuned-in app. Pushed to 220 so the
+          pencil-brush marks actually render — anything smaller than ~200
+          on the default params ends up sub-pixel. Slower seedSpeed reads
+          as ambient rather than busy. */}
+      <div className="absolute right-0 top-1/2 -translate-y-1/2">
         <AnimatedMark
-          size={128}
+          size={220}
           params={{ seedSpeed: 0.0014 }}
           ariaLabel="Tuning indicator"
         />
