@@ -15,6 +15,15 @@ import { parseFeed } from "@/lib/feed-parser";
 
 const USER_AGENT = "Nearstream/0.1 (+https://nearstream.app)";
 
+// The reader fetches friends' RSS via HTTP. When friend and reader live on
+// the same instance (which is always the case today — Phase 6 federation
+// is where cross-instance kicks in), a `friends` or `private` privacy
+// setting on the friend's tenant would 404 their RSS route and starve the
+// reader. We pass a shared secret header so the RSS route knows this is
+// an internal same-instance fetch and can skip the tenant-visibility
+// gate. The secret is env-only; browsers never see it.
+const INTERNAL_HEADER = "x-nearstream-internal";
+
 export type RefreshResult =
   | { status: "ok"; sourceId: string; added: number; notModified: false }
   | { status: "not-modified"; sourceId: string; notModified: true; added: 0 }
@@ -36,6 +45,16 @@ export async function refreshSource(
   };
   if (source.etag) headers["if-none-match"] = source.etag;
   if (source.lastModified) headers["if-modified-since"] = source.lastModified;
+  // Same-instance friends' RSS may be `friends`- or `private`-scoped.
+  // If we (the instance) are fetching, we're allowed — send the shared
+  // secret so the RSS route bypasses its tenant-visibility gate. Only
+  // sent when the feed URL points at our own instance, so the secret
+  // never leaks to a third party.
+  const internal = process.env.NEARSTREAM_INTERNAL_SECRET;
+  const instanceUrl = process.env.NEARSTREAM_SITE_URL;
+  if (internal && instanceUrl && isSameInstanceUrl(source.feedUrl, instanceUrl)) {
+    headers[INTERNAL_HEADER] = internal;
+  }
 
   let res: Response;
   try {
@@ -104,6 +123,31 @@ export async function refreshSource(
   });
 
   return { status: "ok", sourceId: id, added, notModified: false };
+}
+
+// Same-origin match on host. Covers the primary instance URL. Custom
+// tenant domains (from TENANT_DOMAINS) will still send the header only
+// if their host matches this — for MVP the primary instance is enough,
+// since same-instance friends' feeds go through nearstream.app first
+// and get proxied. Extend when custom domains + private tenants collide.
+function isSameInstanceUrl(feedUrl: string, instanceUrl: string): boolean {
+  try {
+    const feedHost = new URL(feedUrl).host;
+    const instHost = new URL(instanceUrl).host;
+    return feedHost === instHost;
+  } catch {
+    return false;
+  }
+}
+
+/** Read this in the RSS route to decide whether to bypass the tenant
+ *  visibility gate. Constant-time compare would be nice; the value is
+ *  short and we're comparing to an env secret so this is fine. */
+export function isInternalFeedRequest(request: Request): boolean {
+  const secret = process.env.NEARSTREAM_INTERNAL_SECRET;
+  if (!secret) return false;
+  const provided = request.headers.get(INTERNAL_HEADER);
+  return provided === secret;
 }
 
 export async function refreshAllSources(userId: string): Promise<RefreshResult[]> {

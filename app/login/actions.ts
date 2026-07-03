@@ -19,7 +19,7 @@ export async function requestMagicLink(formData: FormData): Promise<void> {
 
   const email = normalizeEmail(raw);
 
-  if (isEmailAllowed(email)) {
+  if (await isEmailAllowed(email)) {
     const token = await createMagicLinkToken(email);
     const hdrs = await headers();
     const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host");

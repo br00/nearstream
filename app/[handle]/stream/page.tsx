@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { store } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
+import { checkTenantVisibility } from "@/lib/tenant-visibility";
 import { tenantBase } from "@/lib/tenant-domains";
 import { visibilityOf } from "@/schemas/visibility";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
@@ -54,6 +55,13 @@ export default async function StreamArchive({ params }: Props) {
     inventoryStore.list(user.id),
     getSession(),
   ]);
+  const gate = checkTenantVisibility(user, session);
+  if (!gate.allowed) {
+    if (gate.reason === "sign-in") {
+      redirect(`/login?next=${encodeURIComponent(`/${handle}/stream`)}&reason=private-tenant`);
+    }
+    notFound();
+  }
   const isOwner = session?.userId === user.id;
   const entries = isOwner
     ? allEntries

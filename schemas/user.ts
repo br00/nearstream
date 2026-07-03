@@ -38,6 +38,18 @@ export type UserPreferences = {
   readerLayout?: ReaderLayout;
   /** Mode for the inventory detail page gallery. */
   galleryLayout?: GalleryLayout;
+  /**
+   * Who can view this user's tenant page + detail pages + RSS feed.
+   * - `public`: anyone with the URL. RSS is public.
+   * - `friends`: only signed-in users on the instance. RSS 404s.
+   * - `private`: only the owner. Everything 404s to anyone else.
+   *
+   * When unset, `lib/tenant-visibility.defaultSitePrivacy(email)` picks
+   * a default: the host defaults to `public` (their tenant is the public
+   * face of the instance); everyone else defaults to `friends` so a
+   * random URL guess doesn't expose a friend's site.
+   */
+  sitePrivacy?: SitePrivacy;
 };
 
 export const READER_LAYOUTS = ["default", "broadsheet"] as const;
@@ -57,6 +69,16 @@ export function isGalleryLayout(value: unknown): value is GalleryLayout {
   return (
     typeof value === "string" &&
     (GALLERY_LAYOUTS as readonly string[]).includes(value)
+  );
+}
+
+export const SITE_PRIVACY = ["public", "friends", "private"] as const;
+export type SitePrivacy = (typeof SITE_PRIVACY)[number];
+
+export function isSitePrivacy(value: unknown): value is SitePrivacy {
+  return (
+    typeof value === "string" &&
+    (SITE_PRIVACY as readonly string[]).includes(value)
   );
 }
 

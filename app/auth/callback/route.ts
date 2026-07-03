@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   }
 
   const email = await consumeMagicLinkToken(token);
-  if (!email || !isEmailAllowed(email)) {
+  if (!email || !(await isEmailAllowed(email))) {
     return NextResponse.redirect(new URL("/login?error=invalid_link", url));
   }
 
