@@ -76,6 +76,26 @@ export async function refreshSource(
     return { status: "not-modified", sourceId: id, added: 0, notModified: true };
   }
 
+  // 404 = source is gone. Could be the friend deleted their tenant, or
+  // (slice 36) flipped their site to `private` — either way we should
+  // purge cached entries so the reader doesn't keep showing stale posts
+  // from a source that no longer wants us reading. 5xx and 4xx-other
+  // stay warnings but don't purge (could be transient).
+  if (res.status === 404) {
+    try {
+      await feedEntryStore.deleteBySource(userId, id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[refreshSource] 404 purge failed for ${id}`, message);
+    }
+    await sourceStore.update(userId, id, {
+      lastFetchedAt: new Date().toISOString(),
+      lastError:
+        "source returned 404 — the tenant may have gone private or been removed",
+    });
+    return { status: "error", sourceId: id, error: "HTTP 404" };
+  }
+
   if (!res.ok) {
     const message = `HTTP ${res.status} ${res.statusText}`;
     await sourceStore.update(userId, id, {
