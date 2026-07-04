@@ -63,6 +63,37 @@ function thumbnailElement(
   return `<nearstream:thumbnail url="${escapeXml(url)}" width="${tw}" height="${th}" />`;
 }
 
+// Per-image element used by friends' instances to render a gallery in
+// their reader without having to pull the full-res originals. Carries
+// both the original URL + dimensions and the 600px-capped thumbnail. One
+// element per image in `images[]`; the order matches the order on the
+// detail page. `<enclosure>` stays alongside for non-Nearstream readers.
+function imageElements(
+  images: InventoryImage[],
+  instanceUrl: string,
+): string {
+  return images
+    .map((img) => {
+      const url = `${instanceUrl}/api/media/${img.key}`;
+      const w = img.width;
+      const h = img.height;
+      const wh = w && h ? ` width="${w}" height="${h}"` : "";
+      const thumbAttrs = (() => {
+        if (!img.thumbKey) return "";
+        const tUrl = `${instanceUrl}/api/media/${img.thumbKey}`;
+        if (!w || !h) {
+          return ` thumbUrl="${escapeXml(tUrl)}"`;
+        }
+        const ratio = Math.min(THUMB_MAX_DIM / w, THUMB_MAX_DIM / h, 1);
+        const tw = Math.max(1, Math.round(w * ratio));
+        const th = Math.max(1, Math.round(h * ratio));
+        return ` thumbUrl="${escapeXml(tUrl)}" thumbWidth="${tw}" thumbHeight="${th}"`;
+      })();
+      return `<nearstream:image url="${escapeXml(url)}"${wh}${thumbAttrs} />`;
+    })
+    .join("\n      ");
+}
+
 function htmlEscape(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -212,6 +243,11 @@ export async function GET(_req: Request, { params }: Props) {
     // Missing thumbKey or missing original dims short-circuits the
     // element so older items stay valid.
     const thumb = thumbnailElement(all[0], INSTANCE_URL);
+    // Slice 34 extension: one <nearstream:image> per image so friends'
+    // readers can render a gallery card with all images, not just the
+    // cover. <enclosure> stays for non-Nearstream readers. We emit this
+    // even for single-image items — readers parse the array uniformly.
+    const imageList = imageElements(all, INSTANCE_URL);
     feedItems.push({
       publishedAt: item.publishedAt,
       toXml: () => `    <item>
@@ -222,6 +258,7 @@ export async function GET(_req: Request, { params }: Props) {
       <category>Inventory</category>
       <nearstream:type>picture</nearstream:type>
       ${enclosures}${thumb ? `\n      ${thumb}` : ""}
+      ${imageList}
       <description><![CDATA[${escapeCdata(body)}]]></description>
     </item>`,
     });

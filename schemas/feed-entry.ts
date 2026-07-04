@@ -45,10 +45,27 @@ export type FeedEntry = {
   excerpt?: string;
   /** Set in slice 17. Slice 16 writes "unknown". */
   type: FeedEntryType;
-  /** First enclosure / media:content image, if any. */
+  /** Legacy single-image field. Items mirrored from `images[0]` for one
+   *  release so older read paths don't break. Use `imagesOf()` from
+   *  schemas/feed-entry.ts. */
   image?: FeedEntryImage;
+  /** Ordered image list for picture entries with multiple images (slice
+   *  34). `images[0]` is the cover. Populated by the parser from
+   *  `<nearstream:image>` extension elements or from multiple RSS
+   *  `<enclosure>` tags. May be undefined for legacy entries; callers
+   *  should use `imagesOf()` which coalesces both shapes. */
+  images?: FeedEntryImage[];
   /** When our reader first saw this entry. */
   fetchedAt: string;
 };
+
+/** Read-side helper. Returns the canonical image list whether the entry
+ *  was parsed before slice 34 (one `image`) or after (an `images` array).
+ *  Returns [] for entries with no images at all (notes, essays). */
+export function feedImagesOf(entry: Pick<FeedEntry, "image" | "images">): FeedEntryImage[] {
+  if (entry.images && entry.images.length > 0) return entry.images;
+  if (entry.image) return [entry.image];
+  return [];
+}
 
 export type NewFeedEntry = Omit<FeedEntry, "id" | "fetchedAt">;
