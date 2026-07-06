@@ -8,7 +8,7 @@
 // fine — R2 puts are cheap. If someone hostile spams, we add limits.
 
 import { accessRequestStore } from "@/lib/access-request-store";
-import { normalizeEmail } from "@/lib/auth";
+import { isEmailAllowed, normalizeEmail } from "@/lib/auth";
 import { MESSAGE_MAX } from "@/schemas/access-request";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -50,17 +50,27 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Idempotency by hand: if the same email already has a pending
-    // request, don't create a duplicate. The requester gets the same
-    // acknowledgement page — they can't tell whether it was new or a
-    // repeat, which is fine.
-    const existing = await accessRequestStore.findByEmail(email);
-    const pending = existing.find((r) => r.status === "pending");
-    if (!pending) {
-      await accessRequestStore.create({
-        email: normalizeEmail(email),
-        message: message.trim(),
-      });
+    // Already on the allowlist? Silently drop the submission so the
+    // host doesn't have to triage friends-who-already-exist. The
+    // requester gets the same "Thanks" page — we deliberately don't
+    // leak allowlist membership (matches the /login flow, which also
+    // returns an identical response whether or not the email is on
+    // the list).
+    if (await isEmailAllowed(email)) {
+      // no-op
+    } else {
+      // Idempotency by hand: if the same email already has a pending
+      // request, don't create a duplicate. The requester gets the
+      // same acknowledgement page — they can't tell whether it was
+      // new or a repeat, which is fine.
+      const existing = await accessRequestStore.findByEmail(email);
+      const pending = existing.find((r) => r.status === "pending");
+      if (!pending) {
+        await accessRequestStore.create({
+          email: normalizeEmail(email),
+          message: message.trim(),
+        });
+      }
     }
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
