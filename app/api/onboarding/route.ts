@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
 import { isValidHandle } from "@/schemas/user";
@@ -60,7 +59,11 @@ export async function POST(request: Request) {
     profileMark,
   );
 
-  return Response.redirect(new URL("/studio", request.url), 303);
+  // Slice 37: first-time onboarding lands on /welcome instead of /studio.
+  // Gives the new friend a proper "you're in" moment with their URL,
+  // share button, and two clear next steps (add a friend, write first
+  // post) before dropping them into a compose form.
+  return Response.redirect(new URL("/welcome", request.url), 303);
 }
 
 function errorRedirect(request: Request, message: string): Response {

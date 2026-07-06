@@ -13,7 +13,7 @@ import { getSession, isHostEmail, createMagicLinkToken } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
 import { accessRequestStore } from "@/lib/access-request-store";
 import { allowlistStore } from "@/lib/allowlist-store";
-import { sendMagicLink } from "@/lib/email";
+import { sendWelcomeMagicLink } from "@/lib/email";
 import { headers } from "next/headers";
 
 type Params = { params: Promise<{ id: string }> };
@@ -47,16 +47,18 @@ export async function POST(request: Request, { params }: Params) {
     });
     await accessRequestStore.setStatus(req.id, "approved", user.id);
 
-    // Send a welcome magic link. Same shape as the /login flow — a
-    // 15-minute token to /auth/callback. If it expires the new friend
-    // can request another from /login, since they're now allowlisted.
+    // Send a welcome magic link — same shape as the /login flow (15-min
+    // token to /auth/callback) but with copy that reads as "you're in,
+    // welcome" rather than a routine sign-in. If it expires the new
+    // friend can just head to /login with the same email since they're
+    // now on the allowlist.
     const token = await createMagicLinkToken(req.email);
     const hdrs = await headers();
     const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host");
     const proto = hdrs.get("x-forwarded-proto") ?? "http";
     if (host) {
       const url = `${proto}://${host}/auth/callback?token=${encodeURIComponent(token)}`;
-      await sendMagicLink(req.email, url);
+      await sendWelcomeMagicLink(req.email, url);
     }
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
