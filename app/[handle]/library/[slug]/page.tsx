@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { marked } from "marked";
 import { essayStore } from "@/lib/essay-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
+import { checkTenantVisibility } from "@/lib/tenant-visibility";
 import { tenantBase } from "@/lib/tenant-domains";
 import { visibilityOf } from "@/schemas/visibility";
 import { PageShell } from "@/app/_components/page-shell";
@@ -45,6 +46,13 @@ export default async function EssayPage({ params }: Props) {
     essayStore.getBySlug(user.id, slug),
     getSession(),
   ]);
+  const gate = checkTenantVisibility(user, session);
+  if (!gate.allowed) {
+    if (gate.reason === "sign-in") {
+      redirect(`/login?next=${encodeURIComponent(`/${handle}/library/${slug}`)}&reason=private-tenant`);
+    }
+    notFound();
+  }
   if (!essay) notFound();
   const isOwner = session?.userId === user.id;
   // Private essays 404 for non-owners — don't even leak that the slug exists.

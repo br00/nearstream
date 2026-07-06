@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { checkTenantVisibility } from "@/lib/tenant-visibility";
 import { marked } from "marked";
 import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
@@ -47,6 +48,13 @@ export default async function InventoryItemPage({ params }: Props) {
     inventoryStore.getBySlug(user.id, slug),
     getSession(),
   ]);
+  const gate = checkTenantVisibility(user, session);
+  if (!gate.allowed) {
+    if (gate.reason === "sign-in") {
+      redirect(`/login?next=${encodeURIComponent(`/${handle}/library/inventory/${slug}`)}&reason=private-tenant`);
+    }
+    notFound();
+  }
   if (!item) notFound();
   const isOwner = session?.userId === user.id;
   if (visibilityOf(item) === "private" && !isOwner) notFound();

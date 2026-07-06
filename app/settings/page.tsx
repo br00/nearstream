@@ -6,6 +6,8 @@
 import { redirect } from "next/navigation";
 import { getSession, isHostEmail } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
+import { accessRequestStore } from "@/lib/access-request-store";
+import { resolveSitePrivacy } from "@/lib/tenant-visibility";
 import { tenantAbsoluteBase } from "@/lib/tenant-domains";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamMark } from "@/app/_components/nearstream-mark";
@@ -15,7 +17,7 @@ import { Input } from "@/app/_components/input";
 import { Kicker } from "@/app/_components/kicker";
 import { ProfileMarkPicker } from "@/app/_components/site/profile-mark-picker";
 import { ShareUrlButton } from "@/app/_components/share-url-button";
-import type { ReaderLayout, GalleryLayout } from "@/schemas/user";
+import type { ReaderLayout, GalleryLayout, SitePrivacy } from "@/schemas/user";
 
 // Display modes shipped on this surface. Adding a new one is: define it
 // here, render it in app/reader/page.tsx (and the broadsheet entry helpers
@@ -54,14 +56,56 @@ const GALLERY_LAYOUT_OPTIONS: {
   },
 ];
 
+// Site privacy options. Applied to your tenant page + detail pages +
+// RSS feed. Slice 36 default: friends for non-host users (so a random
+// URL guess doesn't expose them); public for the host (their tenant is
+// the public face of the instance).
+const SITE_PRIVACY_OPTIONS: {
+  key: SitePrivacy;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    key: "public",
+    label: "Public — anyone can view",
+    hint: "Your tenant page and RSS are readable by anyone with the URL. Pick this if you want to share your site publicly (LinkedIn, portfolio, etc).",
+  },
+  {
+    key: "friends",
+    label: "Friends — signed-in only",
+    hint: "Only signed-in users on this instance can see your tenant. RSS returns 404 to the outside world (readers on this instance still work).",
+  },
+  {
+    key: "private",
+    label: "Private — only me",
+    hint: "Only you can view your tenant. New posts stop reaching friends' readers too (existing cached entries stay until they refresh). Use when you want to pause without deleting.",
+  },
+];
+
 export const metadata = {
   title: "Settings · Nearstream",
 };
+
+// Compact relative timestamp for the request queue — the host cares
+// about "how long has this been sitting" more than a wall-clock time.
+function formatRequestedAt(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 60) return mins <= 1 ? "just now" : `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString("en", { day: "numeric", month: "short" });
+}
 
 type Props = {
   searchParams: Promise<{
     "profile-error"?: string;
     "prefs-error"?: string;
+    "host-error"?: string;
   }>;
 };
 
@@ -73,8 +117,16 @@ export default async function SettingsPage({ searchParams }: Props) {
   if (!user) redirect("/login");
   if (!user.handle) redirect("/onboarding");
 
-  const { "profile-error": profileError, "prefs-error": prefsError } =
-    await searchParams;
+  const {
+    "profile-error": profileError,
+    "prefs-error": prefsError,
+    "host-error": hostError,
+  } = await searchParams;
+
+  const isHost = isHostEmail(user.email);
+  const pendingRequests = isHost
+    ? await accessRequestStore.list({ status: "pending" })
+    : [];
 
   return (
     <PageShell
@@ -251,6 +303,46 @@ export default async function SettingsPage({ searchParams }: Props) {
                 </div>
               </fieldset>
 
+              <fieldset className="flex flex-col gap-3">
+                <legend>
+                  <Kicker>Site privacy</Kicker>
+                </legend>
+                <p className="text-sm leading-relaxed text-muted-soft">
+                  Who can view your tenant at{" "}
+                  <code className="font-mono">/{user.handle}</code>. RSS
+                  visibility matches (public → open feed; friends → 404 to
+                  the outside; private → 404 always).
+                </p>
+                <div className="mt-2 flex flex-col gap-3">
+                  {SITE_PRIVACY_OPTIONS.map((opt) => {
+                    const effective = resolveSitePrivacy(user);
+                    const isActive = effective === opt.key;
+                    return (
+                      <label
+                        key={opt.key}
+                        className="flex cursor-pointer items-baseline gap-3 border border-border p-4 transition-colors hover:border-foreground/60 has-[:checked]:border-foreground has-[:checked]:bg-foreground/5"
+                      >
+                        <input
+                          type="radio"
+                          name="sitePrivacy"
+                          value={opt.key}
+                          defaultChecked={isActive}
+                          className="accent-foreground"
+                        />
+                        <span className="flex flex-col gap-1">
+                          <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-foreground">
+                            {opt.label}
+                          </span>
+                          <span className="text-[12.5px] text-muted-soft">
+                            {opt.hint}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
               <SubmitButton pendingLabel="Saving…" className="self-start">
                 Save display
               </SubmitButton>
@@ -330,15 +422,93 @@ export default async function SettingsPage({ searchParams }: Props) {
             </p>
           </div>
 
-          {isHostEmail(user.email) && (
+          {isHost && (
             <>
               <hr className="mt-20 border-border" />
-              <div className="mt-12">
+              <div id="host" className="mt-12 scroll-mt-6">
                 <Kicker>Host tools</Kicker>
+
+                {hostError && (
+                  <div
+                    role="alert"
+                    className="mt-6 border-l-2 border-foreground/50 pl-4 py-2"
+                  >
+                    <Kicker>Could not process</Kicker>
+                    <p className="mt-1 text-sm text-muted">{hostError}</p>
+                  </div>
+                )}
+
+                {/* Access request queue — the LinkedIn-launch tent-pole.
+                    Random requesters land here for review, approve mints
+                    an allowlist entry + sends a welcome magic link. Deny
+                    is silent (no rejection email — a small closed group
+                    doesn't owe explanations). */}
+                <h2 className="mt-8 text-xl font-normal tracking-tight text-foreground">
+                  Access requests
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-soft">
+                  People asking to be invited. Approve adds them to the
+                  allowlist and sends a magic-link welcome; deny quietly
+                  marks the record as handled.
+                </p>
+
+                {pendingRequests.length === 0 ? (
+                  <p className="mt-6 text-sm text-muted-soft">
+                    No pending requests.
+                  </p>
+                ) : (
+                  <ul className="mt-6 flex flex-col gap-4">
+                    {pendingRequests.map((req) => (
+                      <li
+                        key={req.id}
+                        className="flex flex-col gap-3 border border-border p-4"
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="font-mono text-[13px] text-foreground break-all">
+                            {req.email}
+                          </span>
+                          <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft tabular-nums">
+                            {formatRequestedAt(req.requestedAt)}
+                          </span>
+                        </div>
+                        <p className="text-[13.5px] leading-relaxed text-muted whitespace-pre-wrap">
+                          {req.message}
+                        </p>
+                        <div className="flex gap-3">
+                          <form
+                            action={`/api/access-requests/${req.id}/approve`}
+                            method="POST"
+                          >
+                            <button
+                              type="submit"
+                              className="border border-foreground bg-foreground px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-background transition-colors hover:bg-transparent hover:text-foreground"
+                            >
+                              Approve + invite
+                            </button>
+                          </form>
+                          <form
+                            action={`/api/access-requests/${req.id}/deny`}
+                            method="POST"
+                          >
+                            <button
+                              type="submit"
+                              className="border border-border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-muted transition-colors hover:border-foreground hover:text-foreground"
+                            >
+                              Deny
+                            </button>
+                          </form>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <hr className="mt-10 border-border" />
+
                 <form
                   action="/api/admin/migrate-host"
                   method="POST"
-                  className="mt-3"
+                  className="mt-8"
                 >
                   <button
                     type="submit"

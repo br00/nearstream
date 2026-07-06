@@ -121,12 +121,26 @@ export function normalizeEmail(input: string): string {
   return input.trim().toLowerCase();
 }
 
-export function isEmailAllowed(email: string): boolean {
+/** True if the email is on the env-var allowlist. Slice 36: this is now
+ *  the "seed" layer; the full check via `isEmailAllowed(email)` also
+ *  consults the persisted allowlist store (grown by approving access
+ *  requests). Callers that need the full check must use the async
+ *  version below. */
+export function isEmailAllowedSync(email: string): boolean {
   const list = (process.env.ALLOWED_EMAILS ?? "")
     .split(",")
     .map((e) => normalizeEmail(e))
     .filter(Boolean);
   return list.includes(normalizeEmail(email));
+}
+
+/** Full allowlist check: env seed + persisted approvals. Import
+ *  `allowlistStore` lazily inside the function so this module doesn't
+ *  create a load-order cycle with the store (which imports from here). */
+export async function isEmailAllowed(email: string): Promise<boolean> {
+  if (isEmailAllowedSync(email)) return true;
+  const { allowlistStore } = await import("@/lib/allowlist-store");
+  return allowlistStore.has(email);
 }
 
 /** True if the given email matches the configured instance host. */

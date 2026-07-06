@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { store } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
@@ -11,6 +11,7 @@ import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
 import { ProfileMark } from "@/app/_components/site/profile-mark";
 import { isHostEmail, getSession } from "@/lib/auth";
+import { checkTenantVisibility } from "@/lib/tenant-visibility";
 import { tenantBase, tenantAbsoluteBase } from "@/lib/tenant-domains";
 import { visibilityOf } from "@/schemas/visibility";
 
@@ -109,6 +110,19 @@ export default async function TenantHome({ params, searchParams }: Props) {
       inventoryStore.list(user.id),
       getSession(),
     ]);
+
+  // Slice 36 — site privacy. Owner always sees their own tenant. Everyone
+  // else obeys the tenant's `sitePrivacy` preference (friends default for
+  // new users; host defaults to public). Sign-in-needed sends visitors to
+  // /login so they can auth as themselves; not-for-you 404s so we don't
+  // leak that a private tenant exists.
+  const gate = checkTenantVisibility(user, session);
+  if (!gate.allowed) {
+    if (gate.reason === "sign-in") {
+      redirect(`/login?next=${encodeURIComponent(`/${handle}`)}&reason=private-tenant`);
+    }
+    notFound();
+  }
 
   // Owner sees everything (including their own private entries); anyone else
   // only sees public ones. Letter has no per-entry visibility yet — it's the

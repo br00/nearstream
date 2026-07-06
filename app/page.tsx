@@ -117,18 +117,25 @@ export default async function InstanceLanding() {
           {/* CTA */}
           <section className="mt-24 pt-24 border-t border-border">
             <p className={sectionLabel}>Already invited?</p>
-            <div className="mt-8 flex items-center gap-6">
+            <div className="mt-8 flex flex-wrap items-center gap-4">
               <Link
                 href="/login"
                 className="border border-border px-5 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-foreground transition-colors hover:bg-foreground hover:text-background"
               >
                 Sign in
               </Link>
+              <Link
+                href="/request-access"
+                className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted underline underline-offset-4 decoration-muted-soft transition-colors hover:text-foreground hover:decoration-foreground"
+              >
+                Request an invite →
+              </Link>
             </div>
             <p className="mt-6 text-xs text-muted-soft leading-relaxed">
-              Nearstream is invitation-only. If you don&rsquo;t have an invite,
-              there&rsquo;s nothing to sign up for &mdash; that&rsquo;s by
-              design.
+              Nearstream is invitation-only &mdash; a small room for close
+              friends, deliberately not a signup funnel. Asking for an
+              invite is fine; there&rsquo;s no obligation on either side
+              and no rejection email if it&rsquo;s not a fit.
             </p>
           </section>
         </div>

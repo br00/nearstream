@@ -7,6 +7,8 @@ import { userStore } from "@/lib/user-store";
 import { tenantAbsoluteBase } from "@/lib/tenant-domains";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { visibilityOf } from "@/schemas/visibility";
+import { resolveSitePrivacy } from "@/lib/tenant-visibility";
+import { isInternalFeedRequest } from "@/lib/feed-fetcher";
 import type { InventoryItem, InventoryImage } from "@/schemas/inventory";
 import { imagesOf } from "@/schemas/inventory";
 
@@ -150,10 +152,20 @@ type Props = {
   params: Promise<{ handle: string }>;
 };
 
-export async function GET(_req: Request, { params }: Props) {
+export async function GET(request: Request, { params }: Props) {
   const { handle } = await params;
   const user = await userStore.getByHandle(handle);
   if (!user) notFound();
+
+  // Only fully-public tenants expose an RSS feed to the outside world.
+  // The exception: same-instance fetches (the reader pulling friends'
+  // feeds) come with a shared secret header and skip the gate — friends
+  // in `friends` mode still need to be readable by other signed-in users
+  // on this instance. Private tenants 404 always.
+  const privacy = resolveSitePrivacy(user);
+  const internal = isInternalFeedRequest(request);
+  if (privacy === "private") notFound();
+  if (privacy === "friends" && !internal) notFound();
 
   const siteUrl = tenantAbsoluteBase(handle, INSTANCE_URL);
   const feedTitle = `${user.displayName || handle} — Nearstream`;

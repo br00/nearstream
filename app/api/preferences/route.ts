@@ -16,6 +16,7 @@ import { userStore } from "@/lib/user-store";
 import {
   isReaderLayout,
   isGalleryLayout,
+  isSitePrivacy,
   type UserPreferences,
 } from "@/schemas/user";
 
@@ -30,10 +31,12 @@ export async function POST(request: Request) {
 
   let readerLayoutRaw: unknown;
   let galleryLayoutRaw: unknown;
+  let sitePrivacyRaw: unknown;
   if (isJson) {
     const json = await request.json().catch(() => null);
     readerLayoutRaw = json?.readerLayout;
     galleryLayoutRaw = json?.galleryLayout;
+    sitePrivacyRaw = json?.sitePrivacy;
   } else {
     const form = await request.formData();
     // Form submissions only include the field that fieldset was submitted
@@ -41,6 +44,7 @@ export async function POST(request: Request) {
     // the form actually carried.
     readerLayoutRaw = form.has("readerLayout") ? form.get("readerLayout") : undefined;
     galleryLayoutRaw = form.has("galleryLayout") ? form.get("galleryLayout") : undefined;
+    sitePrivacyRaw = form.has("sitePrivacy") ? form.get("sitePrivacy") : undefined;
   }
 
   const patch: Partial<UserPreferences> = {};
@@ -73,6 +77,19 @@ export async function POST(request: Request) {
     );
   }
 
+  if (sitePrivacyRaw === "" || sitePrivacyRaw === null) {
+    patch.sitePrivacy = undefined;
+  } else if (isSitePrivacy(sitePrivacyRaw)) {
+    patch.sitePrivacy = sitePrivacyRaw;
+  } else if (sitePrivacyRaw !== undefined) {
+    return errorResponse(
+      request,
+      isJson,
+      400,
+      `unknown sitePrivacy: ${String(sitePrivacyRaw)}`,
+    );
+  }
+
   if (Object.keys(patch).length === 0) {
     return errorResponse(request, isJson, 400, "no preference fields provided");
   }
@@ -82,6 +99,14 @@ export async function POST(request: Request) {
     if (!updated) return errorResponse(request, isJson, 404, "user not found");
     revalidatePath("/settings");
     revalidatePath("/reader");
+    if (updated.handle) {
+      // sitePrivacy affects tenant surfaces; invalidate them too.
+      revalidatePath(`/${updated.handle}`);
+      revalidatePath(`/${updated.handle}/library`);
+      revalidatePath(`/${updated.handle}/library/inventory`);
+      revalidatePath(`/${updated.handle}/stream`);
+      revalidatePath(`/${updated.handle}/rss.xml`);
+    }
     if (isJson) {
       return Response.json({ ok: true, preferences: updated.preferences });
     }
