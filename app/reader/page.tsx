@@ -138,12 +138,23 @@ function EmptySourcesState() {
         single chronological feed. Add the first friend by their RSS URL to
         begin.
       </p>
-      <Link
-        href="/reader/friends"
-        className="mt-8 inline-block font-mono text-[11px] uppercase tracking-[0.2em] text-foreground underline underline-offset-4 decoration-muted-soft transition-colors hover:decoration-foreground"
-      >
-        Add a friend →
-      </Link>
+      <div className="mt-8 flex flex-wrap items-baseline gap-x-6 gap-y-3">
+        <Link
+          href="/reader/friends"
+          className="font-mono text-[11px] uppercase tracking-[0.2em] text-foreground underline underline-offset-4 decoration-muted-soft transition-colors hover:decoration-foreground"
+        >
+          Add a friend →
+        </Link>
+        {/* Secondary: for friends who didn't see the post-onboarding
+            welcome (either signed up before slice 37 or want a refresher
+            with their URL / share button). */}
+        <Link
+          href="/welcome"
+          className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
+        >
+          First steps →
+        </Link>
+      </div>
     </div>
   );
 }

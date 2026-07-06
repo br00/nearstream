@@ -3,6 +3,7 @@
 // stays focused on consumption. Anything "I do once and forget about" lives
 // here.
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, isHostEmail } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
@@ -137,7 +138,18 @@ export default async function SettingsPage({ searchParams }: Props) {
     >
       <section className="flex flex-1 justify-center px-6 pb-24 sm:pb-12">
         <div className="w-full max-w-lg py-12">
-          <Kicker>Settings</Kicker>
+          <div className="flex items-baseline justify-between gap-4">
+            <Kicker>Settings</Kicker>
+            {/* Quiet link back to the welcome page. Useful for anyone who
+                signed up before slice 37 (never saw the post-onboarding
+                flow) or wants a refresher with their URL + share button. */}
+            <Link
+              href="/welcome"
+              className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft transition-colors hover:text-foreground"
+            >
+              First steps →
+            </Link>
+          </div>
           <h1 className="mt-2 text-2xl font-normal tracking-tight text-foreground">
             Your profile
           </h1>
