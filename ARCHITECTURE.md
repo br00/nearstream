@@ -334,6 +334,7 @@ Each slice is a PR. ARCHITECTURE.md updates with the slice. NEARSTREAM.md decisi
 | `RESEND_API_KEY` | Resend token | resend.com → API Keys |
 | `RESEND_FROM` | sender address | `onboarding@resend.dev` (interim) or verified-domain address |
 | `NEARSTREAM_SITE_URL` | absolute origin for RSS + metadata | the prod URL (e.g. `https://nearstream-xxx.vercel.app` or custom domain) |
+| `NEARSTREAM_INTERNAL_SECRET` | shared secret so same-instance reader fetches bypass the `friends`/`private` RSS gate (slice 36). **Required in prod** — without it, every non-host friend feed 404s and the reader purges the cache. | `openssl rand -hex 32` |
 
 **No `vercel.json`.** Default Next.js detection handles the build (`next build`) and output. Anything in `vercel.json` would be a Vercel-shaped configuration step we'd have to undo on Fly later.
 

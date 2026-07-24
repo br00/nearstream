@@ -12,6 +12,7 @@
 import { sourceStore } from "@/lib/source-store";
 import { feedEntryStore } from "@/lib/feed-entry-store";
 import { parseFeed } from "@/lib/feed-parser";
+import { sameInstanceHost } from "@/lib/tenant-domains";
 
 const USER_AGENT = "Nearstream/0.1 (+https://nearstream.app)";
 
@@ -52,7 +53,7 @@ export async function refreshSource(
   // never leaks to a third party.
   const internal = process.env.NEARSTREAM_INTERNAL_SECRET;
   const instanceUrl = process.env.NEARSTREAM_SITE_URL;
-  if (internal && instanceUrl && isSameInstanceUrl(source.feedUrl, instanceUrl)) {
+  if (internal && instanceUrl && sameInstanceHost(source.feedUrl, instanceUrl)) {
     headers[INTERNAL_HEADER] = internal;
   }
 
@@ -143,21 +144,6 @@ export async function refreshSource(
   });
 
   return { status: "ok", sourceId: id, added, notModified: false };
-}
-
-// Same-origin match on host. Covers the primary instance URL. Custom
-// tenant domains (from TENANT_DOMAINS) will still send the header only
-// if their host matches this — for MVP the primary instance is enough,
-// since same-instance friends' feeds go through nearstream.app first
-// and get proxied. Extend when custom domains + private tenants collide.
-function isSameInstanceUrl(feedUrl: string, instanceUrl: string): boolean {
-  try {
-    const feedHost = new URL(feedUrl).host;
-    const instHost = new URL(instanceUrl).host;
-    return feedHost === instHost;
-  } catch {
-    return false;
-  }
 }
 
 /** Read this in the RSS route to decide whether to bypass the tenant

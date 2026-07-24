@@ -12,7 +12,7 @@ import { PageShell } from "@/app/_components/page-shell";
 import { ProfileMark } from "@/app/_components/site/profile-mark";
 import { isHostEmail, getSession } from "@/lib/auth";
 import { checkTenantVisibility } from "@/lib/tenant-visibility";
-import { tenantBase, tenantAbsoluteBase } from "@/lib/tenant-domains";
+import { tenantBase, tenantAbsoluteBase, normalizeUrl } from "@/lib/tenant-domains";
 import { visibilityOf } from "@/schemas/visibility";
 
 export const dynamic = "force-dynamic";
@@ -144,10 +144,16 @@ export default async function TenantHome({ params, searchParams }: Props) {
         process.env.NEARSTREAM_SITE_URL ?? "",
       );
       const targetFeed = `${targetSite}/rss.xml`;
+      // Normalized so a stale row stored as `nearstream.app` (no www) or
+      // under a superseded NEARSTREAM_SITE_URL still matches today's
+      // canonical form and we don't offer to re-add someone we already
+      // follow.
+      const normFeed = normalizeUrl(targetFeed);
+      const normSite = normalizeUrl(targetSite);
       const alreadyFollowing = sources.some(
         (s) =>
-          s.feedUrl === targetFeed ||
-          s.siteUrl === targetSite ||
+          normalizeUrl(s.feedUrl) === normFeed ||
+          normalizeUrl(s.siteUrl ?? "") === normSite ||
           // Also match instance-relative paths, in case a source was added
           // before tenantAbsoluteBase was wired in.
           s.siteUrl === `/${user.handle}`,
