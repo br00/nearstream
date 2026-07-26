@@ -30,6 +30,13 @@ export type User = {
    * for the canonical defaults + valid values per surface.
    */
   preferences?: UserPreferences;
+  /**
+   * ISO timestamp of the last daily digest email successfully sent to
+   * this user. Server-managed state, not a preference — the cron uses
+   * it to dedupe (don't send twice within ~20h) and to compute the
+   * window of "what's new since last digest." Absent = never sent one.
+   */
+  lastDigestAt?: string;
   createdAt: string;
 };
 
@@ -50,6 +57,15 @@ export type UserPreferences = {
    * random URL guess doesn't expose a friend's site.
    */
   sitePrivacy?: SitePrivacy;
+  /**
+   * Whether to receive the daily digest email. `daily` = one email a
+   * day if friends actually posted; `off` = never. Default (unset) =
+   * `daily`. Opt-out, not opt-in, because friends who join Nearstream
+   * are explicitly asking to hear from other friends — a summary
+   * matches that intent. Emails are only sent when there IS activity,
+   * so a quiet day = no email.
+   */
+  emailDigest?: EmailDigestFrequency;
 };
 
 export const READER_LAYOUTS = ["default", "broadsheet"] as const;
@@ -79,6 +95,16 @@ export function isSitePrivacy(value: unknown): value is SitePrivacy {
   return (
     typeof value === "string" &&
     (SITE_PRIVACY as readonly string[]).includes(value)
+  );
+}
+
+export const EMAIL_DIGEST_FREQUENCIES = ["daily", "off"] as const;
+export type EmailDigestFrequency = (typeof EMAIL_DIGEST_FREQUENCIES)[number];
+
+export function isEmailDigestFrequency(value: unknown): value is EmailDigestFrequency {
+  return (
+    typeof value === "string" &&
+    (EMAIL_DIGEST_FREQUENCIES as readonly string[]).includes(value)
   );
 }
 

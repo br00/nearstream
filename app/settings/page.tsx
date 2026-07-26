@@ -17,7 +17,12 @@ import { Input } from "@/app/_components/input";
 import { Kicker } from "@/app/_components/kicker";
 import { ProfileMarkPicker } from "@/app/_components/site/profile-mark-picker";
 import { ShareUrlButton } from "@/app/_components/share-url-button";
-import type { ReaderLayout, GalleryLayout, SitePrivacy } from "@/schemas/user";
+import type {
+  ReaderLayout,
+  GalleryLayout,
+  SitePrivacy,
+  EmailDigestFrequency,
+} from "@/schemas/user";
 
 // Display modes shipped on this surface. Adding a new one is: define it
 // here, render it in app/reader/page.tsx (and the broadsheet entry helpers
@@ -79,6 +84,27 @@ const SITE_PRIVACY_OPTIONS: {
     key: "private",
     label: "Private — only me",
     hint: "Only you can view your tenant. New posts stop reaching friends' readers too (existing cached entries stay until they refresh). Use when you want to pause without deleting.",
+  },
+];
+
+// Email digest opt-out. Slice 38 default is `daily` — friends who join
+// Nearstream are explicitly asking to hear from other friends, and the
+// digest is only sent on active days, so opt-out matches intent. `off`
+// silences it entirely.
+const EMAIL_DIGEST_OPTIONS: {
+  key: EmailDigestFrequency;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    key: "daily",
+    label: "Daily — on active days",
+    hint: "One email a day summarising what your friends posted. Skipped automatically on quiet days, so a friendless week means an empty inbox.",
+  },
+  {
+    key: "off",
+    label: "Off — never",
+    hint: "No digest emails, ever. You'll only hear from us for sign-in links.",
   },
 ];
 
@@ -325,6 +351,45 @@ export default async function SettingsPage({ searchParams }: Props) {
                         <input
                           type="radio"
                           name="sitePrivacy"
+                          value={opt.key}
+                          defaultChecked={isActive}
+                          className="accent-foreground"
+                        />
+                        <span className="flex flex-col gap-1">
+                          <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-foreground">
+                            {opt.label}
+                          </span>
+                          <span className="text-[12.5px] text-muted-soft">
+                            {opt.hint}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              <fieldset className="flex flex-col gap-3">
+                <legend>
+                  <Kicker>Email digest</Kicker>
+                </legend>
+                <p className="text-sm leading-relaxed text-muted-soft">
+                  A once-a-day summary of what your friends posted, sent to{" "}
+                  <code className="font-mono">{user.email}</code>. Skipped
+                  on quiet days.
+                </p>
+                <div className="mt-2 flex flex-col gap-3">
+                  {EMAIL_DIGEST_OPTIONS.map((opt) => {
+                    const isActive =
+                      (user.preferences?.emailDigest ?? "daily") === opt.key;
+                    return (
+                      <label
+                        key={opt.key}
+                        className="flex cursor-pointer items-baseline gap-3 border border-border p-4 transition-colors hover:border-foreground/60 has-[:checked]:border-foreground has-[:checked]:bg-foreground/5"
+                      >
+                        <input
+                          type="radio"
+                          name="emailDigest"
                           value={opt.key}
                           defaultChecked={isActive}
                           className="accent-foreground"

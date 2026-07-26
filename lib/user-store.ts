@@ -25,6 +25,10 @@ export interface UserStore {
     id: string,
     patch: Partial<UserPreferences>,
   ): Promise<User | null>;
+  /** Mark that we sent a daily digest email at `iso`. Server-managed
+   *  state used by the cron to dedupe + compute the "since last digest"
+   *  window. Passing an empty string clears the mark. */
+  setLastDigestAt(id: string, iso: string): Promise<User | null>;
 }
 
 const PREFIX = "users-meta/";
@@ -91,6 +95,15 @@ class InMemoryUserStore implements UserStore {
       ...this.users[i],
       preferences: mergePreferences(this.users[i].preferences, patch),
     };
+    return this.users[i];
+  }
+  async setLastDigestAt(id: string, iso: string) {
+    const i = this.users.findIndex((u) => u.id === id);
+    if (i === -1) return null;
+    const next: User = { ...this.users[i] };
+    if (iso.length === 0) delete next.lastDigestAt;
+    else next.lastDigestAt = iso;
+    this.users[i] = next;
     return this.users[i];
   }
 }
@@ -242,6 +255,23 @@ class R2UserStore implements UserStore {
       ...current,
       preferences: mergePreferences(current.preferences, patch),
     };
+    const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(updated),
+      headers: { "content-type": "application/json" },
+    });
+    if (!res.ok) {
+      throw new Error(`R2 PUT failed (${res.status} ${res.statusText})`);
+    }
+    return updated;
+  }
+
+  async setLastDigestAt(id: string, iso: string): Promise<User | null> {
+    const current = await this.getById(id);
+    if (!current) return null;
+    const updated: User = { ...current };
+    if (iso.length === 0) delete updated.lastDigestAt;
+    else updated.lastDigestAt = iso;
     const res = await this.client.fetch(`${this.base}/${this.key(id)}`, {
       method: "PUT",
       body: JSON.stringify(updated),
