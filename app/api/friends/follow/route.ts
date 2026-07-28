@@ -11,7 +11,8 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { sourceStore } from "@/lib/source-store";
 import { userStore } from "@/lib/user-store";
-import { tenantAbsoluteBase } from "@/lib/tenant-domains";
+import { tenantAbsoluteBase, normalizeUrl } from "@/lib/tenant-domains";
+import { refreshSource } from "@/lib/feed-fetcher";
 
 function instanceUrl(request: Request): string {
   const envUrl = process.env.NEARSTREAM_SITE_URL;
@@ -61,8 +62,12 @@ export async function POST(request: Request) {
 
   try {
     const existing = await sourceStore.list(session.userId);
+    const normFeed = normalizeUrl(feedUrl);
+    const normSite = normalizeUrl(siteUrl);
     const already = existing.find(
-      (s) => s.feedUrl === feedUrl || s.siteUrl === siteUrl,
+      (s) =>
+        normalizeUrl(s.feedUrl) === normFeed ||
+        normalizeUrl(s.siteUrl ?? "") === normSite,
     );
     if (already) {
       // Idempotent: treat "already following" as success rather than 409.
@@ -76,6 +81,18 @@ export async function POST(request: Request) {
       feedUrl,
       siteUrl,
     });
+    // Prime the reader synchronously so a follow-then-open-reader flow
+    // shows the new friend's entries immediately instead of an empty
+    // card. A refresh failure here doesn't fail the follow — the source
+    // is added, the next refresh tick (or manual pull) will retry.
+    try {
+      await refreshSource(session.userId, source.id);
+    } catch (err) {
+      console.warn(
+        `[POST /api/friends/follow] initial refresh failed for ${source.id}`,
+        err,
+      );
+    }
     revalidatePath("/reader");
     revalidatePath("/reader/friends");
     revalidatePath(`/${target.handle}`);

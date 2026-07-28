@@ -43,3 +43,38 @@ export function tenantAbsoluteBase(
   const custom = customDomainFor(handle);
   return custom ? `https://${custom}` : `${instanceUrl}/${handle}`;
 }
+
+// URL normalization for equality comparisons across stored source rows.
+// A source added when NEARSTREAM_SITE_URL was `nearstream.app` won't match
+// today's canonical `www.nearstream.app` under strict equality — same for
+// mixed-case hosts. We normalize on read so the comparisons in the
+// tenant "already following?" check and the fetcher's same-instance
+// check are self-healing: no migration needed, stale rows just work.
+
+/** Lowercase host, strip a leading `www.`. */
+export function normalizeHost(host: string): string {
+  const lower = host.toLowerCase();
+  return lower.startsWith("www.") ? lower.slice(4) : lower;
+}
+
+/** Normalize a URL string for equality comparison — normalizes the host
+ *  and drops a trailing slash. Preserves protocol, path, and query.
+ *  Returns the input unchanged if parsing fails. */
+export function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.host = normalizeHost(u.host);
+    return u.toString().replace(/\/$/, "");
+  } catch {
+    return url;
+  }
+}
+
+/** True when two URL strings share a host (after normalization). */
+export function sameInstanceHost(a: string, b: string): boolean {
+  try {
+    return normalizeHost(new URL(a).host) === normalizeHost(new URL(b).host);
+  } catch {
+    return false;
+  }
+}
