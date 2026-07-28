@@ -17,6 +17,7 @@ import {
   isReaderLayout,
   isGalleryLayout,
   isSitePrivacy,
+  isEmailDigestFrequency,
   type UserPreferences,
 } from "@/schemas/user";
 
@@ -32,11 +33,13 @@ export async function POST(request: Request) {
   let readerLayoutRaw: unknown;
   let galleryLayoutRaw: unknown;
   let sitePrivacyRaw: unknown;
+  let emailDigestRaw: unknown;
   if (isJson) {
     const json = await request.json().catch(() => null);
     readerLayoutRaw = json?.readerLayout;
     galleryLayoutRaw = json?.galleryLayout;
     sitePrivacyRaw = json?.sitePrivacy;
+    emailDigestRaw = json?.emailDigest;
   } else {
     const form = await request.formData();
     // Form submissions only include the field that fieldset was submitted
@@ -45,6 +48,7 @@ export async function POST(request: Request) {
     readerLayoutRaw = form.has("readerLayout") ? form.get("readerLayout") : undefined;
     galleryLayoutRaw = form.has("galleryLayout") ? form.get("galleryLayout") : undefined;
     sitePrivacyRaw = form.has("sitePrivacy") ? form.get("sitePrivacy") : undefined;
+    emailDigestRaw = form.has("emailDigest") ? form.get("emailDigest") : undefined;
   }
 
   const patch: Partial<UserPreferences> = {};
@@ -87,6 +91,19 @@ export async function POST(request: Request) {
       isJson,
       400,
       `unknown sitePrivacy: ${String(sitePrivacyRaw)}`,
+    );
+  }
+
+  if (emailDigestRaw === "" || emailDigestRaw === null) {
+    patch.emailDigest = undefined;
+  } else if (isEmailDigestFrequency(emailDigestRaw)) {
+    patch.emailDigest = emailDigestRaw;
+  } else if (emailDigestRaw !== undefined) {
+    return errorResponse(
+      request,
+      isJson,
+      400,
+      `unknown emailDigest: ${String(emailDigestRaw)}`,
     );
   }
 
