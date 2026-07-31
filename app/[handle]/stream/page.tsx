@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import { checkTenantVisibility } from "@/lib/tenant-visibility";
 import { tenantBase } from "@/lib/tenant-domains";
 import { visibilityOf } from "@/schemas/visibility";
+import { AudioPlayer } from "@/app/_components/audio-player";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
@@ -148,25 +149,37 @@ export default async function StreamArchive({ params }: Props) {
                       </>
                     )}
                   </div>
-                  <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
-                    {entry.text}
-                    {entry.link &&
-                      (() => {
-                        const title = lookupLinkTitle(entry.link);
-                        if (!title) return null;
-                        return (
-                          <>
-                            {" "}
-                            <Link
-                              href={`${base}${linkHref(entry.link)}`}
-                              className="inline text-foreground underline-offset-4 hover:underline"
-                            >
-                              {title} →
-                            </Link>
-                          </>
-                        );
-                      })()}
-                  </p>
+                  {entry.audio && (
+                    <div className="mt-3 flex justify-start">
+                      <AudioPlayer
+                        src={`/api/media/${entry.audio.key}`}
+                        durationMs={entry.audio.durationMs}
+                        mime={entry.audio.mime}
+                        size={180}
+                      />
+                    </div>
+                  )}
+                  {(entry.text || entry.link) && (
+                    <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
+                      {entry.text}
+                      {entry.link &&
+                        (() => {
+                          const title = lookupLinkTitle(entry.link);
+                          if (!title) return null;
+                          return (
+                            <>
+                              {" "}
+                              <Link
+                                href={`${base}${linkHref(entry.link)}`}
+                                className="inline text-foreground underline-offset-4 hover:underline"
+                              >
+                                {title} →
+                              </Link>
+                            </>
+                          );
+                        })()}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>

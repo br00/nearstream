@@ -7,12 +7,16 @@ interface SubmitButtonProps {
   children: React.ReactNode;
   pendingLabel?: string;
   className?: string;
+  /** External disable (e.g. VoiceForm keeps the button off until a
+   *  recording exists). OR'd with the internal pending state. */
+  disabled?: boolean;
 }
 
 export function SubmitButton({
   children,
   pendingLabel,
   className,
+  disabled = false,
 }: SubmitButtonProps) {
   const ref = useRef<HTMLButtonElement>(null);
   const [pending, setPending] = useState(false);
@@ -29,7 +33,7 @@ export function SubmitButton({
     <button
       ref={ref}
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       aria-busy={pending}
       className={`${buttonClasses} ${className ?? ""}`}
     >

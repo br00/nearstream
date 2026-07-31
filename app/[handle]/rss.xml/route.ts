@@ -196,24 +196,50 @@ export async function GET(request: Request, { params }: Props) {
   const feedItems: FeedItem[] = [];
 
   for (const entry of entries) {
-    const link = `${siteUrl}/stream#entry-${entry.id}`;
+    const hasAudio = !!entry.audio;
+    // Voice entries get their own detail URL so friends' readers link
+    // to a shareable page with a bespoke OG preview. Text-only notes
+    // stay as fragment links into the tenant's `/stream` list.
+    const link = hasAudio
+      ? `${siteUrl}/voice/${entry.id}`
+      : `${siteUrl}/stream#entry-${entry.id}`;
+    // Voice notes may have no caption — title fallback keeps RSS
+    // readers that need a title from rendering an empty string.
+    const title = entry.text
+      ? deriveTitle(entry.text)
+      : hasAudio
+        ? "Voice note"
+        : "";
     let body = entry.text;
     if (entry.link) {
-      const title = lookupLinkTitle(entry.link);
-      if (title) {
-        body += `\n\n→ ${title}: ${siteUrl}${linkHref(entry.link)}`;
+      const linkTitle = lookupLinkTitle(entry.link);
+      if (linkTitle) {
+        body += `\n\n→ ${linkTitle}: ${siteUrl}${linkHref(entry.link)}`;
       }
     }
+    if (hasAudio && entry.audio) {
+      // Inline an <audio> so friends' readers that render HTML can play
+      // without needing to parse the extension element. Same URL as the
+      // <enclosure> below.
+      const audioUrl = `${INSTANCE_URL}/api/media/${entry.audio.key}`;
+      const audioTag = `<p><audio controls src="${escapeXml(audioUrl)}" preload="metadata"></audio></p>`;
+      body = body ? `${audioTag}\n${body}` : audioTag;
+    }
+    const entryType = hasAudio ? "voice" : "note";
+    const audioElements =
+      hasAudio && entry.audio
+        ? `\n      <nearstream:audio url="${escapeXml(`${INSTANCE_URL}/api/media/${entry.audio.key}`)}" mime="${escapeXml(entry.audio.mime)}" durationMs="${entry.audio.durationMs}" />\n      <enclosure url="${escapeXml(`${INSTANCE_URL}/api/media/${entry.audio.key}`)}" length="0" type="${escapeXml(entry.audio.mime)}" />`
+        : "";
     feedItems.push({
       publishedAt: entry.publishedAt,
       toXml: () => `    <item>
-      <title>${escapeXml(deriveTitle(entry.text))}</title>
+      <title>${escapeXml(title)}</title>
       <link>${escapeXml(link)}</link>
       <guid isPermaLink="false">${escapeXml(entry.id)}</guid>
       <pubDate>${toRfc822(entry.publishedAt)}</pubDate>
       <category>Stream</category>
       <category>${escapeXml(entry.tag)}</category>
-      <nearstream:type>note</nearstream:type>
+      <nearstream:type>${entryType}</nearstream:type>${audioElements}
       <description><![CDATA[${escapeCdata(body)}]]></description>
     </item>`,
     });

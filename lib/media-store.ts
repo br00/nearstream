@@ -5,6 +5,11 @@ const ALLOWED_TYPES = [
   "image/png",
   "image/webp",
   "image/gif",
+  // Audio (slice 39). MediaRecorder emits webm/opus on Chromium + Android,
+  // mp4/aac on Safari. We store what the browser gives us — playback is via
+  // `<audio>` on the same browser, so format compatibility is a non-issue.
+  "audio/webm",
+  "audio/mp4",
 ] as const;
 type AllowedType = (typeof ALLOWED_TYPES)[number];
 
@@ -12,6 +17,17 @@ export function isAllowedContentType(value: unknown): value is AllowedType {
   return (
     typeof value === "string" &&
     (ALLOWED_TYPES as readonly string[]).includes(value)
+  );
+}
+
+// Audio-only variant of the same check. Used by the stream upload-url
+// route so a caller can't sneak an image PUT through the audio endpoint
+// (or vice versa via the inventory endpoint).
+const AUDIO_TYPES: readonly AllowedType[] = ["audio/webm", "audio/mp4"];
+export function isAllowedAudioType(value: unknown): value is AllowedType {
+  return (
+    typeof value === "string" &&
+    (AUDIO_TYPES as readonly string[]).includes(value)
   );
 }
 
@@ -25,6 +41,10 @@ function extOf(contentType: AllowedType): string {
       return "webp";
     case "image/gif":
       return "gif";
+    case "audio/webm":
+      return "webm";
+    case "audio/mp4":
+      return "m4a";
   }
 }
 

@@ -189,6 +189,14 @@ type AnimatedMarkProps = {
   className?: string;
   params?: Partial<HumanCircleParams>;
   ariaLabel?: string;
+  /**
+   * Optional live-amplitude source (0..1) that modulates the mark's radial
+   * range and noise chaos each frame. Used by the voice-note visualizer
+   * (slice 39): the parent AudioPlayer writes the AnalyserNode's current
+   * RMS into `amplitudeRef.current`, and the mark "breathes" with it.
+   * Idle (no ref, or `current === 0`) → identical to the static behaviour.
+   */
+  amplitudeRef?: React.MutableRefObject<number>;
 };
 
 // Low-level reusable engine. Renders the noise circle with any param set on
@@ -199,6 +207,7 @@ export function AnimatedMark({
   className,
   params,
   ariaLabel = "Animated mark",
+  amplitudeRef,
 }: AnimatedMarkProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const merged: HumanCircleParams = { ...HUMAN_CIRCLE_DEFAULTS, ...params };
@@ -224,7 +233,20 @@ export function AnimatedMark({
     let raf = 0;
     function tick() {
       if (!ctx) return;
-      drawHumanCircle(ctx, size, size, z, merged);
+      // Audio-reactive path: modulate the two levers that most visibly
+      // "breathe" — radial range (the circle inflates) and noise chaos
+      // (the outline gets rougher on loud passes). Kept subtle so an
+      // idle mark and a peak mark still read as the same visual family.
+      const amp = amplitudeRef?.current ?? 0;
+      const active: HumanCircleParams =
+        amp > 0
+          ? {
+              ...merged,
+              radiusRangeFrac: merged.radiusRangeFrac * (1 + amp * 2.5),
+              nMax: merged.nMax * (1 + amp * 0.8),
+            }
+          : merged;
+      drawHumanCircle(ctx, size, size, z, active);
       z += merged.seedSpeed;
       raf = requestAnimationFrame(tick);
     }

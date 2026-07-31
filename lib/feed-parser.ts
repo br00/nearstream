@@ -15,6 +15,7 @@ import { XMLParser } from "fast-xml-parser";
 import type {
   NewFeedEntry,
   FeedEntryImage,
+  FeedEntryAudio,
   FeedEntryType,
 } from "@/schemas/feed-entry";
 
@@ -67,6 +68,7 @@ function parseRssChannel(channel: any, sourceId: string): ParseResult {
 
     const images = pickRssImages(item);
     const image = images[0];
+    const audio = pickFeedAudio(item);
     const authorName =
       textOf(item["dc:creator"]) ?? textOf(item.author) ?? undefined;
 
@@ -79,12 +81,13 @@ function parseRssChannel(channel: any, sourceId: string): ParseResult {
       authorName,
       body,
       excerpt: makeExcerpt(body),
-      type: detectRssType(item, { title, body, image }),
+      type: detectRssType(item, { title, body, image, audio }),
       // Mirror images[0] into the legacy `image` field for one release so
       // older read paths don't break. The reader uses feedImagesOf() to
       // coalesce both shapes.
       image,
       images: images.length > 0 ? images : undefined,
+      audio,
     });
   }
 
@@ -235,6 +238,8 @@ function parseAtomFeed(feed: any, sourceId: string): ParseResult {
 
     const authorName = textOf(item.author?.name) ?? undefined;
 
+    const audio = pickFeedAudio(item);
+
     entries.push({
       sourceId,
       guid,
@@ -244,8 +249,9 @@ function parseAtomFeed(feed: any, sourceId: string): ParseResult {
       authorName,
       body,
       excerpt: makeExcerpt(body),
-      type: detectAtomType(item, { title, body }),
+      type: detectAtomType(item, { title, body, audio }),
       image: undefined, // Atom rarely carries inline images via a stable convention
+      audio,
     });
   }
 
@@ -348,7 +354,12 @@ const ESSAY_BODY_THRESHOLD = 320; // chars of stripped text; below this a titled
 
 function detectRssType(
   item: any,
-  fallback: { title?: string; body?: string; image?: FeedEntryImage },
+  fallback: {
+    title?: string;
+    body?: string;
+    image?: FeedEntryImage;
+    audio?: FeedEntryAudio;
+  },
 ): FeedEntryType {
   const explicit = textOf(item["nearstream:type"]);
   if (explicit) {
@@ -365,7 +376,7 @@ function detectRssType(
 
 function detectAtomType(
   item: any,
-  fallback: { title?: string; body?: string },
+  fallback: { title?: string; body?: string; audio?: FeedEntryAudio },
 ): FeedEntryType {
   const explicit = textOf(item["nearstream:type"]);
   if (explicit) {
@@ -384,9 +395,38 @@ function detectAtomType(
   return heuristicType(fallback);
 }
 
+/** Voice-note extraction. Prefers `<nearstream:audio url mime durationMs>`
+ *  (Nearstream feeds); falls back to a plain audio `<enclosure>` (any RSS).
+ *  Returns undefined if the item has no audio at all. */
+function pickFeedAudio(item: any): FeedEntryAudio | undefined {
+  const ns = asArray(item["nearstream:audio"])[0];
+  if (ns) {
+    const url = ns?.["@_url"];
+    const mime = ns?.["@_mime"];
+    const dur = ns?.["@_durationMs"];
+    if (typeof url === "string" && typeof mime === "string") {
+      const n = typeof dur === "string" ? Number(dur) : typeof dur === "number" ? dur : NaN;
+      return {
+        url,
+        mime,
+        ...(Number.isFinite(n) && n > 0 ? { durationMs: n } : {}),
+      };
+    }
+  }
+  const encs = asArray(item.enclosure);
+  for (const e of encs) {
+    const type = e?.["@_type"];
+    const url = e?.["@_url"];
+    if (typeof url === "string" && typeof type === "string" && type.startsWith("audio/")) {
+      return { url, mime: type };
+    }
+  }
+  return undefined;
+}
+
 function normalizeType(raw: string): FeedEntryType {
   const v = raw.trim().toLowerCase();
-  if (v === "note" || v === "essay" || v === "picture") return v;
+  if (v === "note" || v === "essay" || v === "picture" || v === "voice") return v;
   return "unknown";
 }
 
@@ -404,7 +444,13 @@ function heuristicType(input: {
   title?: string;
   body?: string;
   image?: FeedEntryImage;
+  audio?: FeedEntryAudio;
 }): FeedEntryType {
+  // Audio present but no explicit type → treat as voice. Podcast episodes
+  // will also match this — acceptable trade for MVP (their reader card
+  // is the same shape: title + audio + player), and podcast subscriptions
+  // aren't the primary case for a small closed-friends reader.
+  if (input.audio) return "voice";
   if (input.image) return "picture";
   const strippedBody = (input.body ?? "")
     .replace(/<[^>]+>/g, " ")

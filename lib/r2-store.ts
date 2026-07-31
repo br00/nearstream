@@ -1,6 +1,7 @@
 import { R2Client } from "@/lib/r2-client";
 import type { NewStreamEntry, StreamEntry } from "@/schemas/stream";
 import type { Store } from "@/lib/store";
+import { mediaStore } from "@/lib/media-store";
 
 export type R2Config = {
   accountId: string;
@@ -37,6 +38,7 @@ export class R2Store implements Store {
       publishedAt: new Date().toISOString(),
       visibility: input.visibility ?? "public",
       ...(input.link ? { link: input.link } : {}),
+      ...(input.audio ? { audio: input.audio } : {}),
     };
     const body = JSON.stringify(entry);
     const res = await this.client.fetch(
@@ -122,6 +124,20 @@ export class R2Store implements Store {
   }
 
   async delete(userId: string, id: string): Promise<boolean> {
+    // Cascade-delete a voice-note audio blob if this entry has one. Same
+    // pattern as inventory (media delete failure logged but not fatal —
+    // an orphan blob is cheap; an undeletable entry is worse UX).
+    const current = await this.getById(userId, id);
+    if (current?.audio && mediaStore) {
+      try {
+        await mediaStore.deleteImage(current.audio.key);
+      } catch (err) {
+        console.warn(
+          "[nearstream] stream cascade delete: audio delete failed (continuing):",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
     const res = await this.client.fetch(`${this.base}/${this.key(userId, id)}`, {
       method: "DELETE",
     });

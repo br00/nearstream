@@ -24,6 +24,19 @@ export type LibraryLink = {
   slug: string;
 };
 
+/** Voice-note payload attached to a Stream entry (slice 39).
+ *  `key` is the R2 object key under `media/` (see lib/media-store.ts).
+ *  `mime` is what the browser recorded — `audio/webm` on Chromium/Android,
+ *  `audio/mp4` on Safari — served back with that same content-type so
+ *  the receiving browser can play it natively.
+ *  `durationMs` is captured client-side at record time and validated
+ *  server-side against a 60s cap. */
+export type StreamAudio = {
+  key: string;
+  mime: string;
+  durationMs: number;
+};
+
 export type StreamEntry = {
   id: string;
   text: string;
@@ -34,12 +47,19 @@ export type StreamEntry = {
   publishedAt: string;
   link?: LibraryLink;
   visibility?: Visibility;
+  /** Voice-note attachment. When present, `text` may be empty — it's the
+   *  optional caption, not the primary content. */
+  audio?: StreamAudio;
 };
 
 export type NewStreamEntry = Pick<
   StreamEntry,
-  "text" | "tag" | "link" | "visibility"
+  "text" | "tag" | "link" | "visibility" | "audio"
 >;
+
+/** Hard cap on voice-note length. WhatsApp does 120s; Nearstream's slower
+ *  rhythm points to shorter. Server rejects anything over. */
+export const VOICE_NOTE_MAX_MS = 60_000;
 
 export function isModeTag(value: unknown): value is ModeTag {
   if (typeof value !== "string") return false;
