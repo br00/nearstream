@@ -317,7 +317,7 @@ export default function VoiceVizLab() {
             <VizCard
               tag="G"
               name="Proximity web"
-              blurb="Drifting points link to neighbours within a threshold; amplitude raises it. Silence is now genuinely sparse (63 links, was 160) so speech creates the web rather than thickening one that was always there — a 6.4× swing instead of 2.2×. Nodes no longer pin against the walls."
+              blurb="Drifting points link to neighbours within a threshold; amplitude raises it. Silence is now genuinely sparse (63 links, was 160) so speech creates the web rather than thickening one that was always there — a 6.4× swing instead of 2.2×. Nodes carry a heading and bounce off the frame, so they cover it evenly instead of collecting in a ring."
             >
               <ProximityWeb
                 width={fmt.w}

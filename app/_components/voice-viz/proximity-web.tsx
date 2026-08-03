@@ -16,7 +16,16 @@ type Props = {
   className?: string;
 };
 
-type Node = { x: number; y: number; seed: number };
+/**
+ * `heading` is state, not something recomputed each frame. That's the whole
+ * trick for staying evenly spread: a node with momentum bounces off a wall
+ * and leaves. Deriving an absolute heading from noise every frame instead
+ * gives nodes no memory, so *any* boundary handling turns into a trap —
+ * a hard clamp pins them to the wall, and an inward force pins them to the
+ * isosurface where that force kicks in. Both were shipped and both showed
+ * up as the web sitting off to one side.
+ */
+type Node = { x: number; y: number; heading: number; seed: number };
 
 const NODE_COUNT = 58; // O(n²) pairs per frame — 1653 checks, cheap enough
 const DRIFT = 0.55; // px per frame at idle
@@ -36,9 +45,12 @@ const LINK_MAX_FRAC = 0.34; // threshold at full amplitude
  * into the middle of the range where it belongs.
  */
 const AMP_CURVE = 0.6;
-/** Where the inward steering starts, as a fraction of the way to the wall. */
-const EDGE_SOFT = 0.55;
-const EDGE_FORCE = 2.5;
+/**
+ * How fast a node's heading curves, in radians per frame at full swing.
+ * Noise *nudges* the stored heading rather than replacing it, so paths
+ * stay smooth and momentum survives a bounce.
+ */
+const WANDER_RATE = 0.22;
 
 export function ProximityWeb({ width, height, amplitudeRef, className }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -60,12 +72,15 @@ export function ProximityWeb({ width, height, amplitudeRef, className }: Props) 
     // whole thing into one solid mesh.
     const short = Math.min(width, height);
     const margin = short * 0.06;
-    const halfW = width / 2;
-    const halfH = height / 2;
+    const minX = margin;
+    const maxX = width - margin;
+    const minY = margin;
+    const maxY = height - margin;
 
     const nodes: Node[] = Array.from({ length: NODE_COUNT }, (_, i) => ({
       x: margin + Math.random() * (width - margin * 2),
       y: margin + Math.random() * (height - margin * 2),
+      heading: Math.random() * Math.PI * 2,
       seed: i * 13.7,
     }));
 
@@ -118,34 +133,33 @@ export function ProximityWeb({ width, height, amplitudeRef, className }: Props) 
       const speed = DRIFT * (1 + react * 2.2);
 
       for (const n of nodes) {
-        // Independent noise per node for heading — keeps the drift
-        // organic without a shared field pulling them all one way.
-        const angle = noise01(n.seed, 0, z) * Math.PI * 4;
-        let vx = Math.cos(angle);
-        let vy = Math.sin(angle);
+        // Independent noise per node, curving the heading it already has.
+        // Continuous in z, so paths arc rather than jitter.
+        n.heading += (noise01(n.seed, 0, z) - 0.5) * WANDER_RATE;
+        n.x += Math.cos(n.heading) * speed;
+        n.y += Math.sin(n.heading) * speed;
 
-        // Steer inward before the wall rather than clamping at it. The old
-        // clamp left 12–17% of nodes pinned flat against the border at any
-        // moment, sliding along it until their noise heading happened to
-        // turn them around — which is what read as the web sitting off to
-        // one side. With this the measured figure is 0%.
-        const bx = (halfW - n.x) / halfW;
-        const by = (halfH - n.y) / halfH;
-        const edge = Math.max(Math.abs(bx), Math.abs(by));
-        if (edge > EDGE_SOFT) {
-          const pull = Math.pow((edge - EDGE_SOFT) / (1 - EDGE_SOFT), 2);
-          vx += bx * pull * EDGE_FORCE;
-          vy += by * pull * EDGE_FORCE;
-          const len = Math.hypot(vx, vy) || 1;
-          vx /= len;
-          vy /= len;
+        // Specular bounce — reflect both the position and the heading, the
+        // way a ball leaves a cushion. No positional force anywhere, so
+        // there's no isosurface for nodes to accumulate on and the interior
+        // stays evenly covered.
+        if (n.x < minX) {
+          n.x = minX + (minX - n.x);
+          n.heading = Math.PI - n.heading;
+        } else if (n.x > maxX) {
+          n.x = maxX - (n.x - maxX);
+          n.heading = Math.PI - n.heading;
         }
-
-        n.x += vx * speed;
-        n.y += vy * speed;
-        // Backstop only — the steering above should keep this from firing.
-        n.x = Math.max(margin, Math.min(width - margin, n.x));
-        n.y = Math.max(margin, Math.min(height - margin, n.y));
+        if (n.y < minY) {
+          n.y = minY + (minY - n.y);
+          n.heading = -n.heading;
+        } else if (n.y > maxY) {
+          n.y = maxY - (n.y - maxY);
+          n.heading = -n.heading;
+        }
+        // Backstop for a pathological overshoot; shouldn't fire.
+        n.x = Math.max(minX, Math.min(maxX, n.x));
+        n.y = Math.max(minY, Math.min(maxY, n.y));
       }
 
       draw(amp);
