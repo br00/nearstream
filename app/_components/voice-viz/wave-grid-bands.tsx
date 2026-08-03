@@ -38,13 +38,21 @@ import type { FrequencyData } from "./use-audio-amplitude";
 import { noise01 } from "./perlin";
 
 type Props = {
-  size: number;
+  width: number;
+  height: number;
   frequencyRef: React.MutableRefObject<FrequencyData>;
+  /**
+   * Simulation steps per rendered frame. 1 runs the medium at frame rate,
+   * which against music read as frantic and out of time with the track.
+   * Below 1 the medium advances on only some frames, bringing it back
+   * near musical tempo.
+   */
+  tempoRef: React.MutableRefObject<number>;
   className?: string;
 };
 
-const COLS = 26;
-const ROWS = 26;
+/** Glyph cell size in CSS px — the grid follows the frame's aspect. */
+const CELL_PX = 12.3;
 const BANDS = 9;
 const SIZE_STEPS = 10;
 const MIN_GLYPH = 3.5;
@@ -97,8 +105,25 @@ const NORMALIZE_EXPONENT = 0.5;
 const IDLE_AMOUNT = 0.12;
 /** How quickly the emitter chases the centroid. Low = it glides. */
 const EMITTER_EASE = 0.1;
+/**
+ * Per-*second* decay for the lowest and highest band, converted to per-step
+ * damping against the current tempo. Expressed this way so the tempo
+ * control slows propagation without also stretching the ring-out — at fixed
+ * per-step damping, halving the tempo doubles how long the plane sounds.
+ * The spread is what carries the band separation: lows hang around, highs
+ * are gone within a beat.
+ */
+const DECAY_LOW_PER_SECOND = 0.62;
+const DECAY_HIGH_PER_SECOND = 0.18;
+const FPS = 60;
 
-export function WaveGridBands({ size, frequencyRef, className }: Props) {
+export function WaveGridBands({
+  width,
+  height,
+  frequencyRef,
+  tempoRef,
+  className,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -108,46 +133,47 @@ export function WaveGridBands({ size, frequencyRef, className }: Props) {
     if (!ctx) return;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width = `${size}px`;
-    canvas.style.height = `${size}px`;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+    const cols = Math.max(4, Math.round(width / CELL_PX));
+    const rows = Math.max(4, Math.round(height / CELL_PX));
     const fonts = buildFontRamp(MIN_GLYPH, MAX_GLYPH, SIZE_STEPS);
-    const cellW = size / COLS;
-    const cellH = size / ROWS;
+    const cellW = width / cols;
+    const cellH = height / rows;
 
     // One medium per band. Low bands: slow, lightly damped — they cross the
     // whole plane. High bands: quick, heavily damped — they stay near the
-    // emitter and are gone within a beat. The damping spread is the part
-    // that carries the separation; measured over a second the low band
-    // retains ~60% of its energy and the top band ~18%.
+    // emitter and are gone within a beat. Damping is re-derived each frame
+    // from the per-second targets, so it survives the tempo control.
     const waves: WaveField[] = [];
+    const decayPerSecond = new Float32Array(BANDS);
     for (let b = 0; b < BANDS; b++) {
       const t = b / (BANDS - 1);
-      waves.push(
-        new WaveField(COLS, ROWS, {
-          speed: 0.14 + t * 0.32,
-          damping: 0.992 - t * 0.02,
-        }),
-      );
+      decayPerSecond[b] =
+        DECAY_LOW_PER_SECOND +
+        t * (DECAY_HIGH_PER_SECOND - DECAY_LOW_PER_SECOND);
+      waves.push(new WaveField(cols, rows, { speed: 0.14 + t * 0.32 }));
     }
 
     const energies = new Float32Array(BANDS);
     const peaks = new Float32Array(BANDS);
     const divisors = new Float32Array(BANDS);
-    const steps = new Uint8Array(COLS * ROWS);
-    const dominant = new Uint8Array(COLS * ROWS);
-    const heights = new Float32Array(COLS * ROWS);
+    const steps = new Uint8Array(cols * rows);
+    const dominant = new Uint8Array(cols * rows);
+    const heights = new Float32Array(cols * rows);
 
     let edges = logBandEdges(frequencyRef.current.length || 128, BANDS);
     let edgesFor = frequencyRef.current.length;
 
     // Emitter starts dead centre and eases toward the centroid from there.
-    let emitterCol = (COLS - 1) / 2;
-    const emitterRow = (ROWS - 1) / 2;
+    let emitterCol = (cols - 1) / 2;
+    const emitterRow = (rows - 1) / 2;
     let z = 0;
+    let stepAcc = 0;
     let raf = 0;
 
     const prefersReducedMotion = window.matchMedia(
@@ -186,9 +212,9 @@ export function WaveGridBands({ size, frequencyRef, className }: Props) {
 
       // Pass 2: size from absolute energy, digit from partly-normalized
       // presence — "which band owns this point", not "which is loudest".
-      for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-          const i = r * COLS + c;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const i = r * cols + c;
           let sum = 0;
           let best = 0;
           let bestRel = 0;
@@ -218,14 +244,14 @@ export function WaveGridBands({ size, frequencyRef, className }: Props) {
     function draw() {
       if (!ctx) return;
       ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, size, size);
+      ctx.fillRect(0, 0, width, height);
 
       for (let s = 0; s < SIZE_STEPS; s++) {
         ctx.font = fonts[s];
         ctx.fillStyle = `rgba(245, 245, 245, ${0.2 + (s / (SIZE_STEPS - 1)) * 0.72})`;
-        for (let r = 0; r < ROWS; r++) {
-          for (let c = 0; c < COLS; c++) {
-            const i = r * COLS + c;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const i = r * cols + c;
             if (steps[i] !== s) continue;
             const x = (c + 0.5) * cellW;
             const y = (r + 0.5) * cellH - heights[i] * cellH * 0.8;
@@ -247,22 +273,36 @@ export function WaveGridBands({ size, frequencyRef, className }: Props) {
       // actually lives — a linear map would pin the emitter near one edge.
       const centroid = Math.pow(spectralCentroid(freq), 0.6);
       const margin = 3;
-      const targetCol = margin + centroid * (COLS - 1 - margin * 2);
+      const targetCol = margin + centroid * (cols - 1 - margin * 2);
       emitterCol += (targetCol - emitterCol) * EMITTER_EASE;
 
+      // Advance the nine media at the requested rate rather than once per
+      // frame. Injection rides inside the loop so energy and propagation
+      // stay in step at any tempo.
+      const tempo = Math.max(0.05, tempoRef.current);
       for (let b = 0; b < BANDS; b++) {
-        if (energies[b] > INJECT_FLOOR) {
-          waves[b].inject(
-            emitterCol,
-            emitterRow,
-            energies[b] * INJECT_GAIN,
-            2,
-          );
+        waves[b].setDamping(
+          Math.pow(decayPerSecond[b], 1 / (tempo * FPS)),
+        );
+      }
+      stepAcc += tempo;
+      let guard = 0;
+      while (stepAcc >= 1 && guard++ < 8) {
+        for (let b = 0; b < BANDS; b++) {
+          if (energies[b] > INJECT_FLOOR) {
+            waves[b].inject(
+              emitterCol,
+              emitterRow,
+              energies[b] * INJECT_GAIN,
+              2,
+            );
+          }
+          waves[b].step();
         }
-        waves[b].step();
+        stepAcc -= 1;
       }
 
-      z += 0.0025;
+      z += 0.0012;
       sample();
       draw();
       raf = requestAnimationFrame(tick);
@@ -278,7 +318,7 @@ export function WaveGridBands({ size, frequencyRef, className }: Props) {
     return () => {
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [size, frequencyRef]);
+  }, [width, height, frequencyRef, tempoRef]);
 
   return (
     <canvas

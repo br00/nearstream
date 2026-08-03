@@ -33,7 +33,7 @@ export class WaveField {
   private cur: Float32Array;
   private next: Float32Array;
   private readonly c2: number;
-  private readonly damping: number;
+  private damping: number;
 
   constructor(cols: number, rows: number, opts: WaveOpts = {}) {
     this.cols = cols;
@@ -44,6 +44,22 @@ export class WaveField {
     this.next = new Float32Array(n);
     this.c2 = Math.min(CFL_LIMIT, Math.max(0, opts.speed ?? 0.3));
     this.damping = Math.min(1, Math.max(0, opts.damping ?? 0.995));
+  }
+
+  /**
+   * Retune the per-step decay.
+   *
+   * Damping is applied per *step*, not per second, so anything that changes
+   * how often `step()` is called silently changes how long the medium rings
+   * in wall-clock time. Halving the step rate to slow propagation doubles
+   * the ring-out, which is how a tempo control quietly reintroduces the
+   * phrase-smearing that the damping was chosen to avoid. Callers that vary
+   * their step rate should hold a per-second decay target and convert:
+   *
+   *   setDamping(Math.pow(decayPerSecond, 1 / stepsPerSecond))
+   */
+  setDamping(damping: number): void {
+    this.damping = Math.min(1, Math.max(0, damping));
   }
 
   /** Height at a cell. Unbounded — callers squash it into their own range. */

@@ -20,13 +20,21 @@ import { buildFontRamp, sizeStep } from "./glyph-grid";
 import { noise01 } from "./perlin";
 
 type Props = {
-  size: number;
+  width: number;
+  height: number;
   amplitudeRef: React.MutableRefObject<number>;
+  /**
+   * Simulation steps per rendered frame. 1 runs the medium at frame rate,
+   * which against music read as frantic and out of time with the track —
+   * the wave churned several times per beat. Below 1 the medium advances
+   * on only some frames, which is what brings it back near musical tempo.
+   */
+  tempoRef: React.MutableRefObject<number>;
   className?: string;
 };
 
-const COLS = 26;
-const ROWS = 26;
+/** Glyph cell size in CSS px — the grid follows the frame's aspect. */
+const CELL_PX = 12.3;
 const SIZE_STEPS = 10;
 const MIN_GLYPH = 3.5;
 const MAX_GLYPH = 15;
@@ -41,8 +49,23 @@ const INJECT_FLOOR = 0.06;
 const INJECT_GAIN = 0.5;
 /** A slow Perlin breath so silence is a living surface, not a dead grid. */
 const IDLE_AMOUNT = 0.14;
+/**
+ * Fraction of amplitude the medium retains per *second*, converted to a
+ * per-step damping against the current tempo. Expressed this way so that
+ * slowing the tempo slows propagation without also stretching the ring-out
+ * — at a fixed per-step damping, tempo 0.4 left the plane still sounding
+ * 4.2s after a phrase ended, and phrases ran into each other.
+ */
+const DECAY_PER_SECOND = 0.43;
+const FPS = 60;
 
-export function WaveGridDigits({ size, amplitudeRef, className }: Props) {
+export function WaveGridDigits({
+  width,
+  height,
+  amplitudeRef,
+  tempoRef,
+  className,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -52,28 +75,32 @@ export function WaveGridDigits({ size, amplitudeRef, className }: Props) {
     if (!ctx) return;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width = `${size}px`;
-    canvas.style.height = `${size}px`;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+    const cols = Math.max(4, Math.round(width / CELL_PX));
+    const rows = Math.max(4, Math.round(height / CELL_PX));
     const fonts = buildFontRamp(MIN_GLYPH, MAX_GLYPH, SIZE_STEPS);
-    const cellW = size / COLS;
-    const cellH = size / ROWS;
+    const cellW = width / cols;
+    const cellH = height / rows;
 
-    // Damping matters more than it looks: at 0.994 the plane is still
-    // ringing at a third of peak two seconds after you stop talking, and
-    // every phrase smears into the next. This settles inside a second.
-    const wave = new WaveField(COLS, ROWS, { speed: 0.32, damping: 0.986 });
+    // Damping matters more than it looks — too little and the plane is
+    // still ringing at a third of peak two seconds after you stop talking,
+    // and every phrase smears into the next. Set per frame from
+    // DECAY_PER_SECOND, since the tempo control moves the step rate.
+    const wave = new WaveField(cols, rows, { speed: 0.32, damping: 0.986 });
 
     // Per-cell scratch, reused every frame — `steps` picks the font bucket,
     // `digits` the character, `heights` the vertical displacement.
-    const steps = new Uint8Array(COLS * ROWS);
-    const digits = new Uint8Array(COLS * ROWS);
-    const heights = new Float32Array(COLS * ROWS);
+    const steps = new Uint8Array(cols * rows);
+    const digits = new Uint8Array(cols * rows);
+    const heights = new Float32Array(cols * rows);
 
     let z = 0;
+    let stepAcc = 0;
     let raf = 0;
 
     const prefersReducedMotion = window.matchMedia(
@@ -84,9 +111,9 @@ export function WaveGridDigits({ size, amplitudeRef, className }: Props) {
     ctx.textBaseline = "middle";
 
     function sample() {
-      for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-          const i = r * COLS + c;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const i = r * cols + c;
           // Wave height plus a slow idle undulation, squashed to −1..1.
           const idle = (noise01(c * 0.16, r * 0.16, z) - 0.5) * 2 * IDLE_AMOUNT;
           const h = Math.max(-1, Math.min(1, wave.at(c, r) * GAIN + idle));
@@ -101,16 +128,16 @@ export function WaveGridDigits({ size, amplitudeRef, className }: Props) {
     function draw() {
       if (!ctx) return;
       ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, size, size);
+      ctx.fillRect(0, 0, width, height);
 
       // One pass per size bucket so `ctx.font` is assigned 10× a frame
-      // rather than 676×.
+      // rather than once per cell.
       for (let s = 0; s < SIZE_STEPS; s++) {
         ctx.font = fonts[s];
         ctx.fillStyle = `rgba(245, 245, 245, ${0.22 + (s / (SIZE_STEPS - 1)) * 0.7})`;
-        for (let r = 0; r < ROWS; r++) {
-          for (let c = 0; c < COLS; c++) {
-            const i = r * COLS + c;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const i = r * cols + c;
             if (steps[i] !== s) continue;
             const x = (c + 0.5) * cellW;
             // Displacing by height is what tips the grid from "chart" into
@@ -124,12 +151,21 @@ export function WaveGridDigits({ size, amplitudeRef, className }: Props) {
 
     function tick() {
       const amp = amplitudeRef.current;
-      if (amp > INJECT_FLOOR) {
-        // Everything enters at one fixed point: the centre of the plane.
-        wave.inject((COLS - 1) / 2, (ROWS - 1) / 2, amp * INJECT_GAIN, 2);
+      // Advance the medium at the requested rate rather than once per
+      // frame. Injection rides inside the loop so energy and propagation
+      // stay in step at any tempo.
+      const tempo = Math.max(0.05, tempoRef.current);
+      wave.setDamping(Math.pow(DECAY_PER_SECOND, 1 / (tempo * FPS)));
+      stepAcc += tempo;
+      let guard = 0;
+      while (stepAcc >= 1 && guard++ < 8) {
+        if (amp > INJECT_FLOOR) {
+          wave.inject((cols - 1) / 2, (rows - 1) / 2, amp * INJECT_GAIN, 2);
+        }
+        wave.step();
+        stepAcc -= 1;
       }
-      wave.step();
-      z += 0.0025;
+      z += 0.0012;
       sample();
       draw();
       raf = requestAnimationFrame(tick);
@@ -145,7 +181,7 @@ export function WaveGridDigits({ size, amplitudeRef, className }: Props) {
     return () => {
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [size, amplitudeRef]);
+  }, [width, height, amplitudeRef, tempoRef]);
 
   return (
     <canvas
