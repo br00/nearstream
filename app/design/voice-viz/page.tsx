@@ -1,8 +1,12 @@
 "use client";
 
-// Voice-viz lab (slice 39.5). Ten candidate audio-reactive visualizers
-// rendered side-by-side from a single shared amplitude source. Pick
-// with your eyes, wire the winner into `AudioPlayer` after.
+// Voice-viz lab (slice 39.5). Candidate audio-reactive visualizers rendered
+// side-by-side from a single shared amplitude source. Pick with your eyes,
+// wire the winner into `AudioPlayer` after.
+//
+// Two batches, and they don't share a premise. A–J are noise fields that
+// react to a level. K–M treat the canvas as a medium a wave travels across —
+// sound seen from directly above.
 //
 // Live mic OR upload/play a file — same RMS calc feeds every canvas so
 // their responses are directly comparable. Follows the mobile-lab /
@@ -28,6 +32,9 @@ import { ProximityWeb } from "@/app/_components/voice-viz/proximity-web";
 import { SpectralColumns } from "@/app/_components/voice-viz/spectral-columns";
 import { RippleInterference } from "@/app/_components/voice-viz/ripple-interference";
 import { AmplitudeDrum } from "@/app/_components/voice-viz/amplitude-drum";
+import { WaveGridDigits } from "@/app/_components/voice-viz/wave-grid-digits";
+import { WaveGridBands } from "@/app/_components/voice-viz/wave-grid-bands";
+import { AntTraces } from "@/app/_components/voice-viz/ant-traces";
 
 const VIZ_SIZE = 320;
 
@@ -56,11 +63,11 @@ export default function VoiceVizLab() {
             Audio-reactive visualizer candidates
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted">
-            Ten moving-points cousins of the human-circle, all driven by the
-            same audio source. Turn on the mic or play a file — every canvas
-            responds to the same signal. Pick the one that reads as
-            &ldquo;voice on Nearstream&rdquo; and it lands in the shipped
-            AudioPlayer.
+            Thirteen candidates, all driven by the same audio source. Turn on
+            the mic or play a file — every canvas responds to the same signal.
+            Pick the one that reads as &ldquo;voice on Nearstream&rdquo; and it
+            lands in the shipped AudioPlayer. Start with K–M; A–J are the
+            earlier batch, kept below for comparison.
           </p>
 
           {/* ── Controls ─────────────────────────────────────────────── */}
@@ -132,7 +139,53 @@ export default function VoiceVizLab() {
             </p>
           </div>
 
-          {/* ── Grid of candidates ──────────────────────────────────── */}
+          {/* ── Wave from above (K–M) ───────────────────────────────── */}
+          <h2 className="mt-16 text-lg font-normal tracking-tight text-foreground">
+            Sound as a wave on a plane, seen from above
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
+            A different substrate from A–J. Those are noise fields that react;
+            these are a <em>medium</em>. Energy enters at a point and then
+            propagates, interferes, reflects off the frame and decays — so the
+            plane holds a short memory of what just happened instead of only
+            restating the current frame. K and L descend from the Processing
+            kraftwerk sketch; M is the fluid reading of the same wave.
+          </p>
+
+          <div className="mt-10 grid gap-8 sm:grid-cols-2">
+            <VizCard
+              tag="K"
+              name="Wave grid — digits by height"
+              blurb="The kraftwerk sketch with the noise field swapped for a real wave. Everything enters at the centre. Digit and size both come from the height, exactly as in the original — which means the digit tells you nothing the size didn't."
+            >
+              <WaveGridDigits size={VIZ_SIZE} amplitudeRef={audio.amplitudeRef} />
+            </VizCard>
+
+            <VizCard
+              tag="L"
+              name="Wave grid — digits by frequency"
+              blurb="Nine wave fields, one per band, each with its own speed and decay: lows travel slow and far, highs die near the source. Size = energy through that point, digit = which band dominates there. The emitter slides with pitch. Cells keep their last band, so the grid stays readable as a still."
+            >
+              <WaveGridBands size={VIZ_SIZE} frequencyRef={audio.frequencyRef} />
+            </VizCard>
+
+            <VizCard
+              tag="M"
+              name="Ant traces"
+              blurb="Same wave, no grid. Agents steer along the contours rather than downhill, so a ripple gets drawn as a ring and the trails accumulate into the wavefront. Records beautifully — but carries no frequency information and has no structure to fall back on."
+            >
+              <AntTraces size={VIZ_SIZE} amplitudeRef={audio.amplitudeRef} />
+            </VizCard>
+          </div>
+
+          {/* ── Earlier candidates (A–J) ────────────────────────────── */}
+          <h2 className="mt-20 text-lg font-normal tracking-tight text-foreground">
+            Earlier candidates
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
+            The first ten. Kept for comparison.
+          </p>
+
           <div className="mt-10 grid gap-8 sm:grid-cols-2">
             <VizCard
               tag="A"
