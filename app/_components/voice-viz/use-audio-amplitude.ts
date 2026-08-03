@@ -13,8 +13,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type AmplitudeMode = "off" | "mic" | "file";
 
+/**
+ * `getByteFrequencyData` insists on a view over a plain ArrayBuffer (not a
+ * SharedArrayBuffer), so the generic argument has to be spelled out. Shared
+ * with the consuming visualizers — a bare `Uint8Array` on their side won't
+ * assign, refs being invariant.
+ */
+export type FrequencyData = Uint8Array<ArrayBuffer>;
+
 export type UseAudioAmplitudeResult = {
   amplitudeRef: React.MutableRefObject<number>;
+  /**
+   * Byte frequency data (0–255 per bin), refreshed on the same rAF tick as
+   * `amplitudeRef`. Most candidates only need amplitude; the spectral ones
+   * read this. Length tracks `analyser.frequencyBinCount` (128 at fftSize
+   * 256) and is zero-filled while `mode === "off"`.
+   */
+  frequencyRef: React.MutableRefObject<FrequencyData>;
   mode: AmplitudeMode;
   startMic: () => Promise<void>;
   stopMic: () => void;
@@ -26,6 +41,7 @@ export type UseAudioAmplitudeResult = {
 
 export function useAudioAmplitude(): UseAudioAmplitudeResult {
   const amplitudeRef = useRef<number>(0);
+  const frequencyRef = useRef<FrequencyData>(new Uint8Array(128));
   const [mode, setMode] = useState<AmplitudeMode>("off");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [currentFileName, setCurrentFileName] = useState<string | null>(null);
@@ -52,8 +68,12 @@ export function useAudioAmplitude(): UseAudioAmplitudeResult {
 
   const startLoop = useCallback((analyser: AnalyserNode) => {
     const buf = new Uint8Array(analyser.frequencyBinCount);
+    if (frequencyRef.current.length !== analyser.frequencyBinCount) {
+      frequencyRef.current = new Uint8Array(analyser.frequencyBinCount);
+    }
     function tick() {
       analyser.getByteTimeDomainData(buf);
+      analyser.getByteFrequencyData(frequencyRef.current);
       let sum = 0;
       for (let i = 0; i < buf.length; i++) {
         const v = (buf[i] - 128) / 128;
@@ -75,6 +95,7 @@ export function useAudioAmplitude(): UseAudioAmplitudeResult {
       rafRef.current = null;
     }
     amplitudeRef.current = 0;
+    frequencyRef.current.fill(0);
   }, []);
 
   const teardownMic = useCallback(() => {
@@ -205,6 +226,7 @@ export function useAudioAmplitude(): UseAudioAmplitudeResult {
 
   return {
     amplitudeRef,
+    frequencyRef,
     mode,
     startMic,
     stopMic,

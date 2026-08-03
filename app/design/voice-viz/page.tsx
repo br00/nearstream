@@ -1,12 +1,16 @@
 "use client";
 
-// Voice-viz lab (slice 39.5). Four candidate audio-reactive visualizers
+// Voice-viz lab (slice 39.5). Ten candidate audio-reactive visualizers
 // rendered side-by-side from a single shared amplitude source. Pick
 // with your eyes, wire the winner into `AudioPlayer` after.
 //
 // Live mic OR upload/play a file — same RMS calc feeds every canvas so
 // their responses are directly comparable. Follows the mobile-lab /
 // multi-image-lab convention: noindex, /design-linked, unshipped.
+//
+// Note on running this on a phone: `getUserMedia` needs a secure context,
+// so the LAN http:// URL will show "mic failed". Run the dev server with
+// `next dev --experimental-https` and accept the certificate warning.
 
 import Link from "next/link";
 import { useRef } from "react";
@@ -18,6 +22,12 @@ import { FlowField } from "@/app/_components/voice-viz/flow-field";
 import { ConcentricEchoes } from "@/app/_components/voice-viz/concentric-echoes";
 import { ScatterField } from "@/app/_components/voice-viz/scatter-field";
 import { UndulatingHorizon } from "@/app/_components/voice-viz/undulating-horizon";
+import { OrbitSwarm } from "@/app/_components/voice-viz/orbit-swarm";
+import { DotMatrixPulse } from "@/app/_components/voice-viz/dot-matrix-pulse";
+import { ProximityWeb } from "@/app/_components/voice-viz/proximity-web";
+import { SpectralColumns } from "@/app/_components/voice-viz/spectral-columns";
+import { RippleInterference } from "@/app/_components/voice-viz/ripple-interference";
+import { AmplitudeDrum } from "@/app/_components/voice-viz/amplitude-drum";
 
 const VIZ_SIZE = 320;
 
@@ -46,9 +56,9 @@ export default function VoiceVizLab() {
             Audio-reactive visualizer candidates
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted">
-            Four moving-points cousins of the human-circle, all driven by the
-            same amplitude source. Turn on the mic or play a file — every
-            canvas responds to the same RMS. Pick the one that reads as
+            Ten moving-points cousins of the human-circle, all driven by the
+            same audio source. Turn on the mic or play a file — every canvas
+            responds to the same signal. Pick the one that reads as
             &ldquo;voice on Nearstream&rdquo; and it lands in the shipped
             AudioPlayer.
           </p>
@@ -122,7 +132,7 @@ export default function VoiceVizLab() {
             </p>
           </div>
 
-          {/* ── 2×2 grid of candidates ──────────────────────────────── */}
+          {/* ── Grid of candidates ──────────────────────────────────── */}
           <div className="mt-10 grid gap-8 sm:grid-cols-2">
             <VizCard
               tag="A"
@@ -154,6 +164,54 @@ export default function VoiceVizLab() {
               blurb="Horizontal line of ~60 points with vertical Perlin. Amplitude drives vertical range. Waveform-adjacent, pointwise."
             >
               <UndulatingHorizon size={VIZ_SIZE} amplitudeRef={audio.amplitudeRef} />
+            </VizCard>
+
+            <VizCard
+              tag="E"
+              name="Orbit swarm"
+              blurb="Every point rides its own tilted ellipse around one centre. Amplitude spins the system up and stretches the orbits. Reads as a body under strain."
+            >
+              <OrbitSwarm size={VIZ_SIZE} amplitudeRef={audio.amplitudeRef} />
+            </VizCard>
+
+            <VizCard
+              tag="F"
+              name="Dot-matrix pulse"
+              blurb="Fixed grid; only dot radius moves. Onsets — not levels — fire a ring outward from centre, so it pulses once per syllable. Closest to the Nothing glyph language."
+            >
+              <DotMatrixPulse size={VIZ_SIZE} amplitudeRef={audio.amplitudeRef} />
+            </VizCard>
+
+            <VizCard
+              tag="G"
+              name="Proximity web"
+              blurb="Drifting points link to neighbours within a threshold; amplitude raises the threshold. Silence scatters, speech knits. The one whose meaning matches Nearstream."
+            >
+              <ProximityWeb size={VIZ_SIZE} amplitudeRef={audio.amplitudeRef} />
+            </VizCard>
+
+            <VizCard
+              tag="H"
+              name="Spectral columns"
+              blurb="Reads the FFT, not RMS — 28 log-spaced bands as dot stacks. The only candidate where two different voices actually look different."
+            >
+              <SpectralColumns size={VIZ_SIZE} frequencyRef={audio.frequencyRef} />
+            </VizCard>
+
+            <VizCard
+              tag="I"
+              name="Ripple interference"
+              blurb="Three off-centre wave sources sampled by a still lattice. Nothing moves but brightness. Silence is flat grey, speech is a moiré."
+            >
+              <RippleInterference size={VIZ_SIZE} amplitudeRef={audio.amplitudeRef} />
+            </VizCard>
+
+            <VizCard
+              tag="J"
+              name="Amplitude drum"
+              blurb="A seismograph wrapped into a circle — a record, not a reaction. After a note the ring holds the shape of the whole sentence, so it also works as a still (OG image, digest card)."
+            >
+              <AmplitudeDrum size={VIZ_SIZE} amplitudeRef={audio.amplitudeRef} />
             </VizCard>
           </div>
         </div>
