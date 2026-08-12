@@ -9,6 +9,8 @@
 //
 // `email` is the auth identifier; the allowlist still gates who can sign in.
 
+import type { VoiceVizKey } from "@/lib/voice-viz-variants";
+
 export type User = {
   id: string;
   email: string;
@@ -45,6 +47,14 @@ export type UserPreferences = {
   readerLayout?: ReaderLayout;
   /** Mode for the inventory detail page gallery. */
   galleryLayout?: GalleryLayout;
+  /**
+   * Which visualizer draws this user's voice notes. Unlike the layout
+   * preferences above — which control how *you* see other people's posts —
+   * this one travels with the post: it's the author's signature, so a voice
+   * note looks the same on their page, in a friend's reader, and in the
+   * digest. See lib/voice-viz-variants.ts for the curated set.
+   */
+  voiceViz?: VoiceVizKey;
   /**
    * Who can view this user's tenant page + detail pages + RSS feed.
    * - `public`: anyone with the URL. RSS is public.

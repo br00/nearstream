@@ -6,6 +6,7 @@ import { inventoryStore } from "@/lib/inventory-store";
 import { imagesOf } from "@/schemas/inventory";
 import { letterStore } from "@/lib/letter-store";
 import { userStore } from "@/lib/user-store";
+import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
 import { sourceStore } from "@/lib/source-store";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
@@ -275,6 +276,7 @@ export default async function TenantHome({ params, searchParams }: Props) {
                             durationMs={entry.audio.durationMs}
                             mime={entry.audio.mime}
                             size={160}
+                            variant={normalizeVoiceViz(user.preferences?.voiceViz)}
                           />
                         </div>
                       )}

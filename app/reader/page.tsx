@@ -12,6 +12,7 @@ import { Kicker } from "@/app/_components/kicker";
 import { ReaderRefresh } from "@/app/_components/reader-refresh";
 import { ReaderPicture } from "@/app/_components/reader-picture";
 import { AudioPlayer } from "@/app/_components/audio-player";
+import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
 import type { FeedEntry } from "@/schemas/feed-entry";
 import type { Source } from "@/schemas/source";
 
@@ -201,6 +202,8 @@ type ReaderAudio = {
   url: string;
   mime: string;
   durationMs?: number;
+  /** Author's visualizer, carried on the feed. Unvalidated wire value. */
+  viz?: string;
 };
 
 type EntryPropsBase = {
@@ -277,6 +280,7 @@ function VoiceBody({ entry }: EntryPropsBase) {
           durationMs={entry.audio.durationMs ?? 0}
           mime={entry.audio.mime}
           size={160}
+          variant={normalizeVoiceViz(entry.audio.viz)}
         />
       </div>
       {entry.excerpt || entry.title ? (
@@ -520,6 +524,7 @@ function BroadsheetVoice({ entry }: EntryPropsBase) {
           durationMs={entry.audio.durationMs ?? 0}
           mime={entry.audio.mime}
           size={200}
+          variant={normalizeVoiceViz(entry.audio.viz)}
         />
       </div>
       {entry.excerpt || entry.title ? (
