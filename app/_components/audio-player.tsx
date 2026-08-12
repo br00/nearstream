@@ -8,7 +8,7 @@
 //
 // Design calls:
 // - Amplitude is written into a MutableRef, not React state. Sixty writes
-//   per second through setState would rerender the AnimatedMark for no
+//   per second through setState would rerender the visualizer for no
 //   visible gain; the ref lets the canvas RAF loop read the current value
 //   without triggering a rerender.
 // - AudioContext is created lazily on first play. Browsers reject a fresh
