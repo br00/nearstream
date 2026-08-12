@@ -58,6 +58,12 @@ export default function DesignPage() {
               >
                 Multi-image lab →
               </Link>
+              <Link
+                href="/design/voice-viz"
+                className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted transition-colors hover:border-foreground hover:text-foreground"
+              >
+                Voice-viz lab →
+              </Link>
             </nav>
           </header>
 
