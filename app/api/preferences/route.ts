@@ -20,6 +20,7 @@ import {
   isEmailDigestFrequency,
   type UserPreferences,
 } from "@/schemas/user";
+import { isVoiceVizKey } from "@/lib/voice-viz-variants";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -34,12 +35,14 @@ export async function POST(request: Request) {
   let galleryLayoutRaw: unknown;
   let sitePrivacyRaw: unknown;
   let emailDigestRaw: unknown;
+  let voiceVizRaw: unknown;
   if (isJson) {
     const json = await request.json().catch(() => null);
     readerLayoutRaw = json?.readerLayout;
     galleryLayoutRaw = json?.galleryLayout;
     sitePrivacyRaw = json?.sitePrivacy;
     emailDigestRaw = json?.emailDigest;
+    voiceVizRaw = json?.voiceViz;
   } else {
     const form = await request.formData();
     // Form submissions only include the field that fieldset was submitted
@@ -49,6 +52,7 @@ export async function POST(request: Request) {
     galleryLayoutRaw = form.has("galleryLayout") ? form.get("galleryLayout") : undefined;
     sitePrivacyRaw = form.has("sitePrivacy") ? form.get("sitePrivacy") : undefined;
     emailDigestRaw = form.has("emailDigest") ? form.get("emailDigest") : undefined;
+    voiceVizRaw = form.has("voiceViz") ? form.get("voiceViz") : undefined;
   }
 
   const patch: Partial<UserPreferences> = {};
@@ -104,6 +108,19 @@ export async function POST(request: Request) {
       isJson,
       400,
       `unknown emailDigest: ${String(emailDigestRaw)}`,
+    );
+  }
+
+  if (voiceVizRaw === "" || voiceVizRaw === null) {
+    patch.voiceViz = undefined;
+  } else if (isVoiceVizKey(voiceVizRaw)) {
+    patch.voiceViz = voiceVizRaw;
+  } else if (voiceVizRaw !== undefined) {
+    return errorResponse(
+      request,
+      isJson,
+      400,
+      `unknown voiceViz: ${String(voiceVizRaw)}`,
     );
   }
 

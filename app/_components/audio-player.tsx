@@ -18,10 +18,12 @@
 //   during playback doesn't leave a ghost source graph.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { VoiceVisualizer } from "@/app/_components/voice-viz/voice-visualizer";
+import type { FrequencyData } from "@/app/_components/voice-viz/use-audio-amplitude";
 import {
-  AnimatedMark,
-  type HumanCircleParams,
-} from "@/app/_components/site/human-circle";
+  DEFAULT_VOICE_VIZ,
+  type VoiceVizKey,
+} from "@/lib/voice-viz-variants";
 
 type Props = {
   src: string;
@@ -30,10 +32,13 @@ type Props = {
   /** Visualizer size in CSS pixels. Reader cards use ~120; the tenant
    *  detail slot uses ~200; the music-page hero uses ~320. */
   size?: number;
-  /** Optional override for the mark's noise/animation params — e.g. so a
-   *  voice note reads with a different visual identity than a music
-   *  track when both appear in the same reader feed. */
-  params?: Partial<HumanCircleParams>;
+  /**
+   * Which visualizer to draw — the post author's preference, so a voice
+   * note looks the same wherever it appears (their page, a friend's
+   * reader, the digest). Variants that can't render at `size` fall back
+   * inside VoiceVisualizer.
+   */
+  variant?: VoiceVizKey;
   className?: string;
 };
 
@@ -49,7 +54,7 @@ export function AudioPlayer({
   durationMs,
   mime,
   size = 200,
-  params,
+  variant = DEFAULT_VOICE_VIZ,
   className,
 }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -57,9 +62,13 @@ export function AudioPlayer({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const rafRef = useRef<number | null>(null);
-  // The channel between the analyser loop and the AnimatedMark. Written
+  // The channel between the analyser loop and the visualizer. Written
   // ~60x/s during playback; read from the canvas RAF loop.
   const amplitudeRef = useRef<number>(0);
+  // Byte FFT on the same tick — the wave grid and ant traces read this to
+  // separate frequency bands and to steer by pitch. Sized to match the
+  // analyser on first run; 128 matches fftSize 256.
+  const frequencyRef = useRef<FrequencyData>(new Uint8Array(128));
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -70,14 +79,19 @@ export function AudioPlayer({
       rafRef.current = null;
     }
     amplitudeRef.current = 0;
+    frequencyRef.current.fill(0);
   }, []);
 
   const startAnalyserLoop = useCallback(() => {
     const analyser = analyserRef.current;
     if (!analyser) return;
     const buf = new Uint8Array(analyser.frequencyBinCount);
+    if (frequencyRef.current.length !== analyser.frequencyBinCount) {
+      frequencyRef.current = new Uint8Array(analyser.frequencyBinCount);
+    }
     function tick() {
       analyser!.getByteTimeDomainData(buf);
+      analyser!.getByteFrequencyData(frequencyRef.current);
       // RMS over the waveform buffer, normalized to ~0..1. Time-domain
       // RMS is more responsive than frequency magnitude for voice and
       // matches how loudness feels perceptually.
@@ -192,11 +206,11 @@ export function AudioPlayer({
   return (
     <div className={className}>
       <div className="relative">
-        <AnimatedMark
+        <VoiceVisualizer
+          variant={variant}
           size={size}
           amplitudeRef={amplitudeRef}
-          params={params}
-          ariaLabel={isPlaying ? "Playing audio" : "Paused audio"}
+          frequencyRef={frequencyRef}
         />
         <button
           type="button"

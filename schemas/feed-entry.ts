@@ -21,6 +21,15 @@ export type FeedEntryAudio = {
    *  duration in HH:MM:SS via iTunes namespace we don't yet parse); the
    *  player falls back to the audio element's own metadata in that case. */
   durationMs?: number;
+  /**
+   * The author's chosen visualizer, carried on the feed so their voice
+   * looks the same in someone else's reader as on their own page. A
+   * `VoiceVizKey`, but deliberately typed as a plain string here: this
+   * comes off the wire from an instance that may ship variants we don't
+   * have. `normalizeVoiceViz` maps anything unrecognised to the default.
+   * Absent for non-Nearstream feeds and for older Nearstream feeds.
+   */
+  viz?: string;
 };
 
 export type FeedEntryImage = {

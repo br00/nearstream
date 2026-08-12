@@ -23,6 +23,10 @@ import type {
   SitePrivacy,
   EmailDigestFrequency,
 } from "@/schemas/user";
+import {
+  listVoiceVizVariants,
+  normalizeVoiceViz,
+} from "@/lib/voice-viz-variants";
 
 // Display modes shipped on this surface. Adding a new one is: define it
 // here, render it in app/reader/page.tsx (and the broadsheet entry helpers
@@ -321,6 +325,46 @@ export default async function SettingsPage({ searchParams }: Props) {
                           </span>
                           <span className="text-[12.5px] text-muted-soft">
                             {opt.hint}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              <fieldset className="flex flex-col gap-3">
+                <legend>
+                  <Kicker>Voice visualizer</Kicker>
+                </legend>
+                <p className="text-sm leading-relaxed text-muted-soft">
+                  How your voice notes are drawn. Unlike the settings above,
+                  this one travels with the post — friends see your voice the
+                  way you picked it, in their reader and in the digest.
+                </p>
+                <div className="mt-2 flex flex-col gap-3">
+                  {listVoiceVizVariants().map((variant) => {
+                    const isActive =
+                      normalizeVoiceViz(user.preferences?.voiceViz) ===
+                      variant.key;
+                    return (
+                      <label
+                        key={variant.key}
+                        className="flex cursor-pointer items-baseline gap-3 border border-border p-4 transition-colors hover:border-foreground/60 has-[:checked]:border-foreground has-[:checked]:bg-foreground/5"
+                      >
+                        <input
+                          type="radio"
+                          name="voiceViz"
+                          value={variant.key}
+                          defaultChecked={isActive}
+                          className="accent-foreground"
+                        />
+                        <span className="flex flex-col gap-1">
+                          <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-foreground">
+                            {variant.name}
+                          </span>
+                          <span className="text-[12.5px] text-muted-soft">
+                            {variant.blurb}
                           </span>
                         </span>
                       </label>
