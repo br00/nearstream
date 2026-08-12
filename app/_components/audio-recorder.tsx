@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { VOICE_NOTE_MAX_MS } from "@/schemas/stream";
 import { AudioPlayer } from "@/app/_components/audio-player";
+import type { VoiceVizKey } from "@/lib/voice-viz-variants";
 
 type Recorded = {
   blob: Blob;
@@ -34,6 +35,8 @@ type Recorded = {
 
 type Props = {
   onChange: (r: Recorded | null) => void;
+  /** Author's visualizer, so the preview matches the published post. */
+  voiceViz: VoiceVizKey;
 };
 
 /** Pick the best MediaRecorder MIME the current browser supports. Chromium
@@ -56,7 +59,7 @@ function formatSeconds(ms: number): string {
   return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 }
 
-export function AudioRecorder({ onChange }: Props) {
+export function AudioRecorder({ onChange, voiceViz }: Props) {
   const [phase, setPhase] = useState<"idle" | "recording" | "recorded" | "unsupported" | "denied">(
     typeof MediaRecorder === "undefined" ? "unsupported" : "idle",
   );
@@ -203,6 +206,7 @@ export function AudioRecorder({ onChange }: Props) {
             durationMs={recorded.durationMs}
             mime={recorded.mime}
             size={200}
+            variant={voiceViz}
           />
           <button
             type="button"

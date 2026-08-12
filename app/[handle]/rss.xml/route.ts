@@ -4,6 +4,7 @@ import { store } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
+import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
 import { tenantAbsoluteBase } from "@/lib/tenant-domains";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { visibilityOf } from "@/schemas/visibility";
@@ -167,6 +168,10 @@ export async function GET(request: Request, { params }: Props) {
   if (privacy === "private") notFound();
   if (privacy === "friends" && !internal) notFound();
 
+  // Carried on every voice item so the author's visualizer travels with
+  // the post — a friend's reader draws their voice the way they picked it.
+  const voiceViz = normalizeVoiceViz(user.preferences?.voiceViz);
+
   const siteUrl = tenantAbsoluteBase(handle, INSTANCE_URL);
   const feedTitle = `${user.displayName || handle} — Nearstream`;
   const feedDescription = `Stream, essays, and inventory from ${user.displayName || handle}.`;
@@ -228,7 +233,7 @@ export async function GET(request: Request, { params }: Props) {
     const entryType = hasAudio ? "voice" : "note";
     const audioElements =
       hasAudio && entry.audio
-        ? `\n      <nearstream:audio url="${escapeXml(`${INSTANCE_URL}/api/media/${entry.audio.key}`)}" mime="${escapeXml(entry.audio.mime)}" durationMs="${entry.audio.durationMs}" />\n      <enclosure url="${escapeXml(`${INSTANCE_URL}/api/media/${entry.audio.key}`)}" length="0" type="${escapeXml(entry.audio.mime)}" />`
+        ? `\n      <nearstream:audio url="${escapeXml(`${INSTANCE_URL}/api/media/${entry.audio.key}`)}" mime="${escapeXml(entry.audio.mime)}" durationMs="${entry.audio.durationMs}" viz="${escapeXml(voiceViz)}" />\n      <enclosure url="${escapeXml(`${INSTANCE_URL}/api/media/${entry.audio.key}`)}" length="0" type="${escapeXml(entry.audio.mime)}" />`
         : "";
     feedItems.push({
       publishedAt: entry.publishedAt,

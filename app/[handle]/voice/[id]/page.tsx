@@ -11,6 +11,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { store } from "@/lib/store";
 import { userStore } from "@/lib/user-store";
+import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
 import { getSession } from "@/lib/auth";
 import { checkTenantVisibility } from "@/lib/tenant-visibility";
 import { tenantBase } from "@/lib/tenant-domains";
@@ -109,6 +110,7 @@ export default async function VoiceNotePage({ params }: Props) {
           durationMs={entry.audio.durationMs}
           mime={entry.audio.mime}
           size={280}
+          variant={normalizeVoiceViz(user.preferences?.voiceViz)}
         />
 
         {entry.text && (
