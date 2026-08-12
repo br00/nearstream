@@ -8,6 +8,7 @@ import { Kicker } from "@/app/_components/kicker";
 import { ModeRadioGroup } from "@/app/_components/mode-radio";
 import { InventoryUploadForm } from "@/app/_components/inventory-upload-form";
 import { VisibilityRadio } from "@/app/_components/visibility-radio";
+import { AudioRecorder } from "@/app/_components/audio-recorder";
 import { DEFAULT_MODE } from "@/schemas/stream";
 
 // Compose-first studio. Federico's "I got lost" and Alessandro's "I don't
@@ -15,13 +16,18 @@ import { DEFAULT_MODE } from "@/schemas/stream";
 // thing: four stacked forms is one too many decisions before you've started.
 // Pick a primitive at the top; the relevant form is the only thing below.
 
-type Primitive = "stream" | "picture" | "essay" | "letter";
+type Primitive = "stream" | "voice" | "picture" | "essay" | "letter";
 
 const PRIMITIVES: { key: Primitive; label: string; hint: string }[] = [
   {
     key: "stream",
     label: "Stream",
     hint: "A short note. No title, no commitment — the most casual thing you can post.",
+  },
+  {
+    key: "voice",
+    label: "Voice",
+    hint: "A short voice note — up to 60 seconds. Optional caption. Plays in the reader with an animated mark that breathes with your voice.",
   },
   {
     key: "picture",
@@ -98,6 +104,7 @@ export function StudioComposer({
         {active === "stream" && (
           <StreamForm essays={essays} inventory={inventoryItems} />
         )}
+        {active === "voice" && <VoiceForm />}
         {active === "picture" && <InventoryUploadForm />}
         {active === "essay" && <EssayForm error={essayError} />}
         {active === "letter" && (
@@ -218,6 +225,126 @@ function LetterForm({
         </SubmitButton>
       </form>
     </>
+  );
+}
+
+function VoiceForm() {
+  const [recorded, setRecorded] = useState<{
+    blob: Blob;
+    durationMs: number;
+    mime: "audio/webm" | "audio/mp4";
+  } | null>(null);
+  const [state, setState] = useState<"idle" | "uploading" | "saving">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    if (!recorded) {
+      setError("Record something first.");
+      return;
+    }
+    // Read the mode + visibility + caption directly off the form so we
+    // don't have to controlled-wrap the shared radio components.
+    const formData = new FormData(e.currentTarget);
+    const caption = String(formData.get("text") ?? "").trim();
+    const tag = String(formData.get("tag") ?? DEFAULT_MODE);
+    const visibility = String(formData.get("visibility") ?? "public");
+
+    try {
+      setState("uploading");
+      const urlRes = await fetch("/api/stream/upload-url", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ contentType: recorded.mime }),
+      });
+      if (!urlRes.ok) {
+        const body = await urlRes.json().catch(() => ({ error: "upload-url failed" }));
+        throw new Error(body.error ?? "upload-url failed");
+      }
+      const { uploadUrl, key } = (await urlRes.json()) as {
+        uploadUrl: string;
+        key: string;
+      };
+
+      const putRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "content-type": recorded.mime },
+        body: recorded.blob,
+      });
+      if (!putRes.ok) {
+        throw new Error(`R2 PUT failed (${putRes.status})`);
+      }
+
+      setState("saving");
+      const postRes = await fetch("/api/stream", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          text: caption,
+          tag,
+          visibility,
+          audioKey: key,
+          audioMime: recorded.mime,
+          audioDurationMs: Math.round(recorded.durationMs),
+        }),
+      });
+      if (!postRes.ok) {
+        const body = await postRes.json().catch(() => ({ error: "post failed" }));
+        throw new Error(body.error ?? "post failed");
+      }
+
+      // Match the redirect-on-success behaviour of the other forms — send
+      // the user back to studio so they can immediately hear it in context.
+      window.location.href = "/studio";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "post failed");
+      setState("idle");
+    }
+  }
+
+  const busy = state !== "idle";
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-8">
+      <div className="flex flex-col gap-2">
+        <Kicker>Voice note</Kicker>
+        <AudioRecorder onChange={setRecorded} />
+      </div>
+
+      <label className="flex flex-col gap-2">
+        <Kicker>Caption (optional)</Kicker>
+        <Textarea
+          name="text"
+          rows={3}
+          placeholder="Anything you want to say alongside it."
+        />
+      </label>
+
+      <fieldset className="flex flex-col gap-3">
+        <legend>
+          <Kicker>Mode</Kicker>
+        </legend>
+        <ModeRadioGroup current={DEFAULT_MODE} />
+      </fieldset>
+
+      <VisibilityRadio defaultValue="public" />
+
+      {error && (
+        <div role="alert" className="border-l-2 border-foreground/50 pl-4 py-2">
+          <Kicker>Could not post</Kicker>
+          <p className="mt-1 text-sm text-muted">{error}</p>
+        </div>
+      )}
+
+      <SubmitButton
+        pendingLabel={state === "uploading" ? "Uploading…" : "Saving…"}
+        disabled={!recorded || busy}
+        className="self-start"
+      >
+        Post voice note
+      </SubmitButton>
+    </form>
   );
 }
 

@@ -10,6 +10,7 @@ import { sourceStore } from "@/lib/source-store";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
 import { ProfileMark } from "@/app/_components/site/profile-mark";
+import { AudioPlayer } from "@/app/_components/audio-player";
 import { isHostEmail, getSession } from "@/lib/auth";
 import { checkTenantVisibility } from "@/lib/tenant-visibility";
 import { tenantBase, tenantAbsoluteBase, normalizeUrl } from "@/lib/tenant-domains";
@@ -267,7 +268,19 @@ export default async function TenantHome({ params, searchParams }: Props) {
                       {formatRelative(entry.publishedAt)}
                     </time>
                     <div>
-                      <span className="whitespace-pre-wrap">{entry.text}</span>
+                      {entry.audio && (
+                        <div className="mb-3 flex justify-start">
+                          <AudioPlayer
+                            src={`/api/media/${entry.audio.key}`}
+                            durationMs={entry.audio.durationMs}
+                            mime={entry.audio.mime}
+                            size={160}
+                          />
+                        </div>
+                      )}
+                      {entry.text && (
+                        <span className="whitespace-pre-wrap">{entry.text}</span>
+                      )}
                       {entry.link &&
                         (() => {
                           const title = lookupLinkTitle(entry.link);

@@ -9,7 +9,19 @@
 // `type` is set in slice 17 (note / essay / picture detection). Slice 16
 // always writes "unknown" — slice 17 fills it in.
 
-export type FeedEntryType = "note" | "essay" | "picture" | "unknown";
+export type FeedEntryType = "note" | "essay" | "picture" | "voice" | "unknown";
+
+/** Voice-note payload parsed from a friend's feed. Populated by
+ *  `pickFeedAudio()` in lib/feed-parser.ts from either the Nearstream
+ *  `<nearstream:audio>` extension or a fallback audio `<enclosure>`. */
+export type FeedEntryAudio = {
+  url: string;
+  mime: string;
+  /** ms. Missing on non-Nearstream feeds (arbitrary podcasts advertise
+   *  duration in HH:MM:SS via iTunes namespace we don't yet parse); the
+   *  player falls back to the audio element's own metadata in that case. */
+  durationMs?: number;
+};
 
 export type FeedEntryImage = {
   /** Full-resolution permalink. Fallback when no thumb is available. */
@@ -55,6 +67,9 @@ export type FeedEntry = {
    *  `<enclosure>` tags. May be undefined for legacy entries; callers
    *  should use `imagesOf()` which coalesces both shapes. */
   images?: FeedEntryImage[];
+  /** Voice-note attachment (slice 39). Present when `type === "voice"`,
+   *  populated from `<nearstream:audio>` or a fallback audio `<enclosure>`. */
+  audio?: FeedEntryAudio;
   /** When our reader first saw this entry. */
   fetchedAt: string;
 };

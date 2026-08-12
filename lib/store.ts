@@ -39,6 +39,7 @@ class InMemoryStore implements Store {
       publishedAt: new Date().toISOString(),
       visibility: input.visibility ?? "public",
       ...(input.link ? { link: input.link } : {}),
+      ...(input.audio ? { audio: input.audio } : {}),
     };
     this.bucket(userId).push(entry);
     return entry;
@@ -57,6 +58,8 @@ class InMemoryStore implements Store {
     const i = b.findIndex((e) => e.id === id);
     if (i === -1) return null;
     // Preserve id + publishedAt; let everything else come from the patch.
+    // `audio` is preserved (not replaced from patch) — voice-note edits so
+    // far only touch caption / mode / visibility, not the audio itself.
     b[i] = {
       ...b[i],
       text: patch.text,

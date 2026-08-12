@@ -7,7 +7,7 @@
 import type { FeedEntry, FeedEntryImage } from "@/schemas/feed-entry";
 import type { Source } from "@/schemas/source";
 
-export type DigestEntryType = "note" | "essay" | "picture" | "unknown";
+export type DigestEntryType = "note" | "essay" | "picture" | "voice" | "unknown";
 
 export type DigestItem = {
   authorName: string;
@@ -17,6 +17,9 @@ export type DigestItem = {
   url: string;
   publishedAt: string;
   imageThumbUrl?: string;
+  /** Voice-note duration in ms (slice 39). Rendered as `▶ 0:23` in the
+   *  digest row when present. Undefined for non-voice items. */
+  audioDurationMs?: number;
 };
 
 export type Digest = {
@@ -72,6 +75,7 @@ export function buildUserDigest(
       url: e.url,
       publishedAt: e.publishedAt,
       imageThumbUrl: image?.thumbUrl ?? image?.url,
+      ...(e.audio?.durationMs ? { audioDurationMs: e.audio.durationMs } : {}),
     });
   }
 
@@ -112,7 +116,11 @@ export function digestTextBody(digest: Digest, readerUrl: string): string {
   const lines: string[] = ["NEARSTREAM", ""];
   for (const item of digest.items) {
     const label = item.type === "unknown" ? "post" : item.type;
-    lines.push(`${item.authorName.toUpperCase()} · ${label}`);
+    const kicker =
+      item.type === "voice" && item.audioDurationMs
+        ? `${item.authorName.toUpperCase()} · voice note · ${formatAudioDuration(item.audioDurationMs)}`
+        : `${item.authorName.toUpperCase()} · ${label}`;
+    lines.push(kicker);
     if (item.title) lines.push(item.title);
     if (item.excerpt && item.excerpt !== item.title) {
       lines.push(truncate(item.excerpt, 140));
@@ -126,6 +134,12 @@ export function digestTextBody(digest: Digest, readerUrl: string): string {
     "You're getting this because a friend on your Nearstream instance posted today. Turn it off in Settings.",
   );
   return lines.join("\n");
+}
+
+/** Format ms as "M:SS" for digest rows. */
+export function formatAudioDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, "0")}`;
 }
 
 function truncate(s: string, max: number): string {

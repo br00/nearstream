@@ -11,6 +11,7 @@ import { AuthedNavTop, AuthedNavBottom } from "@/app/_components/authed-nav";
 import { Kicker } from "@/app/_components/kicker";
 import { ReaderRefresh } from "@/app/_components/reader-refresh";
 import { ReaderPicture } from "@/app/_components/reader-picture";
+import { AudioPlayer } from "@/app/_components/audio-player";
 import type { FeedEntry } from "@/schemas/feed-entry";
 import type { Source } from "@/schemas/source";
 
@@ -196,6 +197,12 @@ type ReaderImage = {
   thumbHeight?: number;
 };
 
+type ReaderAudio = {
+  url: string;
+  mime: string;
+  durationMs?: number;
+};
+
 type EntryPropsBase = {
   entry: {
     url: string;
@@ -204,6 +211,7 @@ type EntryPropsBase = {
     excerpt?: string;
     image?: ReaderImage;
     images?: ReaderImage[];
+    audio?: ReaderAudio;
   };
 };
 
@@ -251,6 +259,32 @@ function EssayBody({ entry }: EntryPropsBase) {
         Read essay →
       </p>
     </a>
+  );
+}
+
+function VoiceBody({ entry }: EntryPropsBase) {
+  // Voice entries lead with the player; caption (if any) sits below as a
+  // short line, not a headline. Duration must be known — Nearstream-emitted
+  // audio always carries it; a bare enclosure without durationMs would
+  // fall through to a 0 duration and just count up during playback. Not
+  // ideal but not broken.
+  if (!entry.audio) return null;
+  return (
+    <div>
+      <div className="flex justify-start">
+        <AudioPlayer
+          src={entry.audio.url}
+          durationMs={entry.audio.durationMs ?? 0}
+          mime={entry.audio.mime}
+          size={160}
+        />
+      </div>
+      {entry.excerpt || entry.title ? (
+        <p className="mt-4 text-[15px] leading-[1.55] text-foreground/95">
+          {entry.excerpt ?? entry.title}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -394,6 +428,8 @@ function DefaultFeed({ entries, sourceById, needsRefresh }: FeedProps) {
                 <PictureBody entry={entry} />
               ) : entry.type === "essay" ? (
                 <EssayBody entry={entry} />
+              ) : entry.type === "voice" ? (
+                <VoiceBody entry={entry} />
               ) : (
                 <NoteBody entry={entry} />
               )}
@@ -461,6 +497,8 @@ function BroadsheetFeed({ entries, sourceById, needsRefresh }: FeedProps) {
                 <BroadsheetPicture entry={entry} />
               ) : entry.type === "essay" ? (
                 <BroadsheetEssay entry={entry} />
+              ) : entry.type === "voice" ? (
+                <BroadsheetVoice entry={entry} />
               ) : (
                 <BroadsheetNote entry={entry} />
               )}
@@ -469,6 +507,27 @@ function BroadsheetFeed({ entries, sourceById, needsRefresh }: FeedProps) {
         })}
       </ul>
     </>
+  );
+}
+
+function BroadsheetVoice({ entry }: EntryPropsBase) {
+  if (!entry.audio) return null;
+  return (
+    <div className="mt-5">
+      <div className="flex justify-start">
+        <AudioPlayer
+          src={entry.audio.url}
+          durationMs={entry.audio.durationMs ?? 0}
+          mime={entry.audio.mime}
+          size={200}
+        />
+      </div>
+      {entry.excerpt || entry.title ? (
+        <p className="mt-5 text-[19px] italic leading-[1.55] text-foreground">
+          &ldquo;{entry.excerpt ?? entry.title}&rdquo;
+        </p>
+      ) : null}
+    </div>
   );
 }
 
