@@ -5,6 +5,7 @@ import { inventoryStore } from "@/lib/inventory-store";
 import { letterStore } from "@/lib/letter-store";
 import { store as streamStore } from "@/lib/store";
 import { userStore } from "@/lib/user-store";
+import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
 import { tenantBase } from "@/lib/tenant-domains";
 import { getSession } from "@/lib/auth";
 import { PageShell } from "@/app/_components/page-shell";
@@ -114,6 +115,7 @@ export default async function StudioPage({ searchParams }: Props) {
 
           <div className="mt-10">
             <StudioComposer
+              voiceViz={normalizeVoiceViz(user.preferences?.voiceViz)}
               initialActive={initialActive}
               letterBody={letter?.body ?? null}
               letterError={letterError}

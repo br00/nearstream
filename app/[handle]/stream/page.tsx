@@ -4,6 +4,7 @@ import { store } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { userStore } from "@/lib/user-store";
+import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
 import { getSession } from "@/lib/auth";
 import { checkTenantVisibility } from "@/lib/tenant-visibility";
 import { tenantBase } from "@/lib/tenant-domains";
@@ -156,6 +157,7 @@ export default async function StreamArchive({ params }: Props) {
                         durationMs={entry.audio.durationMs}
                         mime={entry.audio.mime}
                         size={180}
+                        variant={normalizeVoiceViz(user.preferences?.voiceViz)}
                       />
                     </div>
                   )}

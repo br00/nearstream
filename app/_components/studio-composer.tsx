@@ -8,6 +8,7 @@ import { Kicker } from "@/app/_components/kicker";
 import { ModeRadioGroup } from "@/app/_components/mode-radio";
 import { InventoryUploadForm } from "@/app/_components/inventory-upload-form";
 import { VisibilityRadio } from "@/app/_components/visibility-radio";
+import type { VoiceVizKey } from "@/lib/voice-viz-variants";
 import { AudioRecorder } from "@/app/_components/audio-recorder";
 import { DEFAULT_MODE } from "@/schemas/stream";
 
@@ -49,6 +50,9 @@ const PRIMITIVES: { key: Primitive; label: string; hint: string }[] = [
 export type LibraryPick = { id: string; slug: string; title: string };
 
 type Props = {
+  /** The author's chosen visualizer, so the recorder preview matches
+   *  what everyone else will see. */
+  voiceViz: VoiceVizKey;
   initialActive: Primitive;
   letterBody: string | null;
   letterError?: string;
@@ -58,6 +62,7 @@ type Props = {
 };
 
 export function StudioComposer({
+  voiceViz,
   initialActive,
   letterBody,
   letterError,
@@ -104,7 +109,7 @@ export function StudioComposer({
         {active === "stream" && (
           <StreamForm essays={essays} inventory={inventoryItems} />
         )}
-        {active === "voice" && <VoiceForm />}
+        {active === "voice" && <VoiceForm voiceViz={voiceViz} />}
         {active === "picture" && <InventoryUploadForm />}
         {active === "essay" && <EssayForm error={essayError} />}
         {active === "letter" && (
@@ -228,7 +233,7 @@ function LetterForm({
   );
 }
 
-function VoiceForm() {
+function VoiceForm({ voiceViz }: { voiceViz: VoiceVizKey }) {
   const [recorded, setRecorded] = useState<{
     blob: Blob;
     durationMs: number;
@@ -309,7 +314,7 @@ function VoiceForm() {
     <form onSubmit={handleSubmit} className="flex flex-col gap-8">
       <div className="flex flex-col gap-2">
         <Kicker>Voice note</Kicker>
-        <AudioRecorder onChange={setRecorded} />
+        <AudioRecorder onChange={setRecorded} voiceViz={voiceViz} />
       </div>
 
       <label className="flex flex-col gap-2">

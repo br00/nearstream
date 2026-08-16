@@ -404,12 +404,17 @@ function pickFeedAudio(item: any): FeedEntryAudio | undefined {
     const url = ns?.["@_url"];
     const mime = ns?.["@_mime"];
     const dur = ns?.["@_durationMs"];
+    const viz = ns?.["@_viz"];
     if (typeof url === "string" && typeof mime === "string") {
       const n = typeof dur === "string" ? Number(dur) : typeof dur === "number" ? dur : NaN;
       return {
         url,
         mime,
         ...(Number.isFinite(n) && n > 0 ? { durationMs: n } : {}),
+        // Kept as whatever the feed said; validated at render, not here, so
+        // a peer instance shipping a variant we don't have degrades to the
+        // default instead of failing to parse.
+        ...(typeof viz === "string" && viz ? { viz } : {}),
       };
     }
   }

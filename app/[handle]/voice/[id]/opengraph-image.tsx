@@ -1,57 +1,38 @@
 // Voice-note share preview card (slice 39). Rendered at request time via
-// Next's ImageResponse. The visual language reuses the "circle of points"
-// motif from the animated mark on the tenant page and the reader — but
-// static (ImageResponse doesn't run JS), so we place points along a
-// noise-perturbed circle with fixed seed values.
+// Next's ImageResponse.
 //
-// Not the same math as HUMAN_CIRCLE_DEFAULTS at runtime, because a
-// server-rendered PNG can't call our client-only canvas code. The look
-// is the same visual family — same colour, same density — without being
-// literally the same frame.
+// The panel shows the *author's* chosen visualizer, so a shared link looks
+// like their voice notes do everywhere else. ImageResponse can't run
+// canvas, but the simulations themselves are plain modules — so
+// `lib/voice-viz-static.ts` steps the real wave equation server-side and
+// hands back geometry, which Satori lays out as divs. Same math as the
+// animation, one frozen frame of it.
+//
+// The frame is seeded from the entry id: stable across scrapes and
+// re-renders, but two different voice notes don't get the same picture.
 
 import { ImageResponse } from "next/og";
 import { userStore } from "@/lib/user-store";
 import { store } from "@/lib/store";
+import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
+import { staticVoiceViz } from "@/lib/voice-viz-static";
 
 export const runtime = "nodejs";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 const CANVAS = { w: 1200, h: 630 };
-const CIRCLE_CX = 400;
-const CIRCLE_CY = 315;
-const BASE_R = 190;
-const POINT_COUNT = 220;
+/** Left half of the card, matching the layout below. */
+const PANEL = { w: CANVAS.w * 0.5, h: CANVAS.h };
 
-// Deterministic pseudo-noise — enough variance so points read as a hand-
-// wobbled circle rather than a perfect ring. Same seed → same shape,
-// which is fine for a static OG.
-function noise(a: number): number {
-  return (
-    Math.sin(a * 12.9898) * 0.5 +
-    Math.sin(a * 78.233) * 0.3 +
-    Math.sin(a * 137.5) * 0.2
-  );
-}
-
-type Dot = { cx: number; cy: number; r: number; alpha: number };
-
-function buildDots(): Dot[] {
-  const dots: Dot[] = [];
-  const step = (Math.PI * 2) / POINT_COUNT;
-  for (let i = 0; i < POINT_COUNT; i++) {
-    const angle = i * step;
-    const wobble = noise(angle);
-    const r = BASE_R + wobble * 30;
-    const cx = CIRCLE_CX + r * Math.cos(angle);
-    const cy = CIRCLE_CY + r * Math.sin(angle);
-    // Point size + alpha modulate slightly around the ring so the
-    // outline reads as pencil-brush, not laser-cut.
-    const size = 3 + Math.abs(noise(angle * 3.7)) * 3.5;
-    const alpha = 0.4 + Math.abs(noise(angle * 5.1)) * 0.55;
-    dots.push({ cx, cy, r: size, alpha });
+/** Stable per-entry seed so a given voice note always renders the same. */
+function seedFrom(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
   }
-  return dots;
+  return (h >>> 0) % 100000 || 1;
 }
 
 function formatDuration(ms: number): string {
@@ -76,7 +57,8 @@ export default async function Image({ params }: Props) {
     }
   }
 
-  const dots = buildDots();
+  const variant = normalizeVoiceViz(user?.preferences?.voiceViz);
+  const frame = staticVoiceViz(variant, PANEL.w, PANEL.h, seedFrom(id));
 
   return new ImageResponse(
     (
@@ -98,31 +80,81 @@ export default async function Image({ params }: Props) {
           style={{
             display: "flex",
             position: "relative",
-            width: CANVAS.w * 0.5,
-            height: CANVAS.h,
+            overflow: "hidden",
+            width: PANEL.w,
+            height: PANEL.h,
             flexShrink: 0,
           }}
         >
-          {dots.map((d, i) => (
+          {/* One SVG for all the geometry. Satori lays out a single
+              element here instead of thousands of positioned divs — for
+              the trail-based variants that is the difference between a
+              sub-second card and an eight-second one. */}
+          <svg
+            width={PANEL.w}
+            height={PANEL.h}
+            viewBox={`0 0 ${PANEL.w} ${PANEL.h}`}
+            style={{ position: "absolute", left: 0, top: 0 }}
+          >
+            {frame.paths.map((p, i) => (
+              <polyline
+                key={`p${i}`}
+                points={p.points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")}
+                fill="none"
+                stroke={`rgba(245,245,245,${p.alpha.toFixed(3)})`}
+                strokeWidth={p.width}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
+            {frame.lines.map((l, i) => (
+              <line
+                key={`l${i}`}
+                x1={l.x1.toFixed(1)}
+                y1={l.y1.toFixed(1)}
+                x2={l.x2.toFixed(1)}
+                y2={l.y2.toFixed(1)}
+                stroke={`rgba(245,245,245,${l.alpha.toFixed(3)})`}
+                strokeWidth={1}
+              />
+            ))}
+            {frame.dots.map((d, i) => (
+              <circle
+                key={`d${i}`}
+                cx={d.x.toFixed(1)}
+                cy={d.y.toFixed(1)}
+                r={d.r.toFixed(2)}
+                fill={`rgba(245,245,245,${d.alpha.toFixed(3)})`}
+              />
+            ))}
+          </svg>
+          {frame.glyphs.map((g, i) => (
             <div
-              key={i}
+              key={`g${i}`}
               style={{
                 position: "absolute",
-                left: d.cx - d.r / 2,
-                top: d.cy - d.r / 2,
-                width: d.r,
-                height: d.r,
-                borderRadius: "9999px",
-                background: `rgba(245, 245, 245, ${d.alpha})`,
+                left: g.x - g.size,
+                top: g.y - g.size,
+                width: g.size * 2,
+                height: g.size * 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontFamily: "monospace",
+                fontSize: g.size,
+                lineHeight: 1,
+                color: `rgba(245, 245, 245, ${g.alpha.toFixed(3)})`,
               }}
-            />
+            >
+              {g.char}
+            </div>
           ))}
-          {/* Play glyph centered in the circle. */}
+          {/* Play glyph, centred on the panel. */}
           <div
             style={{
               position: "absolute",
-              left: CIRCLE_CX - 30,
-              top: CIRCLE_CY - 40,
+              left: PANEL.w / 2 - 30,
+              top: PANEL.h / 2 - 40,
               width: 60,
               height: 80,
               display: "flex",
@@ -132,7 +164,7 @@ export default async function Image({ params }: Props) {
               fontSize: 60,
             }}
           >
-            {"▶"}
+            {"\u25B6"}
           </div>
         </div>
 
