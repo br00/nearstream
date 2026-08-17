@@ -3,7 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { checkTenantVisibility } from "@/lib/tenant-visibility";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
+import { musicStore } from "@/lib/music-store";
 import { imagesOf } from "@/schemas/inventory";
+import { formatTrackDuration } from "@/schemas/music";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
@@ -40,6 +42,19 @@ type LibraryEntry =
       isPrivate: boolean;
     }
   | {
+      type: "music";
+      id: string;
+      slug: string;
+      title: string;
+      href: string;
+      publishedAt: string;
+      /** Cover thumb key. Absent when the track was published without art. */
+      imageKey?: string;
+      /** "0:00" or "" — rendered next to the type chip. */
+      durationLabel: string;
+      isPrivate: boolean;
+    }
+  | {
       type: "inventory";
       id: string;
       slug: string;
@@ -67,9 +82,10 @@ export default async function LibraryPage({ params }: Props) {
   const user = await userStore.getByHandle(handle);
   if (!user) notFound();
 
-  const [allEssays, allItems, session] = await Promise.all([
+  const [allEssays, allItems, allTracks, session] = await Promise.all([
     essayStore.list(user.id),
     inventoryStore.list(user.id),
+    musicStore.list(user.id),
     getSession(),
   ]);
   const gate = checkTenantVisibility(user, session);
@@ -86,6 +102,9 @@ export default async function LibraryPage({ params }: Props) {
   const items = isOwner
     ? allItems
     : allItems.filter((i) => visibilityOf(i) === "public");
+  const tracks = isOwner
+    ? allTracks
+    : allTracks.filter((t) => visibilityOf(t) === "public");
   const base = tenantBase(handle);
 
   const entries: LibraryEntry[] = [
@@ -98,6 +117,19 @@ export default async function LibraryPage({ params }: Props) {
         href: `${base}/library/${e.slug}`,
         publishedAt: e.publishedAt,
         isPrivate: visibilityOf(e) === "private",
+      }),
+    ),
+    ...tracks.map(
+      (t): LibraryEntry => ({
+        type: "music",
+        id: t.id,
+        slug: t.slug,
+        title: t.title,
+        href: `${base}/library/music/${t.slug}`,
+        publishedAt: t.publishedAt,
+        imageKey: t.cover?.thumbKey ?? t.cover?.key,
+        durationLabel: formatTrackDuration(t.audio.durationMs),
+        isPrivate: visibilityOf(t) === "private",
       }),
     ),
     ...items
@@ -187,6 +219,24 @@ export default async function LibraryPage({ params }: Props) {
                           </span>
                         )}
                       </div>
+                    ) : entry.type === "music" ? (
+                      <div className="relative flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden border border-border bg-foreground/5">
+                        {entry.imageKey ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={`/api/media/${entry.imageKey}`}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          // No cover: a play glyph, so the row still reads as
+                          // something you listen to rather than an empty tile.
+                          <span aria-hidden className="text-foreground/60">
+                            &#9654;
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <div className="h-16 w-16 flex-shrink-0 border border-border bg-foreground/5" />
                     )}
@@ -199,8 +249,13 @@ export default async function LibraryPage({ params }: Props) {
                           {formatDate(entry.publishedAt)}
                         </time>
                         <span className="inline-block border border-border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
-                          {entry.type}
+                          {entry.type === "music" ? "track" : entry.type}
                         </span>
+                        {entry.type === "music" && entry.durationLabel && (
+                          <span className="font-mono text-[10px] tabular-nums text-muted-soft">
+                            {entry.durationLabel}
+                          </span>
+                        )}
                         {entry.isPrivate && (
                           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground/70">
                             Private

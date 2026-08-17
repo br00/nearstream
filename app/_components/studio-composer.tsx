@@ -6,6 +6,7 @@ import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
 import { ModeRadioGroup } from "@/app/_components/mode-radio";
+import { MusicUploadForm } from "@/app/_components/music-upload-form";
 import { InventoryUploadForm } from "@/app/_components/inventory-upload-form";
 import { VisibilityRadio } from "@/app/_components/visibility-radio";
 import type { VoiceVizKey } from "@/lib/voice-viz-variants";
@@ -17,7 +18,7 @@ import { DEFAULT_MODE } from "@/schemas/stream";
 // thing: four stacked forms is one too many decisions before you've started.
 // Pick a primitive at the top; the relevant form is the only thing below.
 
-type Primitive = "stream" | "voice" | "picture" | "essay" | "letter";
+type Primitive = "stream" | "voice" | "music" | "picture" | "essay" | "letter";
 
 const PRIMITIVES: { key: Primitive; label: string; hint: string }[] = [
   {
@@ -29,6 +30,11 @@ const PRIMITIVES: { key: Primitive; label: string; hint: string }[] = [
     key: "voice",
     label: "Voice",
     hint: "A short voice note — up to 60 seconds. Optional caption. Plays in the reader with an animated mark that breathes with your voice.",
+  },
+  {
+    key: "music",
+    label: "Music",
+    hint: "A track you want to keep somewhere that isn't a streaming service. Cover, title, artist. Lands at /library/music/[slug].",
   },
   {
     key: "picture",
@@ -110,6 +116,7 @@ export function StudioComposer({
           <StreamForm essays={essays} inventory={inventoryItems} />
         )}
         {active === "voice" && <VoiceForm voiceViz={voiceViz} />}
+        {active === "music" && <MusicUploadForm />}
         {active === "picture" && <InventoryUploadForm />}
         {active === "essay" && <EssayForm error={essayError} />}
         {active === "letter" && (

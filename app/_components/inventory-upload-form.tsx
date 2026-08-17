@@ -6,10 +6,12 @@ import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
 import { buttonClasses } from "@/app/_components/button";
 import { INVENTORY_STATUSES } from "@/schemas/inventory";
+import {
+  generateThumbnail,
+  putWithProgress,
+} from "@/app/_components/upload-helpers";
 
 const ACCEPTED_MIME = "image/jpeg,image/png,image/webp,image/gif";
-const THUMB_MAX_DIM = 600;
-const THUMB_QUALITY = 0.85;
 // Mirror of the server-side cap in /api/inventory/route.ts. If you bump
 // one, bump the other.
 const MAX_IMAGES = 12;
@@ -547,92 +549,4 @@ function isOnCellular(): boolean {
   if (conn.type === "wifi" || conn.type === "ethernet") return false;
   const eff = conn.effectiveType ?? "";
   return eff === "2g" || eff === "3g" || eff === "4g" || eff === "slow-2g";
-}
-
-async function generateThumbnail(
-  file: File,
-): Promise<{ thumb: Blob; width: number; height: number }> {
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(file);
-  } catch (err) {
-    throw new Error(
-      `could not decode image for thumbnailing (browser may not support this format): ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-    );
-  }
-
-  const fullWidth = bitmap.width;
-  const fullHeight = bitmap.height;
-  const ratio = Math.min(
-    THUMB_MAX_DIM / fullWidth,
-    THUMB_MAX_DIM / fullHeight,
-    1,
-  );
-  const w = Math.max(1, Math.round(fullWidth * ratio));
-  const h = Math.max(1, Math.round(fullHeight * ratio));
-
-  let blob: Blob;
-
-  if (typeof OffscreenCanvas !== "undefined") {
-    const canvas = new OffscreenCanvas(w, h);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("could not get 2d context for thumbnail");
-    ctx.drawImage(bitmap, 0, 0, w, h);
-    blob = await canvas.convertToBlob({
-      type: "image/jpeg",
-      quality: THUMB_QUALITY,
-    });
-  } else {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("could not get 2d context for thumbnail");
-    ctx.drawImage(bitmap, 0, 0, w, h);
-    blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (b) =>
-          b ? resolve(b) : reject(new Error("canvas toBlob returned null")),
-        "image/jpeg",
-        THUMB_QUALITY,
-      );
-    });
-  }
-
-  bitmap.close?.();
-
-  return { thumb: blob, width: fullWidth, height: fullHeight };
-}
-
-function putWithProgress(
-  url: string,
-  body: Blob,
-  contentType: string,
-  onProgress: (loaded: number) => void,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", url);
-    xhr.setRequestHeader("content-type", contentType);
-    xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable) onProgress(e.loaded);
-    });
-    xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress(body.size);
-        resolve();
-      } else {
-        reject(new Error(`R2 PUT failed: ${xhr.status} ${xhr.statusText}`));
-      }
-    });
-    xhr.addEventListener("error", () =>
-      reject(new Error("network error during upload")),
-    );
-    xhr.addEventListener("abort", () =>
-      reject(new Error("upload aborted")),
-    );
-    xhr.send(body);
-  });
 }

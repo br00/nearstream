@@ -9,7 +9,25 @@
 // `type` is set in slice 17 (note / essay / picture detection). Slice 16
 // always writes "unknown" — slice 17 fills it in.
 
-export type FeedEntryType = "note" | "essay" | "picture" | "voice" | "unknown";
+export type FeedEntryType =
+  | "note"
+  | "essay"
+  | "picture"
+  | "voice"
+  | "track"
+  | "unknown";
+
+/** Music-track metadata parsed from `<nearstream:track>` (slice 40).
+ *  Present only on Nearstream feeds — an arbitrary podcast enclosure lands
+ *  as `voice` instead, which is the right default for a card that is just
+ *  title + player. The audio itself rides on `FeedEntryAudio` either way. */
+export type FeedEntryTrack = {
+  title: string;
+  artist?: string;
+  durationMs?: number;
+  /** Cover thumbnail URL from `<nearstream:cover>`. */
+  coverUrl?: string;
+};
 
 /** Voice-note payload parsed from a friend's feed. Populated by
  *  `pickFeedAudio()` in lib/feed-parser.ts from either the Nearstream
@@ -66,6 +84,8 @@ export type FeedEntry = {
   excerpt?: string;
   /** Set in slice 17. Slice 16 writes "unknown". */
   type: FeedEntryType;
+  /** Populated for `track` entries. See FeedEntryTrack. */
+  track?: FeedEntryTrack;
   /** Legacy single-image field. Items mirrored from `images[0]` for one
    *  release so older read paths don't break. Use `imagesOf()` from
    *  schemas/feed-entry.ts. */

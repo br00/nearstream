@@ -10,6 +10,20 @@ const ALLOWED_TYPES = [
   // `<audio>` on the same browser, so format compatibility is a non-issue.
   "audio/webm",
   "audio/mp4",
+  // Uploaded music (slice 40). Wider than the recorder set because these are
+  // files the user already has rather than something we produced. Several
+  // have more than one content-type in the wild — browsers and operating
+  // systems disagree about m4a, wav and flac — so each accepted spelling is
+  // listed rather than normalized, and the file is stored exactly as sent.
+  "audio/mpeg",
+  "audio/x-m4a",
+  "audio/aac",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/wave",
+  "audio/flac",
+  "audio/x-flac",
+  "audio/ogg",
 ] as const;
 type AllowedType = (typeof ALLOWED_TYPES)[number];
 
@@ -23,11 +37,40 @@ export function isAllowedContentType(value: unknown): value is AllowedType {
 // Audio-only variant of the same check. Used by the stream upload-url
 // route so a caller can't sneak an image PUT through the audio endpoint
 // (or vice versa via the inventory endpoint).
+//
+// Deliberately still just the two recorder formats: the voice endpoint
+// accepts what MediaRecorder produces, and nothing else. Widening it to the
+// music set would let a 20MB mp3 in through the 60-second voice path.
 const AUDIO_TYPES: readonly AllowedType[] = ["audio/webm", "audio/mp4"];
 export function isAllowedAudioType(value: unknown): value is AllowedType {
   return (
     typeof value === "string" &&
     (AUDIO_TYPES as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * Uploaded-music variant (slice 40). Includes the recorder formats too —
+ * a webm the user exported from somewhere else is a legitimate upload —
+ * but not images, which go through the inventory endpoint.
+ */
+const MUSIC_AUDIO_TYPES: readonly AllowedType[] = [
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/x-m4a",
+  "audio/aac",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/wave",
+  "audio/flac",
+  "audio/x-flac",
+  "audio/ogg",
+  "audio/webm",
+];
+export function isAllowedMusicAudioType(value: unknown): value is AllowedType {
+  return (
+    typeof value === "string" &&
+    (MUSIC_AUDIO_TYPES as readonly string[]).includes(value)
   );
 }
 
@@ -44,7 +87,21 @@ function extOf(contentType: AllowedType): string {
     case "audio/webm":
       return "webm";
     case "audio/mp4":
+    case "audio/x-m4a":
       return "m4a";
+    case "audio/mpeg":
+      return "mp3";
+    case "audio/aac":
+      return "aac";
+    case "audio/wav":
+    case "audio/x-wav":
+    case "audio/wave":
+      return "wav";
+    case "audio/flac":
+    case "audio/x-flac":
+      return "flac";
+    case "audio/ogg":
+      return "ogg";
   }
 }
 

@@ -7,7 +7,13 @@
 import type { FeedEntry, FeedEntryImage } from "@/schemas/feed-entry";
 import type { Source } from "@/schemas/source";
 
-export type DigestEntryType = "note" | "essay" | "picture" | "voice" | "unknown";
+export type DigestEntryType =
+  | "note"
+  | "essay"
+  | "picture"
+  | "voice"
+  | "track"
+  | "unknown";
 
 export type DigestItem = {
   authorName: string;
@@ -17,9 +23,12 @@ export type DigestItem = {
   url: string;
   publishedAt: string;
   imageThumbUrl?: string;
-  /** Voice-note duration in ms (slice 39). Rendered as `▶ 0:23` in the
-   *  digest row when present. Undefined for non-voice items. */
+  /** Audio duration in ms (slice 39). Rendered as `▶ 0:23` in the digest
+   *  row when present. Set for voice notes and music tracks. */
   audioDurationMs?: number;
+  /** Track artist (slice 40). Shown in the kicker so a digest row reads
+   *  "ALESSANDRO · track · Artist · 3:24". Undefined for non-tracks. */
+  trackArtist?: string;
 };
 
 export type Digest = {
@@ -74,8 +83,13 @@ export function buildUserDigest(
       excerpt: e.excerpt,
       url: e.url,
       publishedAt: e.publishedAt,
-      imageThumbUrl: image?.thumbUrl ?? image?.url,
-      ...(e.audio?.durationMs ? { audioDurationMs: e.audio.durationMs } : {}),
+      // A track's cover comes off the `nearstream:track`/`cover` pair
+      // rather than the image list, so fall through to it here.
+      imageThumbUrl: image?.thumbUrl ?? image?.url ?? e.track?.coverUrl,
+      ...(e.track?.durationMs ?? e.audio?.durationMs
+        ? { audioDurationMs: e.track?.durationMs ?? e.audio?.durationMs }
+        : {}),
+      ...(e.track?.artist ? { trackArtist: e.track.artist } : {}),
     });
   }
 
@@ -116,10 +130,7 @@ export function digestTextBody(digest: Digest, readerUrl: string): string {
   const lines: string[] = ["NEARSTREAM", ""];
   for (const item of digest.items) {
     const label = item.type === "unknown" ? "post" : item.type;
-    const kicker =
-      item.type === "voice" && item.audioDurationMs
-        ? `${item.authorName.toUpperCase()} · voice note · ${formatAudioDuration(item.audioDurationMs)}`
-        : `${item.authorName.toUpperCase()} · ${label}`;
+    const kicker = `${item.authorName.toUpperCase()} · ${digestKickerLabel(item, label)}`;
     lines.push(kicker);
     if (item.title) lines.push(item.title);
     if (item.excerpt && item.excerpt !== item.title) {
@@ -134,6 +145,26 @@ export function digestTextBody(digest: Digest, readerUrl: string): string {
     "You're getting this because a friend on your Nearstream instance posted today. Turn it off in Settings.",
   );
   return lines.join("\n");
+}
+
+/**
+ * The "voice note · 0:23" / "track · Artist · 3:24" part of a digest
+ * kicker, shared by the text and HTML renderers so the two can't drift.
+ */
+export function digestKickerLabel(
+  item: Pick<DigestItem, "type" | "audioDurationMs" | "trackArtist">,
+  fallbackLabel: string,
+): string {
+  const duration = item.audioDurationMs
+    ? formatAudioDuration(item.audioDurationMs)
+    : "";
+  if (item.type === "voice") {
+    return duration ? `voice note · ${duration}` : "voice note";
+  }
+  if (item.type === "track") {
+    return ["track", item.trackArtist, duration].filter(Boolean).join(" · ");
+  }
+  return fallbackLabel;
 }
 
 /** Format ms as "M:SS" for digest rows. */
