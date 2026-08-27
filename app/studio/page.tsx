@@ -12,6 +12,7 @@ import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamMark } from "@/app/_components/nearstream-mark";
 import { AuthedNavTop, AuthedNavBottom } from "@/app/_components/authed-nav";
 import { Kicker } from "@/app/_components/kicker";
+import { NowEditor } from "@/app/_components/now-editor";
 import { StudioComposer } from "@/app/_components/studio-composer";
 
 // Studio is the *posting* surface only. Slice 25 split everything else out:
@@ -60,11 +61,11 @@ export default async function StudioPage({ searchParams }: Props) {
   // If a server-side form action redirected back here with an error, open
   // the relevant primitive automatically so the error renders next to the
   // form that produced it. Stream is the default otherwise.
-  const initialActive = letterError
-    ? "letter"
-    : essayError
-      ? "essay"
-      : "stream";
+  // A failed essay submit reopens Essay so the error renders next to the
+  // form that produced it. Line is the default otherwise — the point of the
+  // grouped composer is that the most casual primitive costs zero taps.
+  // A failed Now update is handled by the Now block itself, below.
+  const initialActive = essayError ? "essay" : "line";
 
   // Strip to plain props (server → client boundary). The composer only
   // needs id/slug/title for the "link to library" select.
@@ -99,8 +100,8 @@ export default async function StudioPage({ searchParams }: Props) {
               <p className="mt-2 text-sm leading-relaxed text-muted">
                 This is your studio &mdash; the room where you write things.
                 Start with a{" "}
-                <strong className="text-foreground">Stream entry</strong>{" "}
-                below: a short note, no title, no commitment. Your site lives
+                <strong className="text-foreground">Line</strong>{" "}
+                below: a sentence, no title, no commitment. Your site lives
                 at{" "}
                 <Link
                   href={tenantBase(user.handle)}
@@ -117,11 +118,17 @@ export default async function StudioPage({ searchParams }: Props) {
             <StudioComposer
               voiceViz={normalizeVoiceViz(user.preferences?.voiceViz)}
               initialActive={initialActive}
-              letterBody={letter?.body ?? null}
-              letterError={letterError}
               essayError={essayError}
               essays={essayPicks}
               inventoryItems={inventoryPicks}
+            />
+          </div>
+
+          <div className="mt-16">
+            <NowEditor
+              body={letter?.body ?? null}
+              updatedAt={letter?.updatedAt ?? null}
+              error={letterError}
             />
           </div>
         </div>
