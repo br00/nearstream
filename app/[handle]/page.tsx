@@ -333,7 +333,7 @@ export default async function TenantHome({ params, searchParams }: Props) {
                       href={`${base}/library/inventory/${item.slug}`}
                       className="group flex items-center gap-5 text-foreground transition-colors hover:text-white"
                     >
-                      <div className="relative aspect-[4/3] w-24 flex-shrink-0 overflow-hidden border border-border bg-foreground/5">
+                      <div className="relative aspect-[4/3] w-24 flex-shrink-0 overflow-hidden bg-foreground/5">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={`/api/media/${cover.thumbKey ?? cover.key}`}
@@ -387,7 +387,7 @@ export default async function TenantHome({ params, searchParams }: Props) {
                         href={`${base}/library/music/${track.slug}`}
                         className="group flex items-center gap-5 text-foreground transition-colors hover:text-white"
                       >
-                        <div className="relative flex aspect-square w-24 flex-shrink-0 items-center justify-center overflow-hidden border border-border bg-foreground/5">
+                        <div className="relative flex aspect-square w-24 flex-shrink-0 items-center justify-center overflow-hidden bg-foreground/5">
                           {coverKey ? (
                             /* eslint-disable-next-line @next/next/no-img-element */
                             <img

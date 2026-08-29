@@ -132,7 +132,7 @@ export default async function MusicTrackPage({ params }: Props) {
           </div>
 
           {track.cover && (
-            <div className="w-full overflow-hidden border border-border bg-foreground/5">
+            <div className="w-full overflow-hidden bg-foreground/5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`/api/media/${track.cover.key}`}

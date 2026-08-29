@@ -205,7 +205,7 @@ export default async function LibraryPage({ params }: Props) {
                     className="group flex flex-1 items-start gap-4"
                   >
                     {entry.type === "inventory" ? (
-                      <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden border border-border bg-foreground/5">
+                      <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden bg-foreground/5">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={`/api/media/${entry.imageKey}`}
@@ -220,7 +220,7 @@ export default async function LibraryPage({ params }: Props) {
                         )}
                       </div>
                     ) : entry.type === "music" ? (
-                      <div className="relative flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden border border-border bg-foreground/5">
+                      <div className="relative flex h-16 w-16 flex-shrink-0 items-center justify-center overflow-hidden bg-foreground/5">
                         {entry.imageKey ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -238,7 +238,7 @@ export default async function LibraryPage({ params }: Props) {
                         )}
                       </div>
                     ) : (
-                      <div className="h-16 w-16 flex-shrink-0 border border-border bg-foreground/5" />
+                      <div className="h-16 w-16 flex-shrink-0 bg-foreground/5" />
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-3">
