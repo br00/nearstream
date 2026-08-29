@@ -3,7 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { store } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
+import { musicStore } from "@/lib/music-store";
 import { imagesOf } from "@/schemas/inventory";
+import { formatTrackDuration } from "@/schemas/music";
 import { letterStore } from "@/lib/letter-store";
 import { userStore } from "@/lib/user-store";
 import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
@@ -62,6 +64,7 @@ export async function generateMetadata({
 const RECENT_STREAM = 4;
 const RECENT_PICTURES = 4;
 const RECENT_ESSAYS = 3;
+const RECENT_MUSIC = 4;
 
 function formatRelative(iso: string): string {
   const d = new Date(iso);
@@ -104,12 +107,13 @@ export default async function TenantHome({ params, searchParams }: Props) {
 
   const isHost = isHostEmail(user.email);
 
-  const [letter, allEntries, allEssays, allInventory, session] =
+  const [letter, allEntries, allEssays, allInventory, allTracks, session] =
     await Promise.all([
       letterStore.get(user.id),
       store.list(user.id),
       essayStore.list(user.id),
       inventoryStore.list(user.id),
+      musicStore.list(user.id),
       getSession(),
     ]);
 
@@ -191,6 +195,10 @@ export default async function TenantHome({ params, searchParams }: Props) {
   const recentStream = entries.slice(0, RECENT_STREAM);
   const recentPictures = inventoryItems.slice(0, RECENT_PICTURES);
   const recentEssays = essays.slice(0, RECENT_ESSAYS);
+  const tracks = isOwner
+    ? allTracks
+    : allTracks.filter((t) => visibilityOf(t) === "public");
+  const recentMusic = tracks.slice(0, RECENT_MUSIC);
 
   const navLinkClasses =
     "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
@@ -352,6 +360,69 @@ export default async function TenantHome({ params, searchParams }: Props) {
                       </div>
                     </Link>
                   </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          {recentMusic.length > 0 && (
+            <section style={{ marginTop: "4.5rem" }}>
+              <Link
+                href={`${base}/library`}
+                className={sectionLabelClasses + " mb-8"}
+              >
+                Music
+              </Link>
+              <ul className="mt-8 flex flex-col gap-5">
+                {recentMusic.map((track) => {
+                  const coverKey = track.cover?.thumbKey ?? track.cover?.key;
+                  const duration = formatTrackDuration(track.audio.durationMs);
+                  const byline = [track.artist, duration]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return (
+                    <li key={track.id}>
+                      <Link
+                        href={`${base}/library/music/${track.slug}`}
+                        className="group flex items-center gap-5 text-foreground transition-colors hover:text-white"
+                      >
+                        <div className="relative flex aspect-square w-24 flex-shrink-0 items-center justify-center overflow-hidden border border-border bg-foreground/5">
+                          {coverKey ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={`/api/media/${coverKey}`}
+                              alt=""
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            /* No cover art — a play glyph, so the row still
+                               reads as something you listen to rather than a
+                               blank tile. Same treatment as the library index. */
+                            <span aria-hidden className="text-foreground/60">
+                              &#9654;
+                            </span>
+                          )}
+                        </div>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[15px] leading-snug">
+                            {track.title}
+                          </span>
+                          {byline && (
+                            <span className="mt-1 block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
+                              {byline}
+                            </span>
+                          )}
+                        </span>
+                        <time
+                          dateTime={track.publishedAt}
+                          className="flex-shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft tabular-nums whitespace-nowrap"
+                        >
+                          {formatShort(track.publishedAt)}
+                        </time>
+                      </Link>
+                    </li>
                   );
                 })}
               </ul>
