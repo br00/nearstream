@@ -4,20 +4,16 @@ import { store } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
 import { musicStore } from "@/lib/music-store";
-import { imagesOf } from "@/schemas/inventory";
-import { formatTrackDuration } from "@/schemas/music";
 import { letterStore } from "@/lib/letter-store";
 import { userStore } from "@/lib/user-store";
-import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
 import { sourceStore } from "@/lib/source-store";
-import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
+import { HomeEntryBlock } from "@/app/_components/site/home-entry";
+import { buildHomeTimeline, yearMarks } from "@/lib/home-timeline";
 import { ProfileMark } from "@/app/_components/site/profile-mark";
-import { AudioPlayer } from "@/app/_components/audio-player";
 import { isHostEmail, getSession } from "@/lib/auth";
 import { checkTenantVisibility } from "@/lib/tenant-visibility";
 import { tenantBase, tenantAbsoluteBase, normalizeUrl } from "@/lib/tenant-domains";
-import { visibilityOf } from "@/schemas/visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -61,26 +57,6 @@ export async function generateMetadata({
   };
 }
 
-const RECENT_STREAM = 4;
-const RECENT_PICTURES = 4;
-const RECENT_ESSAYS = 3;
-const RECENT_MUSIC = 4;
-
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  const time = d.toTimeString().slice(0, 5);
-  if (sameDay) return `today · ${time}`;
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return "yesterday";
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
-  if (diffDays >= 2 && diffDays < 8) return `${diffDays} days`;
-  const month = d.toLocaleString("en", { month: "short" });
-  const day = d.getDate();
-  return `${month} ${day}`;
-}
 
 function formatShort(iso: string): string {
   const d = new Date(iso);
@@ -167,38 +143,19 @@ export default async function TenantHome({ params, searchParams }: Props) {
       friendState = alreadyFollowing ? "following" : "not-following";
     }
   }
-  const entries = isOwner
-    ? allEntries
-    : allEntries.filter((e) => visibilityOf(e) === "public");
-  const essays = isOwner
-    ? allEssays
-    : allEssays.filter((e) => visibilityOf(e) === "public");
-  const inventoryItems = isOwner
-    ? allInventory
-    : allInventory.filter((i) => visibilityOf(i) === "public");
-
-  const essayTitles = new Map(essays.map((e) => [e.slug, e.title]));
-  const inventoryTitles = new Map(inventoryItems.map((i) => [i.slug, i.title]));
-  function lookupLinkTitle(link: LibraryLink): string | null {
-    return (
-      (link.type === "essay" ? essayTitles : inventoryTitles).get(link.slug) ??
-      null
-    );
-  }
-
   const base = tenantBase(handle);
 
-  function tenantPath(link: LibraryLink): string {
-    return `${base}${linkHref(link)}`;
-  }
-
-  const recentStream = entries.slice(0, RECENT_STREAM);
-  const recentPictures = inventoryItems.slice(0, RECENT_PICTURES);
-  const recentEssays = essays.slice(0, RECENT_ESSAYS);
-  const tracks = isOwner
-    ? allTracks
-    : allTracks.filter((t) => visibilityOf(t) === "public");
-  const recentMusic = tracks.slice(0, RECENT_MUSIC);
+  // One document, not five sections. Everything the viewer may see, newest
+  // first, each entry carrying its own age treatment.
+  const timeline = buildHomeTimeline({
+    entries: allEntries,
+    essays: allEssays,
+    inventory: allInventory,
+    tracks: allTracks,
+    base,
+    isOwner,
+  });
+  const marks = yearMarks(timeline);
 
   const navLinkClasses =
     "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
@@ -219,7 +176,10 @@ export default async function TenantHome({ params, searchParams }: Props) {
       }
     >
       <section className="flex flex-1 justify-center px-6">
-        <div className="w-full max-w-[30rem] pt-12 pb-32">
+        {/* Paper is never perfectly flat. Fixed, pointer-transparent,
+            almost subliminal — see globals.css. */}
+        <div className="tooth" aria-hidden />
+        <div className="relative w-full max-w-[34rem] pt-12 pb-32">
           {/* Hero — everyone renders the profile mark they picked in
               onboarding (variant 0 = original signature parameters, so the
               default still looks like the piece). */}
@@ -256,209 +216,46 @@ export default async function TenantHome({ params, searchParams }: Props) {
             </div>
           ) : null}
 
-          {recentStream.length > 0 && (
-            <section style={{ marginTop: "4.5rem" }}>
-              <Link
-                href={`${base}/stream`}
-                className={sectionLabelClasses + " mb-8"}
-              >
-                Stream
-              </Link>
-              <ul className="mt-8 flex flex-col gap-4">
-                {recentStream.map((entry) => (
-                  <li
-                    key={entry.id}
-                    className="grid grid-cols-[7rem_1fr] gap-4 text-sm leading-relaxed text-foreground"
-                  >
-                    <time
-                      dateTime={entry.publishedAt}
-                      className="pt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-soft tabular-nums"
-                    >
-                      {formatRelative(entry.publishedAt)}
-                    </time>
-                    <div>
-                      {entry.audio && (
-                        <div className="mb-3 flex justify-start">
-                          <AudioPlayer
-                            src={`/api/media/${entry.audio.key}`}
-                            durationMs={entry.audio.durationMs}
-                            mime={entry.audio.mime}
-                            size={160}
-                            variant={normalizeVoiceViz(user.preferences?.voiceViz)}
-                          />
-                        </div>
-                      )}
-                      {entry.text && (
-                        <span className="whitespace-pre-wrap">{entry.text}</span>
-                      )}
-                      {entry.link &&
-                        (() => {
-                          const title = lookupLinkTitle(entry.link);
-                          if (!title) return null;
-                          return (
-                            <>
-                              {" "}
-                              <Link
-                                href={tenantPath(entry.link)}
-                                className="text-foreground underline underline-offset-4 decoration-muted-soft hover:decoration-foreground"
-                              >
-                                {title} →
-                              </Link>
-                            </>
-                          );
-                        })()}
-                    </div>
-                  </li>
+          {timeline.length === 0 ? (
+            <p className="mt-16 text-sm leading-relaxed text-muted">
+              Nothing here yet.
+            </p>
+          ) : (
+            <div className="mt-14">
+              {timeline.map((entry) => (
+                <HomeEntryBlock
+                  key={`${entry.kind}-${entry.id}`}
+                  entry={entry}
+                  date={formatShort(entry.publishedAt)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* The year — one mark per entry, tallest for the things that took
+              the most out of you. The rhythm of a year rather than a wall of
+              thumbnails, and the only "how much is here" signal on a page
+              that never paginates. */}
+          {marks.length > 1 && (
+            <div style={{ marginTop: "4rem" }} className="border-t border-border pt-5">
+              <div className="mb-3 flex items-baseline justify-between">
+                <span className={sectionLabelClasses}>This year</span>
+                <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-muted-soft tabular-nums">
+                  {timeline.length} {timeline.length === 1 ? "entry" : "entries"}
+                </span>
+              </div>
+              <div className="flex h-8 items-end gap-[2px]" aria-hidden>
+                {marks.map((m, i) => (
+                  <span
+                    key={i}
+                    className="w-[2px] flex-none rounded-[1px] bg-foreground/35"
+                    style={{ height: `${m.height}%`, opacity: m.opacity }}
+                  />
                 ))}
-              </ul>
-            </section>
+              </div>
+            </div>
           )}
 
-          {recentPictures.length > 0 && (
-            <section style={{ marginTop: "4.5rem" }}>
-              <Link
-                href={`${base}/library/inventory`}
-                className={sectionLabelClasses + " mb-8"}
-              >
-                Pictures
-              </Link>
-              <ul className="mt-8 flex flex-col gap-5">
-                {recentPictures.map((item) => {
-                  const all = imagesOf(item);
-                  const cover = all[0];
-                  if (!cover) return null;
-                  return (
-                  <li key={item.id}>
-                    <Link
-                      href={`${base}/library/inventory/${item.slug}`}
-                      className="group flex items-center gap-5 text-foreground transition-colors hover:text-white"
-                    >
-                      <div className="relative aspect-[4/3] w-24 flex-shrink-0 overflow-hidden bg-foreground/5">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={`/api/media/${cover.thumbKey ?? cover.key}`}
-                          alt={item.title}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                        {all.length > 1 && (
-                          <span className="absolute right-1 bottom-1 border border-border bg-background/85 px-1 py-0.5 font-mono text-[9px] tabular-nums text-foreground">
-                            · {all.length}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-1 items-baseline justify-between gap-4">
-                        <span className="text-[15px] leading-snug">
-                          {item.title}
-                        </span>
-                        <time
-                          dateTime={item.publishedAt}
-                          className="flex-shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft tabular-nums"
-                        >
-                          {formatShort(item.publishedAt)}
-                        </time>
-                      </div>
-                    </Link>
-                  </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
-
-          {recentMusic.length > 0 && (
-            <section style={{ marginTop: "4.5rem" }}>
-              <Link
-                href={`${base}/library`}
-                className={sectionLabelClasses + " mb-8"}
-              >
-                Music
-              </Link>
-              <ul className="mt-8 flex flex-col gap-5">
-                {recentMusic.map((track) => {
-                  const coverKey = track.cover?.thumbKey ?? track.cover?.key;
-                  const duration = formatTrackDuration(track.audio.durationMs);
-                  const byline = [track.artist, duration]
-                    .filter(Boolean)
-                    .join(" · ");
-                  return (
-                    <li key={track.id}>
-                      <Link
-                        href={`${base}/library/music/${track.slug}`}
-                        className="group flex items-center gap-5 text-foreground transition-colors hover:text-white"
-                      >
-                        <div className="relative flex aspect-square w-24 flex-shrink-0 items-center justify-center overflow-hidden bg-foreground/5">
-                          {coverKey ? (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img
-                              src={`/api/media/${coverKey}`}
-                              alt=""
-                              className="h-full w-full object-cover"
-                              loading="lazy"
-                            />
-                          ) : (
-                            /* No cover art — a play glyph, so the row still
-                               reads as something you listen to rather than a
-                               blank tile. Same treatment as the library index. */
-                            <span aria-hidden className="text-foreground/60">
-                              &#9654;
-                            </span>
-                          )}
-                        </div>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[15px] leading-snug">
-                            {track.title}
-                          </span>
-                          {byline && (
-                            <span className="mt-1 block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
-                              {byline}
-                            </span>
-                          )}
-                        </span>
-                        <time
-                          dateTime={track.publishedAt}
-                          className="flex-shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft tabular-nums whitespace-nowrap"
-                        >
-                          {formatShort(track.publishedAt)}
-                        </time>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
-
-          {recentEssays.length > 0 && (
-            <section style={{ marginTop: "4.5rem" }}>
-              <Link
-                href={`${base}/library`}
-                className={sectionLabelClasses + " mb-8"}
-              >
-                Essays
-              </Link>
-              <ul className="mt-8 flex flex-col gap-5">
-                {recentEssays.map((essay) => (
-                  <li key={essay.id}>
-                    <Link
-                      href={`${base}/library/${essay.slug}`}
-                      className="group flex items-baseline justify-between gap-4 text-foreground transition-colors hover:text-white"
-                    >
-                      <span className="text-[15px] leading-snug">
-                        {essay.title}
-                      </span>
-                      <time
-                        dateTime={essay.publishedAt}
-                        className="flex-shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft tabular-nums whitespace-nowrap"
-                      >
-                        {formatShort(essay.publishedAt)}
-                      </time>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
 
           {/* Elsewhere — host-only for now; tenant elsewhere links are a
               future primitive. */}
