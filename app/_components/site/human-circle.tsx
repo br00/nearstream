@@ -116,6 +116,9 @@ export type HumanCircleParams = {
   zOffset?: number;
 };
 
+/** The half-canvas the brush fractions are calibrated against. */
+const BRUSH_REF_HALF = 220;
+
 export const HUMAN_CIRCLE_DEFAULTS: HumanCircleParams = {
   nMax: 0.45,
   angleStep: 0.012,
@@ -171,7 +174,18 @@ function drawHumanCircle(
   const half = Math.min(cx, cy);
   const radiusBase = half * p.baseRadiusFrac;
   const radiusRange = half * p.radiusRangeFrac;
-  const brushScale = half * p.brushScaleFrac;
+  // Optical sizing, not linear. `brushScaleFrac` is calibrated against
+  // half = 220 (a ~440px mark); scaled linearly, a 96px picker tile gives a
+  // 0.22–0.65px brush — the whole pencil texture drops below one pixel and
+  // every variant renders as the same anti-aliased hairline. That's why the
+  // ten profile marks were indistinguishable in the picker.
+  //
+  // The sqrt keeps the mark identical at its design size and lets the stroke
+  // grow proportionally heavier as the canvas shrinks, which is the same
+  // compensation a type designer makes for small optical sizes. Relative
+  // weight between variants is preserved exactly, so Thin still reads
+  // thinner than Thick at any size.
+  const brushScale = p.brushScaleFrac * Math.sqrt(half * BRUSH_REF_HALF);
   for (let a = 0; a < Math.PI * 2; a += p.angleStep) {
     const xoff = mapTo(Math.cos(a), -1, 1, 0, p.nMax);
     const yoff = mapTo(Math.sin(a), -1, 1, 0, p.nMax);
