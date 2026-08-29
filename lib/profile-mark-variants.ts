@@ -15,10 +15,23 @@ import type { HumanCircleParams } from "@/app/_components/site/human-circle";
 // show. Stroke weight is the most legible difference between two marks at
 // small size, so it's the one axis none of them should share.
 //
-// Spread across the set, as fractions of the half-canvas:
-//   radius  0.20 → 0.38   (was 0.22 → 0.36)
-//   wobble  0.03 → 0.26   (was 0.04 → 0.20)
-//   weight  1/340 → 1/130 (was 1/320 → 1/160, and only on two variants)
+// The variants differ by FORM, not just by knobs. Ten parameter sets of a
+// single noise circle were rendered offscreen at both 96px and 280px and came
+// out as ten circles of slightly different weight — no amount of retuning
+// fixes that, because the knobs only control how big, how thick and how
+// wobbly one shape is.
+//
+//   0 Signature  ring    the original parameters, untouched — Alessandro's
+//                        mark and the one the whole system was drawn from
+//   1 Tight      ring    small, near-perfect, barely breathing
+//   2 Open       arc     a bite out of the circle
+//   3 Echo       double  two rings wobbling independently
+//   4 Stitch     dashed  the ring as strokes and gaps
+//   5 Thin       ring    the lightest weight in the set
+//   6 Dense      mass    stamps filling the disc, not tracing it
+//   7 Horizon    band    a line across the tile — no circle at all
+//   8 Scribble   mass    dense, wide, chaotic
+//   9 Satellite  orbit   a small ring with one arc riding outside it
 
 export type ProfileMarkVariant = {
   /** Stable index — persisted on User.profileMark. Don't reorder. */
@@ -31,16 +44,17 @@ export type ProfileMarkVariant = {
 export const PROFILE_MARK_VARIANTS: ProfileMarkVariant[] = [
   {
     index: 0,
-    name: "Quiet",
+    name: "Signature",
     params: {
+      form: "ring",
       angleStep: 0.012,
       baseRadiusFrac: 0.3,
-      radiusRangeFrac: 0.06,
+      radiusRangeFrac: 0.1,
       brushAngleStep: 0.1,
       brushNoiseRange: 15,
       brushScaleFrac: 1 / 220,
       seedSpeed: 0.0024,
-      nMax: 0.35,
+      nMax: 0.45,
       zOffset: 0,
     },
   },
@@ -48,6 +62,7 @@ export const PROFILE_MARK_VARIANTS: ProfileMarkVariant[] = [
     index: 1,
     name: "Tight",
     params: {
+      form: "ring",
       angleStep: 0.006,
       baseRadiusFrac: 0.36,
       radiusRangeFrac: 0.03,
@@ -61,46 +76,49 @@ export const PROFILE_MARK_VARIANTS: ProfileMarkVariant[] = [
   },
   {
     index: 2,
-    name: "Loose",
+    name: "Open",
     params: {
-      angleStep: 0.018,
-      baseRadiusFrac: 0.24,
-      radiusRangeFrac: 0.2,
-      brushAngleStep: 0.08,
-      brushNoiseRange: 11,
-      brushScaleFrac: 1 / 200,
-      seedSpeed: 0.0034,
-      nMax: 0.65,
+      form: "arc",
+      angleStep: 0.011,
+      baseRadiusFrac: 0.32,
+      radiusRangeFrac: 0.09,
+      brushAngleStep: 0.09,
+      brushNoiseRange: 16,
+      brushScaleFrac: 1 / 210,
+      seedSpeed: 0.0026,
+      nMax: 0.45,
       zOffset: 7.1,
     },
   },
   {
     index: 3,
-    name: "Slow",
+    name: "Echo",
     params: {
+      form: "double",
       angleStep: 0.01,
-      baseRadiusFrac: 0.33,
-      radiusRangeFrac: 0.1,
-      brushAngleStep: 0.09,
-      brushNoiseRange: 20,
-      brushScaleFrac: 1 / 240,
-      seedSpeed: 0.0012,
+      baseRadiusFrac: 0.34,
+      radiusRangeFrac: 0.06,
+      brushAngleStep: 0.1,
+      brushNoiseRange: 18,
+      brushScaleFrac: 1 / 250,
+      seedSpeed: 0.0016,
       nMax: 0.4,
       zOffset: 11.4,
     },
   },
   {
     index: 4,
-    name: "Restless",
+    name: "Stitch",
     params: {
-      angleStep: 0.014,
-      baseRadiusFrac: 0.26,
-      radiusRangeFrac: 0.16,
-      brushAngleStep: 0.16,
-      brushNoiseRange: 9,
-      brushScaleFrac: 1 / 210,
-      seedSpeed: 0.0048,
-      nMax: 0.55,
+      form: "dashed",
+      angleStep: 0.009,
+      baseRadiusFrac: 0.34,
+      radiusRangeFrac: 0.07,
+      brushAngleStep: 0.11,
+      brushNoiseRange: 14,
+      brushScaleFrac: 1 / 190,
+      seedSpeed: 0.003,
+      nMax: 0.4,
       zOffset: 21.0,
     },
   },
@@ -108,12 +126,13 @@ export const PROFILE_MARK_VARIANTS: ProfileMarkVariant[] = [
     index: 5,
     name: "Thin",
     params: {
-      angleStep: 0.008,
-      baseRadiusFrac: 0.38,
-      radiusRangeFrac: 0.05,
+      form: "ring",
+      angleStep: 0.007,
+      baseRadiusFrac: 0.43,
+      radiusRangeFrac: 0.04,
       brushAngleStep: 0.13,
       brushNoiseRange: 24,
-      brushScaleFrac: 1 / 340,
+      brushScaleFrac: 1 / 400,
       seedSpeed: 0.0022,
       nMax: 0.35,
       zOffset: 34.6,
@@ -121,44 +140,47 @@ export const PROFILE_MARK_VARIANTS: ProfileMarkVariant[] = [
   },
   {
     index: 6,
-    name: "Thick",
+    name: "Dense",
     params: {
-      angleStep: 0.013,
-      baseRadiusFrac: 0.22,
-      radiusRangeFrac: 0.12,
-      brushAngleStep: 0.07,
-      brushNoiseRange: 13,
-      brushScaleFrac: 1 / 130,
+      form: "mass",
+      angleStep: 0.01,
+      baseRadiusFrac: 0.3,
+      radiusRangeFrac: 0.14,
+      brushAngleStep: 0.08,
+      brushNoiseRange: 12,
+      brushScaleFrac: 1 / 240,
       seedSpeed: 0.0028,
-      nMax: 0.45,
+      nMax: 0.55,
       zOffset: 45.9,
     },
   },
   {
     index: 7,
-    name: "Drifting",
+    name: "Horizon",
     params: {
-      angleStep: 0.011,
-      baseRadiusFrac: 0.3,
-      radiusRangeFrac: 0.22,
+      form: "band",
+      angleStep: 0.009,
+      baseRadiusFrac: 0.42,
+      radiusRangeFrac: 0.16,
       brushAngleStep: 0.1,
       brushNoiseRange: 17,
-      brushScaleFrac: 1 / 230,
-      seedSpeed: 0.0016,
-      nMax: 0.75,
+      brushScaleFrac: 1 / 140,
+      seedSpeed: 0.0018,
+      nMax: 0.6,
       zOffset: 58.3,
     },
   },
   {
     index: 8,
-    name: "Scribbled",
+    name: "Scribble",
     params: {
-      angleStep: 0.02,
-      baseRadiusFrac: 0.2,
-      radiusRangeFrac: 0.26,
-      brushAngleStep: 0.18,
+      form: "mass",
+      angleStep: 0.017,
+      baseRadiusFrac: 0.26,
+      radiusRangeFrac: 0.22,
+      brushAngleStep: 0.16,
       brushNoiseRange: 10,
-      brushScaleFrac: 1 / 190,
+      brushScaleFrac: 1 / 170,
       seedSpeed: 0.004,
       nMax: 0.9,
       zOffset: 67.0,
@@ -166,16 +188,17 @@ export const PROFILE_MARK_VARIANTS: ProfileMarkVariant[] = [
   },
   {
     index: 9,
-    name: "Calm orbit",
+    name: "Satellite",
     params: {
-      angleStep: 0.009,
-      baseRadiusFrac: 0.34,
-      radiusRangeFrac: 0.04,
+      form: "orbit",
+      angleStep: 0.01,
+      baseRadiusFrac: 0.3,
+      radiusRangeFrac: 0.06,
       brushAngleStep: 0.11,
       brushNoiseRange: 19,
-      brushScaleFrac: 1 / 260,
-      seedSpeed: 0.0014,
-      nMax: 0.25,
+      brushScaleFrac: 1 / 240,
+      seedSpeed: 0.0015,
+      nMax: 0.35,
       zOffset: 73.8,
     },
   },
