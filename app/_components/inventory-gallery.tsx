@@ -152,7 +152,7 @@ function GalleryTile({
       onClick={onOpen}
       aria-label={`Open ${title}, image ${index + 1}`}
       className={
-        "group relative block w-full overflow-hidden border border-border bg-foreground/5 " +
+        "group relative block w-full overflow-hidden bg-foreground/5 " +
         (full ? "" : "aspect-square")
       }
     >
@@ -309,7 +309,7 @@ function StackGallery({
         return (
           <div
             key={i}
-            className="overflow-hidden border border-border bg-foreground/5"
+            className="overflow-hidden bg-foreground/5"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

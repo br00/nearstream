@@ -121,3 +121,35 @@ body {
   background-size: 200% 100%;
   animation: shimmer-sweep 1.6s ease-in-out infinite;
 }
+
+/* ---------------------------------------------------------------------------
+   Tenant home — age and tooth (slice 41)
+   Older entries are quieter; looking at one brings it back. The opacity and
+   blur themselves are computed server-side per entry in lib/home-timeline.ts
+   and set inline — only the restore lives here, so it isn't recomputed for
+   every entry on the page.
+--------------------------------------------------------------------------- */
+.home-entry {
+  transition: opacity 0.45s ease, filter 0.45s ease;
+}
+.home-entry:hover,
+.home-entry:focus-within {
+  opacity: 1 !important;
+  filter: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-entry { transition: none; }
+}
+
+/* Paper is never perfectly flat. A soft-light noise layer over the page —
+   deliberately almost subliminal, and pointer-transparent so it can't eat
+   a click. */
+.tooth {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/><feColorMatrix type='saturate' values='0'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='0.5'/></svg>");
+}

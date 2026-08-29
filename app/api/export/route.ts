@@ -1,10 +1,12 @@
 // "Ownership through exit" — proof a user can leave with their content.
 //
 // Returns a ZIP file containing:
-//   - nearstream-export.json: profile + Letter + Stream + Essays + Inventory
-//     metadata + Reader sources
-//   - media/{key}: every inventory image (original + thumbnail) as actual
-//     bytes, so the export is self-contained if R2 ever goes away
+//   - nearstream-export.json: profile + Now + Stream + Essays + Inventory +
+//     Music metadata + Reader sources
+//   - media/{key}: every blob you own — inventory images (originals AND
+//     extras, not just the cover), voice-note audio, music audio and cover
+//     art — as actual bytes, so the export is self-contained if R2 ever
+//     goes away
 //
 // Auth-gated to the signed-in user — you can only export your own data.
 
@@ -15,6 +17,8 @@ import { letterStore } from "@/lib/letter-store";
 import { store as streamStore } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
+import { musicStore } from "@/lib/music-store";
+import { imagesOf } from "@/schemas/inventory";
 import { sourceStore } from "@/lib/source-store";
 import { mediaStore } from "@/lib/media-store";
 
@@ -31,13 +35,14 @@ export async function GET() {
     return Response.json({ error: "user not found" }, { status: 404 });
   }
 
-  let letter, streams, essays, inventory, sources;
+  let letter, streams, essays, inventory, music, sources;
   try {
-    [letter, streams, essays, inventory, sources] = await Promise.all([
+    [letter, streams, essays, inventory, music, sources] = await Promise.all([
       letterStore.get(user.id),
       streamStore.list(user.id),
       essayStore.list(user.id),
       inventoryStore.list(user.id),
+      musicStore.list(user.id),
       sourceStore.list(user.id),
     ]);
   } catch (err) {
@@ -70,27 +75,53 @@ export async function GET() {
     // Inventory items keep their image keys; the actual bytes are in the zip
     // under media/{key}.
     inventory,
+    // Tracks keep their audio + cover keys; the bytes are in the zip under
+    // media/{key}.
+    music,
     readerSources: sources,
   };
 
   const zip = new JSZip();
   zip.file("nearstream-export.json", JSON.stringify(exportData, null, 2));
 
-  // Bundle every inventory image (original + thumbnail) as actual bytes so the
-  // export is portable. Best-effort: a single image fetch failure doesn't
-  // block the whole export — the JSON still has the keys, the user can fetch
-  // missing files later from the running instance.
+  // Bundle every blob the user owns as actual bytes so the export is
+  // portable. Best-effort: a single fetch failure doesn't block the whole
+  // export — the JSON still has the keys, and the user can fetch what's
+  // missing from the running instance.
   if (mediaStore) {
     const m = mediaStore;
     const keys = new Set<string>();
+
+    // Inventory images. `imagesOf()` rather than the legacy `image` field:
+    // reading `image` alone exported only the cover, so every extra image on
+    // a multi-image item (slice 33) was silently dropped from the archive
+    // while its key sat in the JSON.
     for (const item of inventory) {
-      if (item.image?.key) keys.add(item.image.key);
-      if (item.image?.thumbKey) keys.add(item.image.thumbKey);
+      for (const img of imagesOf(item)) {
+        keys.add(img.key);
+        if (img.thumbKey) keys.add(img.thumbKey);
+      }
+    }
+
+    // Voice-note audio (slice 39). Stream entries carried their audio key in
+    // the JSON but the bytes were never bundled, so an exported voice note
+    // was a filename with nothing behind it.
+    for (const entry of streams) {
+      if (entry.audio?.key) keys.add(entry.audio.key);
+    }
+
+    // Music: the track itself, plus cover art and its thumbnail.
+    for (const track of music) {
+      keys.add(track.audio.key);
+      if (track.cover?.key) keys.add(track.cover.key);
+      if (track.cover?.thumbKey) keys.add(track.cover.thumbKey);
     }
 
     await Promise.all(
       [...keys].map(async (key) => {
         try {
+          // getImage is key-generic and passes the stored content-type
+          // through, so it serves audio as happily as images.
           const res = await m.getImage(key);
           if (!res.ok) return;
           const buf = Buffer.from(await res.arrayBuffer());
@@ -114,8 +145,8 @@ export async function GET() {
         `Handle: /${user.handle}`,
         "",
         "Files:",
-        "  nearstream-export.json — profile + Letter + Stream + Essays + Inventory metadata + Reader sources",
-        "  media/                  — image bytes (originals + thumbnails). Filenames match `image.key` and `image.thumbKey` in the JSON.",
+        "  nearstream-export.json — profile + Now + Stream + Essays + Inventory + Music metadata + Reader sources",
+        "  media/                  — every blob: inventory images (all of them, plus thumbnails), voice-note audio, music audio and cover art. Filenames match the `key` fields in the JSON.",
         "",
         "Re-importing into another Nearstream instance is a Phase 6 follow-up.",
         "For now this is a complete snapshot of everything you posted — yours forever.",

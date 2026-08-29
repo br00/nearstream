@@ -324,7 +324,7 @@ function TrackBody({
     <div className={broadsheet ? "mt-5" : undefined}>
       <div className="flex items-start gap-4">
         {coverUrl && (
-          <div className="h-20 w-20 flex-shrink-0 overflow-hidden border border-border bg-foreground/5">
+          <div className="h-20 w-20 flex-shrink-0 overflow-hidden bg-foreground/5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={coverUrl}
@@ -427,7 +427,7 @@ function PictureBody({ entry }: EntryPropsBase) {
                 src={src}
                 alt=""
                 loading="lazy"
-                className="h-20 w-20 shrink-0 border border-border bg-foreground/5 object-cover"
+                className="h-20 w-20 shrink-0 bg-foreground/5 object-cover"
               />
             );
           })}
@@ -682,7 +682,7 @@ function BroadsheetPicture({ entry }: EntryPropsBase) {
                 src={tsrc}
                 alt=""
                 loading="lazy"
-                className="h-20 w-20 shrink-0 border border-border bg-foreground/5 object-cover"
+                className="h-20 w-20 shrink-0 bg-foreground/5 object-cover"
               />
             );
           })}

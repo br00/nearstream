@@ -114,7 +114,33 @@ export type HumanCircleParams = {
   brushScaleFrac: number;
   /** Optional fixed z-offset so different marks live in different noise slices. */
   zOffset?: number;
+  /**
+   * Which shape the noise is drawn onto. Ten parameter sets of one form gave
+   * ten circles of slightly different weight — measured, rendered and
+   * confirmed — so the variants differ by *topology* now, not just by knobs.
+   *
+   *   ring     a closed noise circle. The original, and variant 0 forever.
+   *   arc      the same circle with a bite taken out of it
+   *   double   two rings at different radii, sampling different noise
+   *   dashed   the ring drawn as strokes with gaps
+   *   mass     stamps filling the disc rather than tracing its edge
+   *   band     a horizontal line that undulates — no circle at all
+   *   orbit    a small ring with one satellite arc outside it
+   */
+  form?: MarkForm;
 };
+
+export type MarkForm =
+  | "ring"
+  | "arc"
+  | "double"
+  | "dashed"
+  | "mass"
+  | "band"
+  | "orbit";
+
+/** The half-canvas the brush fractions are calibrated against. */
+const BRUSH_REF_HALF = 220;
 
 export const HUMAN_CIRCLE_DEFAULTS: HumanCircleParams = {
   nMax: 0.45,
@@ -171,15 +197,107 @@ function drawHumanCircle(
   const half = Math.min(cx, cy);
   const radiusBase = half * p.baseRadiusFrac;
   const radiusRange = half * p.radiusRangeFrac;
-  const brushScale = half * p.brushScaleFrac;
-  for (let a = 0; a < Math.PI * 2; a += p.angleStep) {
-    const xoff = mapTo(Math.cos(a), -1, 1, 0, p.nMax);
-    const yoff = mapTo(Math.sin(a), -1, 1, 0, p.nMax);
+  // Optical sizing, not linear. `brushScaleFrac` is calibrated against
+  // half = 220 (a ~440px mark); scaled linearly, a 96px picker tile gives a
+  // 0.22–0.65px brush — the whole pencil texture drops below one pixel and
+  // every variant renders as the same anti-aliased hairline. That's why the
+  // ten profile marks were indistinguishable in the picker.
+  //
+  // The sqrt keeps the mark identical at its design size and lets the stroke
+  // grow proportionally heavier as the canvas shrinks, which is the same
+  // compensation a type designer makes for small optical sizes. Relative
+  // weight between variants is preserved exactly, so Thin still reads
+  // thinner than Thick at any size.
+  const brushScale = p.brushScaleFrac * Math.sqrt(half * BRUSH_REF_HALF);
+
+  // Sample the noise field at an angle and return the point to stamp.
+  const onRing = (a: number, scale: number, phase: number) => {
+    const xoff = mapTo(Math.cos(a), -1, 1, 0, p.nMax) + phase;
+    const yoff = mapTo(Math.sin(a), -1, 1, 0, p.nMax) + phase;
     const n = noise01(xoff, yoff, z);
-    const r = mapTo(n, 0, 1, radiusBase, radiusBase + radiusRange * 2);
-    const x = cx + r * Math.cos(a);
-    const y = cy + r * Math.sin(a);
-    pencilBrush(ctx, x, y, Math.cos(a), brushScale, p.brushAngleStep, p.brushNoiseRange);
+    const r = mapTo(n, 0, 1, radiusBase * scale, (radiusBase + radiusRange * 2) * scale);
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  };
+  const stamp = (x: number, y: number, inc: number) =>
+    pencilBrush(ctx, x, y, inc, brushScale, p.brushAngleStep, p.brushNoiseRange);
+
+  const TAU = Math.PI * 2;
+  switch (p.form ?? "ring") {
+    case "arc": {
+      // A bite out of the ring. The gap is fixed rather than noise-driven so
+      // the mark is recognisably the same creature every frame.
+      const gap = TAU * 0.28;
+      for (let a = gap / 2; a < TAU - gap / 2; a += p.angleStep) {
+        const { x, y } = onRing(a, 1, 0);
+        stamp(x, y, Math.cos(a));
+      }
+      break;
+    }
+    case "double": {
+      // Two rings at different radii, offset in the noise field so they
+      // wobble independently instead of reading as one thick line.
+      for (let a = 0; a < TAU; a += p.angleStep) {
+        const inner = onRing(a, 0.62, 0);
+        stamp(inner.x, inner.y, Math.cos(a));
+        const outer = onRing(a, 1, 11.5);
+        stamp(outer.x, outer.y, Math.sin(a));
+      }
+      break;
+    }
+    case "dashed": {
+      const on = TAU / 26;
+      for (let a = 0; a < TAU; a += p.angleStep) {
+        if (Math.floor(a / on) % 2 === 1) continue;
+        const { x, y } = onRing(a, 1, 0);
+        stamp(x, y, Math.cos(a));
+      }
+      break;
+    }
+    case "mass": {
+      // Fill the disc rather than trace it. Radius walks with a second noise
+      // sample so the density is uneven — a scribble, not a printed disc.
+      for (let a = 0; a < TAU; a += p.angleStep) {
+        const xoff = mapTo(Math.cos(a), -1, 1, 0, p.nMax);
+        const yoff = mapTo(Math.sin(a), -1, 1, 0, p.nMax);
+        const depth = noise01(xoff * 2.3, yoff * 2.3, z + 40);
+        const outer = mapTo(noise01(xoff, yoff, z), 0, 1, radiusBase, radiusBase + radiusRange * 2);
+        const r = outer * (0.18 + depth * 0.82);
+        stamp(cx + r * Math.cos(a), cy + r * Math.sin(a), Math.cos(a));
+      }
+      break;
+    }
+    case "band": {
+      // No circle at all — a line across the tile that undulates. The one
+      // variant nobody could mistake for the others.
+      const span = radiusBase * 2 + radiusRange;
+      const amp = radiusRange * 1.6 + half * 0.06;
+      const stepX = span * (p.angleStep / 0.012) * 0.012;
+      for (let t = -span / 2; t <= span / 2; t += Math.max(0.4, stepX)) {
+        const n = noise01(mapTo(t, -span / 2, span / 2, 0, p.nMax * 3), 0.5, z);
+        stamp(cx + t, cy + mapTo(n, 0, 1, -amp, amp), t / (span / 2));
+      }
+      break;
+    }
+    case "orbit": {
+      // A small ring with one satellite arc riding outside it.
+      for (let a = 0; a < TAU; a += p.angleStep) {
+        const { x, y } = onRing(a, 0.66, 0);
+        stamp(x, y, Math.cos(a));
+      }
+      const start = TAU * 0.08;
+      for (let a = start; a < start + TAU * 0.22; a += p.angleStep) {
+        const { x, y } = onRing(a, 1.24, 27.3);
+        stamp(x, y, Math.sin(a));
+      }
+      break;
+    }
+    case "ring":
+    default: {
+      for (let a = 0; a < TAU; a += p.angleStep) {
+        const { x, y } = onRing(a, 1, 0);
+        stamp(x, y, Math.cos(a));
+      }
+    }
   }
 }
 

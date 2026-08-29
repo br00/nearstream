@@ -312,7 +312,7 @@ export function InventoryUploadForm() {
                 key={t.id}
                 className="relative flex flex-col gap-2 border border-border p-2"
               >
-                <div className="relative aspect-square overflow-hidden border border-border bg-foreground/5">
+                <div className="relative aspect-square overflow-hidden bg-foreground/5">
                   {t.previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img

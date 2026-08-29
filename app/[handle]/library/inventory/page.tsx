@@ -103,7 +103,7 @@ export default async function InventoryArchivePage({ params }: Props) {
                     href={`${base}/library/inventory/${item.slug}`}
                     className="group block"
                   >
-                    <div className="relative aspect-square w-full overflow-hidden border border-border bg-foreground/5">
+                    <div className="relative aspect-square w-full overflow-hidden bg-foreground/5">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={`/api/media/${cover.thumbKey ?? cover.key}`}
