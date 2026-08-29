@@ -13,6 +13,7 @@ import { ReaderRefresh } from "@/app/_components/reader-refresh";
 import { ReaderPicture } from "@/app/_components/reader-picture";
 import { AudioPlayer } from "@/app/_components/audio-player";
 import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
+import { formatTrackDuration } from "@/schemas/music";
 import type { FeedEntry } from "@/schemas/feed-entry";
 import type { Source } from "@/schemas/source";
 
@@ -198,6 +199,13 @@ type ReaderImage = {
   thumbHeight?: number;
 };
 
+type ReaderTrack = {
+  title: string;
+  artist?: string;
+  durationMs?: number;
+  coverUrl?: string;
+};
+
 type ReaderAudio = {
   url: string;
   mime: string;
@@ -215,6 +223,7 @@ type EntryPropsBase = {
     image?: ReaderImage;
     images?: ReaderImage[];
     audio?: ReaderAudio;
+    track?: ReaderTrack;
   };
 };
 
@@ -288,6 +297,67 @@ function VoiceBody({ entry }: EntryPropsBase) {
           {entry.excerpt ?? entry.title}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+function TrackBody({
+  entry,
+  broadsheet = false,
+}: EntryPropsBase & { broadsheet?: boolean }) {
+  // A track leads with its cover and byline rather than the player — the
+  // thing being shared is a record, and the cover is how you recognise it.
+  // The player sits underneath at the same size a voice note uses.
+  //
+  // `track` comes from the Nearstream extension and is absent on arbitrary
+  // podcast feeds, which the parser types as `voice` instead; falling back
+  // to the entry title keeps a hand-written feed from rendering blank.
+  if (!entry.audio) return null;
+  const title = entry.track?.title ?? entry.title ?? "Untitled";
+  const artist = entry.track?.artist;
+  const coverUrl = entry.track?.coverUrl;
+  const duration = formatTrackDuration(
+    entry.track?.durationMs ?? entry.audio.durationMs,
+  );
+
+  return (
+    <div className={broadsheet ? "mt-5" : undefined}>
+      <div className="flex items-start gap-4">
+        {coverUrl && (
+          <div className="h-20 w-20 flex-shrink-0 overflow-hidden border border-border bg-foreground/5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverUrl}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p
+            className={
+              broadsheet
+                ? "text-[19px] leading-[1.35] text-foreground"
+                : "text-[15px] leading-[1.4] text-foreground"
+            }
+          >
+            {title}
+          </p>
+          <p className="mt-1 font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-soft">
+            {[artist, duration].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 flex justify-start">
+        <AudioPlayer
+          src={entry.audio.url}
+          durationMs={entry.track?.durationMs ?? entry.audio.durationMs ?? 0}
+          mime={entry.audio.mime}
+          size={broadsheet ? 200 : 160}
+          variant={normalizeVoiceViz(entry.audio.viz)}
+        />
+      </div>
     </div>
   );
 }
@@ -432,6 +502,8 @@ function DefaultFeed({ entries, sourceById, needsRefresh }: FeedProps) {
                 <PictureBody entry={entry} />
               ) : entry.type === "essay" ? (
                 <EssayBody entry={entry} />
+              ) : entry.type === "track" ? (
+                <TrackBody entry={entry} />
               ) : entry.type === "voice" ? (
                 <VoiceBody entry={entry} />
               ) : (
@@ -501,6 +573,8 @@ function BroadsheetFeed({ entries, sourceById, needsRefresh }: FeedProps) {
                 <BroadsheetPicture entry={entry} />
               ) : entry.type === "essay" ? (
                 <BroadsheetEssay entry={entry} />
+              ) : entry.type === "track" ? (
+                <TrackBody entry={entry} broadsheet />
               ) : entry.type === "voice" ? (
                 <BroadsheetVoice entry={entry} />
               ) : (

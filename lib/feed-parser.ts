@@ -16,6 +16,7 @@ import type {
   NewFeedEntry,
   FeedEntryImage,
   FeedEntryAudio,
+  FeedEntryTrack,
   FeedEntryType,
 } from "@/schemas/feed-entry";
 
@@ -69,6 +70,7 @@ function parseRssChannel(channel: any, sourceId: string): ParseResult {
     const images = pickRssImages(item);
     const image = images[0];
     const audio = pickFeedAudio(item);
+    const track = pickFeedTrack(item);
     const authorName =
       textOf(item["dc:creator"]) ?? textOf(item.author) ?? undefined;
 
@@ -82,6 +84,7 @@ function parseRssChannel(channel: any, sourceId: string): ParseResult {
       body,
       excerpt: makeExcerpt(body),
       type: detectRssType(item, { title, body, image, audio }),
+      track,
       // Mirror images[0] into the legacy `image` field for one release so
       // older read paths don't break. The reader uses feedImagesOf() to
       // coalesce both shapes.
@@ -429,9 +432,44 @@ function pickFeedAudio(item: any): FeedEntryAudio | undefined {
   return undefined;
 }
 
+/** Music-track metadata (slice 40). Nearstream feeds only — the element
+ *  doesn't exist elsewhere, so absence just means "not a track". */
+function pickFeedTrack(item: any): FeedEntryTrack | undefined {
+  const el = asArray(item["nearstream:track"])[0];
+  if (!el) return undefined;
+  const title = el?.["@_title"];
+  if (typeof title !== "string" || title.length === 0) return undefined;
+
+  const out: FeedEntryTrack = { title };
+
+  const artist = el?.["@_artist"];
+  if (typeof artist === "string" && artist.length > 0) out.artist = artist;
+
+  const dur = el?.["@_durationMs"];
+  const n =
+    typeof dur === "string" ? Number(dur) : typeof dur === "number" ? dur : NaN;
+  if (Number.isFinite(n) && n > 0) out.durationMs = n;
+
+  const cover = asArray(item["nearstream:cover"])[0];
+  const coverUrl = cover?.["@_url"];
+  if (typeof coverUrl === "string" && coverUrl.length > 0) {
+    out.coverUrl = coverUrl;
+  }
+
+  return out;
+}
+
 function normalizeType(raw: string): FeedEntryType {
   const v = raw.trim().toLowerCase();
-  if (v === "note" || v === "essay" || v === "picture" || v === "voice") return v;
+  if (
+    v === "note" ||
+    v === "essay" ||
+    v === "picture" ||
+    v === "voice" ||
+    v === "track"
+  ) {
+    return v;
+  }
   return "unknown";
 }
 
@@ -441,6 +479,7 @@ function mapNearstreamCategory(categories: string[]): FeedEntryType {
     if (v === "stream") return "note";
     if (v === "essay") return "essay";
     if (v === "inventory") return "picture";
+    if (v === "music") return "track";
   }
   return "unknown";
 }

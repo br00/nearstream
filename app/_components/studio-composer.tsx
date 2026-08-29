@@ -6,6 +6,7 @@ import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
 import { ModeRadioGroup } from "@/app/_components/mode-radio";
+import { MusicUploadForm } from "@/app/_components/music-upload-form";
 import { InventoryUploadForm } from "@/app/_components/inventory-upload-form";
 import { VisibilityRadio } from "@/app/_components/visibility-radio";
 import type { VoiceVizKey } from "@/lib/voice-viz-variants";
@@ -14,21 +15,58 @@ import { DEFAULT_MODE } from "@/schemas/stream";
 
 // Compose-first studio. Federico's "I got lost" and Alessandro's "I don't
 // post because I have to scroll past three forms" both point at the same
-// thing: four stacked forms is one too many decisions before you've started.
-// Pick a primitive at the top; the relevant form is the only thing below.
+// thing: too many decisions before you've started.
+//
+// Two groups, not a flat row. The flat row was six chips at 537px against
+// 327px of usable width on a phone, so three of six were visible and Essay
+// hid behind a horizontal scroll — and it got worse with every primitive
+// added. Grouping is fixed-width forever: a new Library type joins a group
+// instead of extending a row.
+//
+// The groups aren't invented for the layout, they're the model the
+// manifesto already uses. Stream is the running feed that syndicates;
+// Library is the things that keep a permanent URL.
+//
+// Stream is active on arrival with the Line composer already open, so the
+// most casual thing you can post costs zero taps. That's the point: this
+// is the surface friends aren't using.
+//
+// Note what ISN'T here: the Now editor (formerly "Letter"). It isn't a
+// post — its store is get/set rather than list/add, it has no id, slug or
+// visibility, and it appears nowhere in RSS, the reader or the digest. It
+// never leaves your own page. It lives in its own block on /studio.
 
-type Primitive = "stream" | "voice" | "picture" | "essay" | "letter";
+type Primitive = "line" | "voice" | "music" | "picture" | "essay";
+
+type Group = {
+  key: "stream" | "library";
+  label: string;
+  members: Primitive[];
+};
+
+const GROUPS: Group[] = [
+  { key: "stream", label: "Stream", members: ["line", "voice"] },
+  { key: "library", label: "Library", members: ["music", "picture", "essay"] },
+];
 
 const PRIMITIVES: { key: Primitive; label: string; hint: string }[] = [
   {
-    key: "stream",
-    label: "Stream",
+    key: "line",
+    // "Line" over "Note": a note sounds like something with length to it,
+    // and this is the one-sentence primitive. "Drop someone a line" already
+    // carries the brevity.
+    label: "Line",
     hint: "A short note. No title, no commitment — the most casual thing you can post.",
   },
   {
     key: "voice",
     label: "Voice",
-    hint: "A short voice note — up to 60 seconds. Optional caption. Plays in the reader with an animated mark that breathes with your voice.",
+    hint: "A short voice note — up to 60 seconds. Optional caption. Plays in the reader with a visualizer that moves with your voice.",
+  },
+  {
+    key: "music",
+    label: "Music",
+    hint: "A track you want to keep somewhere that isn't a streaming service. Cover, title, artist. Lands at /library/music/[slug].",
   },
   {
     key: "picture",
@@ -40,12 +78,11 @@ const PRIMITIVES: { key: Primitive; label: string; hint: string }[] = [
     label: "Essay",
     hint: "Markdown long-form. Lands at /library/[slug].",
   },
-  {
-    key: "letter",
-    label: "Letter",
-    hint: "The dated note at the top of your home page. Update it when your head changes.",
-  },
 ];
+
+function groupOf(p: Primitive): Group {
+  return GROUPS.find((g) => g.members.includes(p)) ?? GROUPS[0];
+}
 
 export type LibraryPick = { id: string; slug: string; title: string };
 
@@ -54,8 +91,6 @@ type Props = {
    *  what everyone else will see. */
   voiceViz: VoiceVizKey;
   initialActive: Primitive;
-  letterBody: string | null;
-  letterError?: string;
   essayError?: string;
   essays: LibraryPick[];
   inventoryItems: LibraryPick[];
@@ -64,41 +99,65 @@ type Props = {
 export function StudioComposer({
   voiceViz,
   initialActive,
-  letterBody,
-  letterError,
   essayError,
   essays,
   inventoryItems,
 }: Props) {
   const [active, setActive] = useState<Primitive>(initialActive);
+  const group = groupOf(active);
   const meta = PRIMITIVES.find((p) => p.key === active)!;
 
   return (
     <div>
-      {/* Primitive chips. -mx-6 + px-6 lets the row scroll past the page
-          gutter on narrow screens without clipping. */}
-      <div className="-mx-6 overflow-x-auto px-6 pb-1">
-        <div className="flex gap-2">
-          {PRIMITIVES.map((p) => {
-            const isActive = p.key === active;
-            return (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => setActive(p.key)}
-                className={
-                  "shrink-0 border px-4 py-2 font-mono text-[10.5px] uppercase tracking-[0.22em] transition-colors " +
-                  (isActive
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-border text-muted hover:border-foreground hover:text-foreground")
-                }
-                aria-pressed={isActive}
-              >
-                {p.label}
-              </button>
-            );
-          })}
-        </div>
+      {/* Two group chips, split evenly. No overflow container: the row is
+          fixed at two items forever, so there is nothing to scroll. */}
+      <div className="flex gap-2">
+        {GROUPS.map((g) => {
+          const isActive = g.key === group.key;
+          return (
+            <button
+              key={g.key}
+              type="button"
+              // Selecting a group lands on its first member, so a tap always
+              // produces a usable form rather than an empty state.
+              onClick={() => setActive(g.members[0])}
+              className={
+                "flex-1 border px-4 py-2 font-mono text-[10.5px] uppercase tracking-[0.22em] transition-colors " +
+                (isActive
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border text-muted hover:border-foreground hover:text-foreground")
+              }
+              aria-pressed={isActive}
+            >
+              {g.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Members of the active group. Text rather than chips so the two
+          levels don't compete, and they wrap instead of scrolling. */}
+      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+        {group.members.map((key) => {
+          const p = PRIMITIVES.find((x) => x.key === key)!;
+          const isActive = key === active;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setActive(key)}
+              className={
+                "font-mono text-[10.5px] uppercase tracking-[0.18em] underline-offset-4 transition-colors " +
+                (isActive
+                  ? "text-foreground underline"
+                  : "text-muted hover:text-foreground")
+              }
+              aria-pressed={isActive}
+            >
+              {p.label}
+            </button>
+          );
+        })}
       </div>
 
       <p className="mt-6 text-[13px] leading-relaxed text-muted-soft">
@@ -106,15 +165,13 @@ export function StudioComposer({
       </p>
 
       <div className="mt-8">
-        {active === "stream" && (
+        {active === "line" && (
           <StreamForm essays={essays} inventory={inventoryItems} />
         )}
         {active === "voice" && <VoiceForm voiceViz={voiceViz} />}
+        {active === "music" && <MusicUploadForm />}
         {active === "picture" && <InventoryUploadForm />}
         {active === "essay" && <EssayForm error={essayError} />}
-        {active === "letter" && (
-          <LetterForm body={letterBody} error={letterError} />
-        )}
       </div>
     </div>
   );
@@ -189,47 +246,6 @@ function StreamForm({
         Post
       </SubmitButton>
     </form>
-  );
-}
-
-function LetterForm({
-  body,
-  error,
-}: {
-  body: string | null;
-  error?: string;
-}) {
-  return (
-    <>
-      {error && (
-        <div
-          role="alert"
-          className="mb-6 border-l-2 border-foreground/50 pl-4 py-2"
-        >
-          <Kicker>Could not update</Kicker>
-          <p className="mt-1 text-sm text-muted">{error}</p>
-        </div>
-      )}
-      <form action="/api/letter" method="POST" className="flex flex-col gap-8">
-        <label className="flex flex-col gap-2">
-          <Kicker>Body</Kicker>
-          <Textarea
-            name="body"
-            required
-            rows={5}
-            defaultValue={body ?? ""}
-            placeholder="Working on Soft Iron and a piece for an upcoming show. Writing about the shape of a quieter web."
-          />
-        </label>
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft">
-          The date appears automatically — today&rsquo;s date is set when you
-          update.
-        </p>
-        <SubmitButton pendingLabel="Updating…" className="self-start">
-          Update letter
-        </SubmitButton>
-      </form>
-    </>
   );
 }
 

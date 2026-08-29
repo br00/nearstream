@@ -7,7 +7,7 @@
 // reliably. All styles inlined for the same reason.
 
 import type { Digest, DigestItem } from "@/lib/digest";
-import { digestSubject, digestTextBody, formatAudioDuration } from "@/lib/digest";
+import { digestSubject, digestTextBody, digestKickerLabel } from "@/lib/digest";
 
 const HOST_NAME = process.env.HOST_USER_NAME ?? "Alessandro";
 
@@ -272,14 +272,10 @@ function renderDigestItem(item: DigestItem): string {
   // Voice notes get a distinct "voice note" label + duration in the kicker,
   // both to disambiguate from plain notes and because "you have to click
   // through to hear it" is worth being explicit about.
-  const typeLabel =
-    item.type === "voice"
-      ? item.audioDurationMs
-        ? `voice note · ${formatAudioDuration(item.audioDurationMs)}`
-        : "voice note"
-      : item.type === "unknown"
-        ? "post"
-        : item.type;
+  const typeLabel = digestKickerLabel(
+    item,
+    item.type === "unknown" ? "post" : item.type,
+  );
   const safeUrl = escapeHtml(item.url);
   // Title takes precedence; else use the excerpt as the body line.
   const title = item.title ? escapeHtml(item.title) : "";
@@ -290,14 +286,16 @@ function renderDigestItem(item: DigestItem): string {
   // Thumbnail — only include for pictures. Sized 96x96 so mobile clients
   // render without blowing out the layout. Voice notes get a mono ▶ glyph
   // in the same slot so the row shape stays consistent.
+  // A track with cover art uses the picture treatment; without one it
+  // falls through to the ▶ glyph alongside voice notes.
   const thumb =
-    item.type === "picture" && item.imageThumbUrl
+    (item.type === "picture" || item.type === "track") && item.imageThumbUrl
       ? `<td width="96" valign="top" style="padding-right:16px;width:96px;">
           <a href="${safeUrl}" style="text-decoration:none;">
             <img src="${escapeHtml(item.imageThumbUrl)}" width="96" height="96" alt="" style="display:block;width:96px;height:96px;object-fit:cover;border:1px solid #27272a;">
           </a>
         </td>`
-      : item.type === "voice"
+      : item.type === "voice" || item.type === "track"
         ? `<td width="96" valign="top" style="padding-right:16px;width:96px;">
           <a href="${safeUrl}" style="text-decoration:none;">
             <div style="display:block;width:96px;height:96px;border:1px solid #27272a;background:#0a0a0a;text-align:center;line-height:96px;color:#e4e4e7;font-size:36px;">&#9654;</div>

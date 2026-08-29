@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { store } from "@/lib/store";
 import { essayStore } from "@/lib/essay-store";
 import { inventoryStore } from "@/lib/inventory-store";
+import { musicStore } from "@/lib/music-store";
 import { userStore } from "@/lib/user-store";
 import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
 import { tenantAbsoluteBase } from "@/lib/tenant-domains";
@@ -45,7 +46,7 @@ function deriveTitle(text: string): string {
   return firstLine.slice(0, 77).trimEnd() + "…";
 }
 
-// Matches THUMB_MAX_DIM in app/_components/inventory-upload-form.tsx.
+// Matches THUMB_MAX_DIM in app/_components/upload-helpers.ts.
 const THUMB_MAX_DIM = 600;
 
 function thumbnailElement(
@@ -176,10 +177,11 @@ export async function GET(request: Request, { params }: Props) {
   const feedTitle = `${user.displayName || handle} — Nearstream`;
   const feedDescription = `Stream, essays, and inventory from ${user.displayName || handle}.`;
 
-  const [allEntries, allEssays, allItems] = await Promise.all([
+  const [allEntries, allEssays, allItems, allTracks] = await Promise.all([
     store.list(user.id),
     essayStore.list(user.id),
     inventoryStore.list(user.id),
+    musicStore.list(user.id),
   ]);
   // RSS is public-only — private entries never leave the instance, and the
   // RSS guid for an entry that flips from public → private wouldn't reappear
@@ -187,6 +189,7 @@ export async function GET(request: Request, { params }: Props) {
   const entries = allEntries.filter((e) => visibilityOf(e) === "public");
   const essays = allEssays.filter((e) => visibilityOf(e) === "public");
   const items = allItems.filter((i) => visibilityOf(i) === "public");
+  const tracks = allTracks.filter((t) => visibilityOf(t) === "public");
 
   const essayTitles = new Map(essays.map((e) => [e.slug, e.title]));
   const inventoryTitles = new Map(items.map((i) => [i.slug, i.title]));
@@ -302,6 +305,67 @@ export async function GET(request: Request, { params }: Props) {
       <nearstream:type>picture</nearstream:type>
       ${enclosures}${thumb ? `\n      ${thumb}` : ""}
       ${imageList}
+      <description><![CDATA[${escapeCdata(body)}]]></description>
+    </item>`,
+    });
+  }
+
+  for (const track of tracks) {
+    const link = `${siteUrl}/library/music/${track.slug}`;
+    const audioUrl = `${INSTANCE_URL}/api/media/${track.audio.key}`;
+    const byline = track.artist ? `${track.artist} — ${track.title}` : track.title;
+
+    // Body: cover image (if any), then an inline <audio> so readers that
+    // render HTML can play without parsing the extension, then the notes.
+    // Same order as the detail page.
+    const parts: string[] = [];
+    if (track.cover) {
+      const coverUrl = `${INSTANCE_URL}/api/media/${track.cover.key}`;
+      const dims =
+        track.cover.width && track.cover.height
+          ? ` width="${track.cover.width}" height="${track.cover.height}"`
+          : "";
+      parts.push(
+        `<p><img src="${htmlEscape(coverUrl)}" alt="${htmlEscape(`Cover for ${track.title}`)}"${dims} style="max-width: 100%; height: auto;" /></p>`,
+      );
+    }
+    parts.push(
+      `<p><audio controls src="${htmlEscape(audioUrl)}" preload="metadata"></audio></p>`,
+    );
+    if (track.description) {
+      parts.push(await marked.parse(track.description, { async: true }));
+    }
+    const body = parts.join("\n");
+
+    // `nearstream:track` carries what a card needs without re-parsing the
+    // body: artist and title separately (a reader may want to render them
+    // differently), plus duration. The audio itself rides on
+    // `nearstream:audio` — the same element voice notes use — so a reader
+    // that already handles voice gets playback for free and only needs the
+    // new element for the metadata.
+    const durationAttr =
+      typeof track.audio.durationMs === "number"
+        ? ` durationMs="${track.audio.durationMs}"`
+        : "";
+    const artistAttr = track.artist
+      ? ` artist="${escapeXml(track.artist)}"`
+      : "";
+    const coverEl = track.cover
+      ? `\n      <nearstream:cover url="${escapeXml(`${INSTANCE_URL}/api/media/${track.cover.thumbKey ?? track.cover.key}`)}" />`
+      : "";
+
+    feedItems.push({
+      publishedAt: track.publishedAt,
+      toXml: () => `    <item>
+      <title>${escapeXml(byline)}</title>
+      <link>${escapeXml(link)}</link>
+      <guid isPermaLink="true">${escapeXml(link)}</guid>
+      <pubDate>${toRfc822(track.publishedAt)}</pubDate>
+      <category>Music</category>
+      <nearstream:type>track</nearstream:type>
+      <nearstream:track title="${escapeXml(track.title)}"${artistAttr}${durationAttr} />${coverEl}
+      <nearstream:audio url="${escapeXml(audioUrl)}" mime="${escapeXml(track.audio.mime)}"${durationAttr} viz="${escapeXml(voiceViz)}" />
+      <enclosure url="${escapeXml(audioUrl)}" length="${track.audio.sizeBytes}" type="${escapeXml(track.audio.mime)}" />
       <description><![CDATA[${escapeCdata(body)}]]></description>
     </item>`,
     });
