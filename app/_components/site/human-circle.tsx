@@ -142,6 +142,28 @@ export type MarkForm =
 /** The half-canvas the brush fractions are calibrated against. */
 const BRUSH_REF_HALF = 220;
 
+/**
+ * The mark size `seedSpeed` is calibrated against, and how hard the speed is
+ * compensated below it.
+ *
+ * Same failure as the brush had, one layer up. `seedSpeed` advances the noise
+ * z-axis by a fixed amount per frame, but how far that moves the outline *in
+ * pixels* scales with the mark: the wobble range is a fraction of the canvas.
+ * At 280px a point on the ring travels about 4.8px per second, which reads as
+ * alive. At the 96px picker tile the same settings give 1.7px per second —
+ * more than half a second to move a single pixel, which reads as a static
+ * drawing.
+ *
+ * Compensating at exponent 1 would hold pixels-per-second exactly constant,
+ * but then a small mark traverses its whole range in 2s against 5.8s for a
+ * large one, and looks restless rather than breathing. 0.75 keeps the
+ * perceived motion close (3.7px/s at 96px vs 4.8px/s at 280px) while letting
+ * bigger marks stay statelier. Capped so an unusually small mark can't spin.
+ */
+const ANIM_REF_SIZE = 280;
+const ANIM_EXPONENT = 0.75;
+const ANIM_MAX_BOOST = 3;
+
 export const HUMAN_CIRCLE_DEFAULTS: HumanCircleParams = {
   nMax: 0.45,
   angleStep: 0.012,
@@ -347,6 +369,13 @@ export function AnimatedMark({
       "(prefers-reduced-motion: reduce)",
     ).matches;
 
+    // Small marks need a faster z-advance to move a visible number of
+    // pixels — see ANIM_REF_SIZE.
+    const speedBoost = Math.min(
+      ANIM_MAX_BOOST,
+      Math.pow(ANIM_REF_SIZE / Math.max(1, size), ANIM_EXPONENT),
+    );
+
     let z = merged.zOffset ?? 0;
     let raf = 0;
     function tick() {
@@ -365,7 +394,7 @@ export function AnimatedMark({
             }
           : merged;
       drawHumanCircle(ctx, size, size, z, active);
-      z += merged.seedSpeed;
+      z += merged.seedSpeed * speedBoost;
       raf = requestAnimationFrame(tick);
     }
 
