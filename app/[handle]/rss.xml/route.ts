@@ -6,6 +6,7 @@ import { inventoryStore } from "@/lib/inventory-store";
 import { musicStore } from "@/lib/music-store";
 import { userStore } from "@/lib/user-store";
 import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
+import { THUMB_MAX_DIM } from "@/lib/thumbnails";
 import { tenantAbsoluteBase } from "@/lib/tenant-domains";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { visibilityOf } from "@/schemas/visibility";
@@ -45,9 +46,6 @@ function deriveTitle(text: string): string {
   if (firstLine.length <= 80) return firstLine;
   return firstLine.slice(0, 77).trimEnd() + "…";
 }
-
-// Matches THUMB_MAX_DIM in app/_components/upload-helpers.ts.
-const THUMB_MAX_DIM = 600;
 
 function thumbnailElement(
   cover: InventoryImage,

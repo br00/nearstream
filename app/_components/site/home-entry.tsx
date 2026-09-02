@@ -18,6 +18,7 @@
 
 import Link from "next/link";
 import type { HomeEntry } from "@/lib/home-timeline";
+import { THUMB_MAX_DIM } from "@/lib/thumbnails";
 
 /**
  * A deterministic bar profile, seeded off the id so a given track always
@@ -101,14 +102,39 @@ export function HomeEntryBlock({
           </p>
         );
 
-      case "picture":
+      case "picture": {
+        // The picture runs the full column width, so it needs more than the
+        // 600px thumbnail: the column is 544 CSS px, which is 1088 device
+        // pixels at DPR 2. Offering both sizes as a `srcset` lets the
+        // browser pick — the thumbnail on a narrow 1x screen, the original
+        // where the resolution is actually needed — rather than forcing a
+        // multi-megabyte original onto a phone.
+        const src = `/api/media/${entry.imageKey}`;
+        const thumb = entry.imageThumbKey
+          ? `/api/media/${entry.imageThumbKey}`
+          : null;
+        const thumbW = entry.imageWidth
+          ? Math.min(THUMB_MAX_DIM, entry.imageWidth)
+          : THUMB_MAX_DIM;
+        const srcSet =
+          thumb && entry.imageWidth && entry.imageWidth > thumbW
+            ? `${thumb} ${thumbW}w, ${src} ${entry.imageWidth}w`
+            : undefined;
         return (
           <>
             <div className="w-full overflow-hidden bg-foreground/5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`/api/media/${entry.imageKey}`}
+                src={src}
+                srcSet={srcSet}
+                // The column is capped at 34rem; below that it's the
+                // viewport minus the page gutters.
+                sizes="(max-width: 37rem) calc(100vw - 3rem), 34rem"
                 alt={entry.title ?? ""}
+                width={entry.imageWidth}
+                height={entry.imageHeight}
+                // Intrinsic dimensions reserve the space, so the page
+                // doesn't jump as each picture arrives.
                 className="h-auto w-full object-cover"
                 loading="lazy"
               />
@@ -123,6 +149,7 @@ export function HomeEntryBlock({
             </div>
           </>
         );
+      }
 
       case "voice":
         return (
