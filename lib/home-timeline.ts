@@ -15,9 +15,16 @@
 //           Recency emerges from optics instead of from an algorithm.
 //
 //   WET INK An entry written in the last few hours arrives faint and darkens
-//           as it sets. You can't see your own new post at full strength
+//           as it sets. You can't see your OWN new post at full strength
 //           immediately, which is the opposite of the instant-feedback loop
 //           every other posting surface is built around.
+//
+//           Owner-only, and that's the whole point of it. The argument is
+//           about denying the author an instant reward for posting; a
+//           visitor arriving at a friend's page is in no such loop, and a
+//           dimmed photograph just reads as broken or half-loaded. Applying
+//           it to everyone made a friend's fresh photo look like a failed
+//           image request.
 
 import type { StreamEntry } from "@/schemas/stream";
 import type { Essay } from "@/schemas/essay";
@@ -75,8 +82,21 @@ export type HomeEntry = {
 
 /** Above this many characters a Line is set small and narrow instead of large. */
 const LONG_LINE_CHARS = 90;
-/** How long ink takes to set. */
-const WET_HOURS = 6;
+/**
+ * How long ink takes to set, and how faint it starts.
+ *
+ * Originally 6 hours from 0.35, which was wrong in practice in a way it
+ * wasn't in the prototype: a freshly published essay was so faint it read
+ * as a rendering fault, and on a hover-capable device it snapped to full
+ * strength under the cursor, which made it look like a bug being caught in
+ * the act. Publishing something and not being able to see it is a broken
+ * flow, not a philosophical position.
+ *
+ * Softened to a *cue* rather than a veil: legible immediately, visibly
+ * newer than everything under it, settled within a few hours.
+ */
+const WET_HOURS = 3;
+const WET_START_OPACITY = 0.82;
 /** Age is measured against a year; past that everything is equally distant. */
 const AGE_DAYS = 365;
 /** Never fade past this — below it the text stops being readable. */
@@ -195,7 +215,7 @@ export function buildHomeTimeline({
 
   const total = drafts.length;
   return drafts.map((d, i) => {
-    const { opacity, blur, wet } = weather(d.publishedAt, now);
+    const { opacity, blur, wet } = weather(d.publishedAt, now, isOwner);
     return { ...d, number: total - i, opacity, blur, wet };
   });
 }
@@ -207,15 +227,19 @@ export function buildHomeTimeline({
 function weather(
   publishedAt: string,
   now: number,
+  isOwner: boolean,
 ): { opacity: number; blur: number; wet: boolean } {
   const ms = now - Date.parse(publishedAt);
   if (!Number.isFinite(ms)) return { opacity: 1, blur: 0, wet: false };
 
   const hours = ms / 3_600_000;
-  if (hours >= 0 && hours < WET_HOURS) {
-    // Wet: 0.35 → 1 over the first few hours.
+  // Only the author waits for their own ink to set. For everyone else a
+  // fresh entry is simply the newest thing, at full strength.
+  if (isOwner && hours >= 0 && hours < WET_HOURS) {
     return {
-      opacity: round(0.35 + 0.65 * (hours / WET_HOURS)),
+      opacity: round(
+        WET_START_OPACITY + (1 - WET_START_OPACITY) * (hours / WET_HOURS),
+      ),
       blur: 0,
       wet: true,
     };
