@@ -137,6 +137,20 @@ body {
   opacity: 1 !important;
   filter: none !important;
 }
+
+/* Touch devices can't hover, and tapping an entry navigates rather than
+   restoring it — so on a phone the age treatment had no way back and an old
+   entry stayed faded permanently. Rather than add a scroll observer (client
+   JS, on a page that is otherwise entirely server-rendered), the fade is
+   simply gentler where it can't be undone: the floor lifts from 45% to 72%
+   and the blur is dropped. The past still goes quiet, it just never goes
+   far enough to need rescuing. */
+@media (hover: none) {
+  .home-entry {
+    opacity: calc(0.72 + (1 - 0.72) * var(--age-opacity, 1)) !important;
+    filter: none !important;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .home-entry { transition: none; }
 }

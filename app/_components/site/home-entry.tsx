@@ -198,10 +198,16 @@ export function HomeEntryBlock({
         "home-entry mt-9 sm:mt-11" +
         (entry.sealed ? " border-l border-dashed border-border pl-4" : "")
       }
-      style={{
-        opacity: entry.opacity,
-        filter: entry.blur ? `blur(${entry.blur}px)` : undefined,
-      }}
+      // `--age-opacity` duplicates the opacity as a custom property so the
+      // touch-device rule in globals.css can remap it onto a gentler range —
+      // CSS can't read back an inline `opacity` value.
+      style={
+        {
+          opacity: entry.opacity,
+          filter: entry.blur ? `blur(${entry.blur}px)` : undefined,
+          "--age-opacity": entry.opacity,
+        } as React.CSSProperties
+      }
       tabIndex={0}
     >
       {entry.href ? (
