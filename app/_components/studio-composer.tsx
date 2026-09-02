@@ -4,6 +4,7 @@ import { useState } from "react";
 import { SubmitButton } from "@/app/_components/submit-button";
 import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
+import { MarkdownField } from "@/app/_components/markdown-field";
 import { Kicker } from "@/app/_components/kicker";
 import { ModeRadioGroup } from "@/app/_components/mode-radio";
 import { MusicUploadForm } from "@/app/_components/music-upload-form";
@@ -391,15 +392,15 @@ function EssayForm({ error }: { error?: string }) {
             placeholder="The shape of a quieter web"
           />
         </label>
-        <label className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <Kicker>Body</Kicker>
-          <Textarea
+          <MarkdownField
             name="body"
             required
             rows={14}
             placeholder="## A heading&#10;&#10;Markdown body. Links, *italics*, **bold**, lists, code, blockquotes — all supported."
           />
-        </label>
+        </div>
         <VisibilityRadio defaultValue="public" />
         <SubmitButton pendingLabel="Publishing…" className="self-start">
           Publish
