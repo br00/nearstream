@@ -4,7 +4,7 @@ import { marked } from "marked";
 import { essayStore } from "@/lib/essay-store";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
-import { checkTenantVisibility } from "@/lib/tenant-visibility";
+import { checkTenantVisibility, resolveSitePrivacy } from "@/lib/tenant-visibility";
 import { tenantBase } from "@/lib/tenant-domains";
 import { visibilityOf } from "@/schemas/visibility";
 import { PageShell } from "@/app/_components/page-shell";
@@ -25,15 +25,67 @@ function formatDate(iso: string): string {
   return `${month} ${day}, ${year}`;
 }
 
+/**
+ * A share preview is often the only thing a stranger ever sees of an essay,
+ * so it gets the essay's own opening rather than the site's boilerplate.
+ * Markdown syntax and the leading H1 are stripped, since a preview card
+ * rendering a literal `#` reads as broken.
+ */
+function shareExcerpt(body: string, max = 200): string {
+  const flat = body
+    .replace(/^#.*$/gm, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[*_`>#]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (flat.length <= max) return flat;
+  const cut = flat.slice(0, max);
+  const lastStop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("? "));
+  return lastStop > max * 0.5
+    ? cut.slice(0, lastStop + 1)
+    : cut.trimEnd() + "…";
+}
+
 export async function generateMetadata({ params }: Props) {
   const { handle, slug } = await params;
   const user = await userStore.getByHandle(handle);
   if (!user) return { title: "Not found · Nearstream" };
   const essay = await essayStore.getBySlug(user.id, slug);
   if (!essay) return { title: "Not found · Nearstream" };
+
+  const displayName = user.displayName || handle;
+  const title = `${essay.title} · ${displayName}`;
+  const description =
+    shareExcerpt(essay.body) || `An essay by ${displayName} on Nearstream.`;
+
+  // Search indexing follows the tenant's own privacy setting rather than
+  // being off everywhere. A `friends` or `private` site must never be
+  // indexed; a site its owner has deliberately made public, and is linking
+  // to from elsewhere, has no reason to be invisible to search. Individual
+  // private essays are still excluded below.
+  const indexable =
+    resolveSitePrivacy(user) === "public" &&
+    visibilityOf(essay) === "public";
+
   return {
-    title: `${essay.title} · ${user.displayName || handle}`,
-    robots: { index: false, follow: false },
+    title,
+    description,
+    robots: indexable
+      ? { index: true, follow: true }
+      : { index: false, follow: false },
+    openGraph: {
+      title,
+      description,
+      type: "article",
+      siteName: "Nearstream",
+      publishedTime: essay.publishedAt,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   };
 }
 
