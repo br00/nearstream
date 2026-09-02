@@ -53,11 +53,6 @@ function Margin({ entry, date }: { entry: HomeEntry; date: string }) {
       >
         {date}
       </time>
-      {entry.wet && (
-        <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-muted-soft">
-          · setting
-        </span>
-      )}
       {entry.sealed && (
         <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-foreground/60">
           · sealed

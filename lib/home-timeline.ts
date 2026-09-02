@@ -14,10 +14,12 @@
 //           quieter, and hovering or focusing an entry restores it fully.
 //           Recency emerges from optics instead of from an algorithm.
 //
-//   WET INK An entry written in the last few hours arrives faint and darkens
-//           as it sets. You can't see your own new post at full strength
-//           immediately, which is the opposite of the instant-feedback loop
-//           every other posting surface is built around.
+// Wet ink — a freshly published entry rendering faint and darkening as it
+// "set" — was removed on 2026-09-02. It read as a rendering fault rather
+// than as a choice: reported as a bug twice within ten minutes, once on a
+// friend's photo and once on a just-published essay. A mechanic that needs
+// a "· setting" caption to explain itself has already failed. Age alone
+// carries the same argument, and it does it quietly.
 
 import type { StreamEntry } from "@/schemas/stream";
 import type { Essay } from "@/schemas/essay";
@@ -40,12 +42,10 @@ export type HomeEntry = {
   publishedAt: string;
   /** Sequence number, counting down from the newest. Rendered in the margin. */
   number: number;
-  /** 0.45–1. Age, or the wet-ink ramp for something written in the last hours. */
+  /** 0.45–1, from the entry's age. */
   opacity: number;
   /** 0–0.4px. Grows with age; hover clears it. */
   blur: number;
-  /** True while the ink is still setting (< WET_HOURS old). */
-  wet: boolean;
   /** Owner-only marker: this one isn't public. */
   sealed: boolean;
   href?: string;
@@ -75,8 +75,6 @@ export type HomeEntry = {
 
 /** Above this many characters a Line is set small and narrow instead of large. */
 const LONG_LINE_CHARS = 90;
-/** How long ink takes to set. */
-const WET_HOURS = 6;
 /** Age is measured against a year; past that everything is equally distant. */
 const AGE_DAYS = 365;
 /** Never fade past this — below it the text stops being readable. */
@@ -104,7 +102,7 @@ export function buildHomeTimeline({
   isOwner,
   now = Date.now(),
 }: Sources): HomeEntry[] {
-  type Draft = Omit<HomeEntry, "number" | "opacity" | "blur" | "wet">;
+  type Draft = Omit<HomeEntry, "number" | "opacity" | "blur">;
   const drafts: Draft[] = [];
 
   for (const e of entries) {
@@ -195,8 +193,8 @@ export function buildHomeTimeline({
 
   const total = drafts.length;
   return drafts.map((d, i) => {
-    const { opacity, blur, wet } = weather(d.publishedAt, now);
-    return { ...d, number: total - i, opacity, blur, wet };
+    const { opacity, blur } = weather(d.publishedAt, now);
+    return { ...d, number: total - i, opacity, blur };
   });
 }
 
@@ -207,25 +205,14 @@ export function buildHomeTimeline({
 function weather(
   publishedAt: string,
   now: number,
-): { opacity: number; blur: number; wet: boolean } {
+): { opacity: number; blur: number } {
   const ms = now - Date.parse(publishedAt);
-  if (!Number.isFinite(ms)) return { opacity: 1, blur: 0, wet: false };
-
-  const hours = ms / 3_600_000;
-  if (hours >= 0 && hours < WET_HOURS) {
-    // Wet: 0.35 → 1 over the first few hours.
-    return {
-      opacity: round(0.35 + 0.65 * (hours / WET_HOURS)),
-      blur: 0,
-      wet: true,
-    };
-  }
+  if (!Number.isFinite(ms)) return { opacity: 1, blur: 0 };
 
   const t = Math.min(1, Math.max(0, ms / (AGE_DAYS * 86_400_000)));
   return {
     opacity: round(1 - (1 - MIN_OPACITY) * t),
     blur: round(MAX_BLUR * t),
-    wet: false,
   };
 }
 

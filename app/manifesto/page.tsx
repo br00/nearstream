@@ -993,7 +993,9 @@ const DECISIONS: Decision[] = [
       <>
         Contrast and a hair of blur derived from the post&rsquo;s age, floored
         so nothing becomes unreadable, with hover and focus restoring it fully.
-        Fresh entries arrive faint and darken as the ink sets.{" "}
+        A companion idea &mdash; fresh entries arriving faint and darkening
+        as the ink set &mdash; was built and then removed: it read as a
+        rendering fault rather than a choice.{" "}
         <em>
           Why: recency should come from optics, not from an algorithm choosing
           an order or a &ldquo;load more&rdquo; hiding the past. Nothing is ever
