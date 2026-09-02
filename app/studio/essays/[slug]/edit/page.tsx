@@ -7,7 +7,7 @@ import { SubmitButton } from "@/app/_components/submit-button";
 import { PageShell } from "@/app/_components/page-shell";
 import { NearstreamLockup } from "@/app/_components/nearstream-mark";
 import { Input } from "@/app/_components/input";
-import { Textarea } from "@/app/_components/textarea";
+import { MarkdownField } from "@/app/_components/markdown-field";
 import { Kicker } from "@/app/_components/kicker";
 import { VisibilityRadio } from "@/app/_components/visibility-radio";
 import { visibilityOf } from "@/schemas/visibility";
@@ -84,15 +84,15 @@ export default async function EditEssay({ params, searchParams }: Props) {
               />
             </label>
 
-            <label className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               <Kicker>Body</Kicker>
-              <Textarea
+              <MarkdownField
                 name="body"
                 required
                 rows={14}
                 defaultValue={essay.body}
               />
-            </label>
+            </div>
 
             <VisibilityRadio defaultValue={visibilityOf(essay)} />
 
