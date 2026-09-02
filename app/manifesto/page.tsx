@@ -8,6 +8,10 @@
 // Source of truth for content lives here. NEARSTREAM.md stays in the
 // repo as the working doc (decisions log + raw thinking); sync when
 // noteworthy decisions land.
+//
+// Last synced 2026-09-02 — slices 39-41: voice notes, the visualizer
+// picker, music tracks, the grouped composer, Letter renamed Now, and the
+// home page rebuilt as a diary.
 
 import Link from "next/link";
 import { PageShell } from "@/app/_components/page-shell";
@@ -211,19 +215,27 @@ export default function ManifestoPage() {
         </Section>
 
         <Section number="03" title="Content model">
-          <Subhead>Stream / Library / Letter</Subhead>
+          <Subhead>Stream / Library / Now</Subhead>
           <p>
-            Three primitives every Nearstream site has. <strong>Stream</strong>{" "}
-            is the process. <strong>Library</strong> is the artifact.{" "}
-            <strong>Letter</strong> is the standing note at the top of your
-            home.
+            Two territories and a standing note. <strong>Stream</strong> is the
+            process — a Line or a voice note, posted in passing.{" "}
+            <strong>Library</strong> is the artifact — a track, a picture, an
+            essay, each with its own permanent URL. <strong>Now</strong> is
+            what you&rsquo;re up to at the moment: it replaces itself, never
+            syndicates, and isn&rsquo;t a post at all.
+          </p>
+          <p>
+            The home page renders both territories as{" "}
+            <strong>one dated document</strong> — everything you&rsquo;ve
+            posted, newest first, no pagination and no sections. Library is
+            where the same things are filed by kind.
           </p>
           <CompareTable
             head={["", "Stream", "Library"]}
             rows={[
-              ["Shape", "Short text + timestamp + mode", "Typed entry — essay, inventory item"],
-              ["URL", "None — lives only in the timeline", "Each entry has its own deep page"],
-              ["Sort", "Strictly chronological", "Sectioned (essays / inventory), recent within"],
+              ["Shape", "A Line or a voice note + timestamp + mode", "Typed entry — track, picture, essay"],
+              ["URL", "Voice notes get one; Lines live in the timeline", "Each entry has its own deep page"],
+              ["Sort", "Strictly chronological", "By kind, newest within"],
               ["Cadence", "Daily-ish — the texture of life", "Weekly to monthly — finished work"],
               ["Mental model", "What you'd say to a friend at coffee", "What you'd hand a friend"],
             ]}
@@ -371,7 +383,7 @@ export default function ManifestoPage() {
         </Section>
 
         <footer className="mt-24 flex items-center justify-between border-t border-border pt-8 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft">
-          <span>Nearstream — manifesto v0.4</span>
+          <span>Nearstream — manifesto v0.5</span>
           <span>start small · own everything · add friends slowly</span>
         </footer>
       </main>
@@ -391,13 +403,13 @@ function DocHeader() {
             Nearstream
           </h1>
           <p className="mt-2 text-sm italic text-muted-soft">
-            A shared journal between close friends — manifesto v0.4
+            A shared journal between close friends — manifesto v0.5
           </p>
         </div>
         <div className="text-right font-mono text-[10px] uppercase tracking-[0.22em] text-muted-soft leading-loose">
           <span className="block">Status — building</span>
           <span className="block">Updated 2026-06-11</span>
-          <span className="block">Supersedes v0.3 · v0.2 · v0.1</span>
+          <span className="block">Supersedes v0.4 · v0.3 · v0.2 · v0.1</span>
         </div>
       </div>
       <div className="mx-auto mt-8 w-full max-w-3xl border-t border-dashed border-border pt-6 text-sm text-muted">
@@ -578,11 +590,31 @@ const LEXICON: Lex[] = [
     ),
   },
   {
-    term: "Letter",
+    term: "Now",
     def: (
       <>
-        The dated standing note at the top of your home. Updated when your
-        head changes.
+        What you&rsquo;re up to at the moment, at the top of your home.
+        Replaces itself &mdash; it isn&rsquo;t posted, and friends never see it
+        in their reader. Called <em>Letter</em> until 2026-08.
+      </>
+    ),
+  },
+  {
+    term: "Line",
+    def: (
+      <>
+        The short-text Stream primitive. A sentence, no title, no commitment
+        &mdash; the most casual thing you can post.
+      </>
+    ),
+  },
+  {
+    term: "Voice note",
+    def: (
+      <>
+        Up to 60 seconds, recorded in the browser. Plays with a visualizer
+        that moves with the sound, and travels to friends&rsquo; readers
+        through RSS.
       </>
     ),
   },
@@ -835,8 +867,13 @@ const LIBRARY_ENTRY_TYPES: Primitive[] = [
   },
   {
     name: "Inventory item",
-    fields: "title · image · body · visibility",
+    fields: "title · images · body · visibility",
     use: "Pictures, objects, anything visual. Lands at /library/inventory/{slug}.",
+  },
+  {
+    name: "Music track",
+    fields: "title · artist · audio · cover · notes · visibility",
+    use: "A track you want to keep somewhere that isn't a streaming service. Stored as uploaded — no re-encoding. Lands at /library/music/{slug}.",
   },
 ];
 
@@ -929,6 +966,98 @@ function DecisionCard({ date, title, body }: Decision) {
 }
 
 const DECISIONS: Decision[] = [
+  {
+    date: "2026-08-29",
+    title: "The home page is one dated document, not category sections",
+    body: (
+      <>
+        Everything you post &mdash; Lines, voice, pictures, tracks, essays
+        &mdash; merged into a single reverse-chronological page with{" "}
+        <strong>no pagination</strong>. Each kind carries its own form: a short
+        Line is set large because one sentence is the whole post, a long one
+        drops small and narrow, pictures go full width, audio is a band, an
+        essay is the only thing with a headline.{" "}
+        <em>
+          Why: the sectioned home read as four filing cabinets when full and as
+          empty when sparse, and every entry rendered identically so a
+          photograph and a one-liner were the same object. Stream is the diary;
+          Library is where the same things are filed by kind.
+        </em>
+      </>
+    ),
+  },
+  {
+    date: "2026-08-29",
+    title: "Older entries fade; looking at one brings it back",
+    body: (
+      <>
+        Contrast and a hair of blur derived from the post&rsquo;s age, floored
+        so nothing becomes unreadable, with hover and focus restoring it fully.
+        Fresh entries arrive faint and darken as the ink sets.{" "}
+        <em>
+          Why: recency should come from optics, not from an algorithm choosing
+          an order or a &ldquo;load more&rdquo; hiding the past. Nothing is ever
+          removed from the page &mdash; it just goes quiet, the way a print left
+          in the light does. And you can&rsquo;t see your own new post at full
+          strength immediately, which is the inverse of the instant-feedback
+          loop every other posting surface is built on.
+        </em>
+      </>
+    ),
+  },
+  {
+    date: "2026-08-27",
+    title: "Letter becomes Now, and leaves the composer",
+    body: (
+      <>
+        Renamed and moved into its own block, separate from posting.{" "}
+        <em>
+          Why: it was never a post. It replaces itself rather than
+          accumulating, has no permanent URL, and never appears in RSS, a
+          friend&rsquo;s reader or the digest &mdash; it never leaves your own
+          page. Sitting in &ldquo;post something&rdquo; beside five things that
+          genuinely syndicate made it read as a sixth way to publish.
+          &ldquo;Now&rdquo; is the IndieWeb convention for exactly this;
+          &ldquo;Letter&rdquo; implied the newsletter &sect;04 rejects.
+        </em>
+      </>
+    ),
+  },
+  {
+    date: "2026-08-27",
+    title: "The composer groups by territory, and Stream is already open",
+    body: (
+      <>
+        Two chips &mdash; Stream and Library &mdash; with the Line composer
+        open on arrival, so the most casual thing you can post costs zero taps.{" "}
+        <em>
+          Why: a flat row of primitives overflowed on every phone once music
+          landed, and it grew with each new type. Two groups stay two groups
+          forever; a new Library type joins one instead of extending a row. The
+          short-text primitive is a &ldquo;Line&rdquo; rather than a
+          &ldquo;note&rdquo; &mdash; a note sounds like it has length to it.
+        </em>
+      </>
+    ),
+  },
+  {
+    date: "2026-08-12",
+    title: "Voice and music are first-class, and the visualizer is a choice",
+    body: (
+      <>
+        Voice notes in Stream, music tracks in Library, both on one shared
+        audio layer. Three visualizers &mdash; ant traces, proximity web, wave
+        grid &mdash; and the pick travels with the post rather than with the
+        viewer.{" "}
+        <em>
+          Why: audio is the differentiator against every text-first
+          alternative, and nothing else does it well at this scale. The
+          visualizer is your signature, so a voice note should look the same on
+          your page, in a friend&rsquo;s reader and in the digest.
+        </em>
+      </>
+    ),
+  },
   {
     date: "2026-06-11",
     title: "Stream tag is a mode, not a discipline",

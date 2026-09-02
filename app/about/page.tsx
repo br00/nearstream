@@ -139,10 +139,11 @@ export default function AboutPage() {
                   Primitives
                 </dt>
                 <dd className="text-muted">
-                  Stream (timestamped notes), Library (essays + inventory
-                  items, each at its own URL), Letter (the dated dispatch at
-                  the top of a home), Source (a friend&rsquo;s feed URL in
-                  your local reader).
+                  Stream (Lines and voice notes, posted in passing), Library
+                  (essays, pictures and music tracks, each at its own URL),
+                  Now (what you&rsquo;re up to at the moment &mdash; it
+                  replaces itself and never syndicates), Source (a
+                  friend&rsquo;s feed URL in your local reader).
                 </dd>
 
                 <dt className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft pt-1">
@@ -151,9 +152,11 @@ export default function AboutPage() {
                 <dd className="text-muted">
                   RSS 2.0 with a tiny Nearstream namespace{" "}
                   <TechBit>xmlns:nearstream</TechBit> so typed entries (note /
-                  essay / picture) round-trip between instances. Any RSS
-                  reader can read a Nearstream feed; any Nearstream reader
-                  can read any RSS feed.
+                  essay / picture / voice / track) round-trip between
+                  instances, audio and all. Any RSS reader can read a
+                  Nearstream feed; any Nearstream reader can read any RSS
+                  feed &mdash; and a podcast enclosure just lands as a voice
+                  entry.
                 </dd>
 
                 <dt className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft pt-1">
