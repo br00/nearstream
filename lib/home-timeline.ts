@@ -55,7 +55,17 @@ export type HomeEntry = {
   long?: boolean;
   title?: string;
   excerpt?: string;
+  /**
+   * Full-resolution key. The home renders pictures at the full column
+   * width, so the 600px thumbnail alone is not enough: the column is 544
+   * CSS px, which is 1088 device pixels on a retina screen. Both keys are
+   * carried so the markup can offer a `srcset` and let the browser choose.
+   */
   imageKey?: string;
+  imageThumbKey?: string;
+  /** Intrinsic dimensions, for srcset widths and to reserve layout space. */
+  imageWidth?: number;
+  imageHeight?: number;
   imageCount?: number;
   durationLabel?: string;
   audioKey?: string;
@@ -140,7 +150,10 @@ export function buildHomeTimeline({
       sealed,
       href: `${base}/library/inventory/${i.slug}`,
       title: i.title,
-      imageKey: cover.thumbKey ?? cover.key,
+      imageKey: cover.key,
+      imageThumbKey: cover.thumbKey,
+      imageWidth: cover.width,
+      imageHeight: cover.height,
       imageCount: images.length,
     });
   }
@@ -157,7 +170,10 @@ export function buildHomeTimeline({
       title: t.title,
       text: t.artist,
       durationLabel: formatTrackDuration(t.audio.durationMs),
-      imageKey: t.cover?.thumbKey ?? t.cover?.key,
+      imageKey: t.cover?.key,
+      imageThumbKey: t.cover?.thumbKey,
+      imageWidth: t.cover?.width,
+      imageHeight: t.cover?.height,
     });
   }
 

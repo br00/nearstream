@@ -9,7 +9,11 @@
 // rather than `lib/` because `lib/` is imported by server code that has no
 // business pulling in a module that touches `document`.
 
-export const THUMB_MAX_DIM = 600;
+// Re-exported from lib/thumbnails so the client and server agree by
+// construction rather than by comment. Imported as well as re-exported,
+// because a bare `export … from` doesn't bind the name locally.
+import { THUMB_MAX_DIM } from "@/lib/thumbnails";
+export { THUMB_MAX_DIM };
 const THUMB_QUALITY = 0.85;
 
 /**
