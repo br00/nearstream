@@ -19,6 +19,10 @@ export type Source = {
   siteUrl?: string;
   /** ISO timestamp when this Source was added to your local list. */
   addedAt: string;
+  /** Protocol address (`nearstream.app/gosia`) when this friend shared
+   *  with you through a key (PROTOCOL.md §5). `feedUrl` is then their key
+   *  URL. Absent for feeds added by hand. */
+  address?: string;
 
   /** ISO timestamp of the last successful fetch. Unset until first refresh. */
   lastFetchedAt?: string;

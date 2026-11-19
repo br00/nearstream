@@ -17,6 +17,7 @@ import { Input } from "@/app/_components/input";
 import { Textarea } from "@/app/_components/textarea";
 import { Kicker } from "@/app/_components/kicker";
 import { buttonClasses } from "@/app/_components/button";
+import { VISIBILITY_LEVELS, type Visibility } from "@/schemas/visibility";
 import {
   generateThumbnail,
   putWithProgress,
@@ -49,7 +50,7 @@ export function MusicUploadForm() {
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [description, setDescription] = useState("");
-  const [visibility, setVisibility] = useState<"public" | "private">("public");
+  const [visibility, setVisibility] = useState<Visibility>("public");
   const [state, setState] = useState<FlowState>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -369,7 +370,7 @@ export function MusicUploadForm() {
           <Kicker>Visibility</Kicker>
         </legend>
         <div className="flex gap-3">
-          {(["public", "private"] as const).map((v) => (
+          {VISIBILITY_LEVELS.map((v) => (
             <label
               key={v}
               className="flex cursor-pointer items-center gap-2 border border-border px-4 py-2 transition-colors hover:border-foreground/60 has-[:checked]:border-foreground has-[:checked]:bg-foreground/5"

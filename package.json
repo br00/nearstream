@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "lab": "node scripts/lab/run.mjs",
+    "lab:test": "node scripts/lab/test.mjs"
   },
   "dependencies": {
     "aws4fetch": "^1.0.20",

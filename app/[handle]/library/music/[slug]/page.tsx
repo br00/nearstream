@@ -14,7 +14,7 @@ import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
 import { getSession } from "@/lib/auth";
 import { checkTenantVisibility } from "@/lib/tenant-visibility";
 import { tenantBase } from "@/lib/tenant-domains";
-import { visibilityOf } from "@/schemas/visibility";
+import { isPublic, restrictionLabel } from "@/schemas/visibility";
 import { formatTrackDuration } from "@/schemas/music";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
@@ -78,7 +78,7 @@ export default async function MusicTrackPage({ params }: Props) {
   if (!track) notFound();
 
   const isOwner = session?.userId === user.id;
-  if (visibilityOf(track) === "private" && !isOwner) notFound();
+  if (!isPublic(track) && !isOwner) notFound();
 
   const base = tenantBase(handle);
   const displayName = user.displayName || handle;
@@ -120,11 +120,11 @@ export default async function MusicTrackPage({ params }: Props) {
                   <span className="font-mono tabular-nums">{durationLabel}</span>
                 </>
               )}
-              {visibilityOf(track) === "private" && (
+              {restrictionLabel(track) && (
                 <>
                   {" · "}
                   <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground/70">
-                    Private
+                    {restrictionLabel(track)}
                   </span>
                 </>
               )}
