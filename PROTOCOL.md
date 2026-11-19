@@ -188,6 +188,8 @@ Push notifications ("Gosia posted") go home server → phone via the platform pu
 
 ## 8 — The story
 
+![How the Nearstream Protocol works: Alice shares a key with Bob, posts friends-only, Bob's server reads it with the key, and when she stops sharing the key dies.](./docs/protocol/how-it-works.svg)
+
 Alessandro (`alessandroborelli.it`) and Gosia (`nearstream.app/gosia`):
 
 1. Alessandro types `nearstream.app/gosia` in the app and taps **Share with Gosia**. *(§7)*

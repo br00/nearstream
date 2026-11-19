@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1080" viewBox="0 0 1200 1080" role="img" aria-labelledby="title desc">
+  <title id="title">How the Nearstream Protocol works</title>
+  <desc id="desc">Alice and Bob on two separate servers. Alice shares a key with Bob, posts something friends-only, Bob's server reads it with the key, and when Alice stops sharing the key dies. The post never leaves Alice's server.</desc>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#e4e4e7"/>
+    </marker>
+    <marker id="head-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#a1a1aa"/>
+    </marker>
+    <style>
+      .mono { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .sans { font-family: "Geist", ui-sans-serif, -apple-system, "Helvetica Neue", Arial, sans-serif; }
+      .kicker { font-size: 13px; letter-spacing: 0.2em; fill: #71717a; }
+      .name { font-size: 26px; fill: #e4e4e7; }
+      .addr { font-size: 15px; fill: #a1a1aa; }
+      .label { font-size: 19px; fill: #e4e4e7; }
+      .sub { font-size: 15px; fill: #a1a1aa; }
+      .num { font-size: 14px; fill: #e4e4e7; }
+      .note { font-size: 17px; fill: #e4e4e7; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="1080" fill="#000"/>
+
+  <!-- Header -->
+  <text x="60" y="64" class="mono kicker">NEARSTREAM PROTOCOL · V0.1</text>
+  <text x="60" y="104" class="sans name">Your posts stay on your server. Friends come and read them.</text>
+
+  <!-- Servers -->
+  <rect x="150" y="150" width="340" height="96" fill="none" stroke="#e4e4e7" stroke-width="1.5"/>
+  <text x="320" y="190" text-anchor="middle" class="sans name">Alice’s server</text>
+  <text x="320" y="222" text-anchor="middle" class="mono addr">alice.example</text>
+
+  <rect x="710" y="150" width="340" height="96" fill="none" stroke="#e4e4e7" stroke-width="1.5"/>
+  <text x="880" y="190" text-anchor="middle" class="sans name">Bob’s server</text>
+  <text x="880" y="222" text-anchor="middle" class="mono addr">bob.example</text>
+
+  <!-- Lifelines -->
+  <line x1="320" y1="246" x2="320" y2="960" stroke="#27272a" stroke-width="2"/>
+  <line x1="880" y1="246" x2="880" y2="960" stroke="#27272a" stroke-width="2"/>
+
+  <!-- 1 · share -->
+  <circle cx="80" cy="310" r="16" fill="none" stroke="#71717a"/>
+  <text x="80" y="315" text-anchor="middle" class="mono num">1</text>
+  <text x="600" y="290" text-anchor="middle" class="mono label">ring · share</text>
+  <line x1="324" y1="310" x2="874" y2="310" stroke="#e4e4e7" stroke-width="1.5" marker-end="url(#head)"/>
+  <text x="600" y="338" text-anchor="middle" class="sans sub">“I want to share with you. Here’s your key.”</text>
+
+  <!-- 2 · verify -->
+  <circle cx="80" cy="410" r="16" fill="none" stroke="#71717a"/>
+  <text x="80" y="415" text-anchor="middle" class="mono num">2</text>
+  <text x="600" y="390" text-anchor="middle" class="sans label">checks the key really lives on Alice’s server</text>
+  <line x1="876" y1="410" x2="326" y2="410" stroke="#a1a1aa" stroke-width="1.5" stroke-dasharray="7 6" marker-end="url(#head-muted)"/>
+
+  <!-- 3 · accept -->
+  <circle cx="80" cy="490" r="16" fill="none" stroke="#71717a"/>
+  <text x="80" y="495" text-anchor="middle" class="mono num">3</text>
+  <rect x="720" y="466" width="320" height="48" fill="#000" stroke="#27272a"/>
+  <text x="880" y="496" text-anchor="middle" class="sans note">Bob accepts</text>
+
+  <!-- 4 · post -->
+  <circle cx="80" cy="580" r="16" fill="none" stroke="#71717a"/>
+  <text x="80" y="585" text-anchor="middle" class="mono num">4</text>
+  <rect x="160" y="548" width="320" height="64" fill="#000" stroke="#e4e4e7" stroke-width="1.5"/>
+  <text x="320" y="575" text-anchor="middle" class="sans note">Alice posts · friends only</text>
+  <text x="320" y="599" text-anchor="middle" class="sans sub">stored here, and only here</text>
+
+  <!-- 5 · ring new -->
+  <circle cx="80" cy="680" r="16" fill="none" stroke="#71717a"/>
+  <text x="80" y="685" text-anchor="middle" class="mono num">5</text>
+  <text x="600" y="660" text-anchor="middle" class="mono label">ring · new</text>
+  <line x1="324" y1="680" x2="874" y2="680" stroke="#e4e4e7" stroke-width="1.5" marker-end="url(#head)"/>
+  <text x="600" y="708" text-anchor="middle" class="sans sub">a knock, not a delivery. No content.</text>
+
+  <!-- 6 · read -->
+  <circle cx="80" cy="780" r="16" fill="none" stroke="#71717a"/>
+  <text x="80" y="785" text-anchor="middle" class="mono num">6</text>
+  <text x="600" y="760" text-anchor="middle" class="sans label">Bob’s server reads it, with Bob’s key</text>
+  <line x1="876" y1="780" x2="326" y2="780" stroke="#a1a1aa" stroke-width="1.5" stroke-dasharray="7 6" marker-end="url(#head-muted)"/>
+  <text x="600" y="808" text-anchor="middle" class="mono sub">alice.example/feed/k_9fQ2…</text>
+
+  <!-- 7 · revoke -->
+  <circle cx="80" cy="890" r="16" fill="none" stroke="#71717a"/>
+  <text x="80" y="895" text-anchor="middle" class="mono num">7</text>
+  <rect x="160" y="858" width="320" height="64" fill="#000" stroke="#27272a"/>
+  <text x="320" y="885" text-anchor="middle" class="sans note">Alice stops sharing</text>
+  <text x="320" y="909" text-anchor="middle" class="mono sub">key → 410 Gone</text>
+  <rect x="720" y="858" width="320" height="64" fill="#000" stroke="#27272a"/>
+  <text x="880" y="885" text-anchor="middle" class="sans note">Alice’s posts disappear</text>
+  <text x="880" y="909" text-anchor="middle" class="sans sub">from Bob’s reader</text>
+
+  <!-- Footer -->
+  <line x1="60" y1="990" x2="1140" y2="990" stroke="#27272a"/>
+  <text x="60" y="1030" class="sans sub">Nothing is copied between servers. No platform in the middle. Stop sharing and the key dies.</text>
+  <text x="1140" y="1030" text-anchor="end" class="mono kicker">NEARSTREAM.APP</text>
+</svg>
