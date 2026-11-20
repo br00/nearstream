@@ -64,5 +64,12 @@ export function envFor(instance) {
     ALLOWED_EMAILS: instance.people.map((p) => p.email).join(","),
     NEARSTREAM_PROTOCOL_ALLOW_HTTP: "1",
     NEARSTREAM_DOORBELL_MIN_INTERVAL_MS: "0",
+    // Own cookie per instance, so nothing else on localhost (the other lab
+    // instance, a normal `npm run dev` on :3000) can replace this session.
+    NEARSTREAM_SESSION_COOKIE: sessionCookieFor(instance),
   };
+}
+
+export function sessionCookieFor(instance) {
+  return `nearstream_lab_${instance.name.toLowerCase()}_session`;
 }

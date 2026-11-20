@@ -4,6 +4,7 @@
 // stops both. Exit code 0 = the protocol works.
 
 import { INSTANCES, startInstance, stopAll, waitReady } from "./instances.mjs";
+import { sessionCookieFor } from "./config.mjs";
 
 const A = INSTANCES.a;
 const B = INSTANCES.b;
@@ -58,7 +59,7 @@ async function signIn(instance, person) {
   });
   const cookie = (cb.headers.getSetCookie?.() ?? [])
     .map((c) => c.split(";")[0])
-    .find((c) => c.startsWith("nearstream_session="));
+    .find((c) => c.startsWith(`${sessionCookieFor(instance)}=`));
   if (!cookie) throw new Error(`sign-in failed for ${person.email} (${cb.status})`);
   const form = new FormData();
   form.set("handle", person.handle);
