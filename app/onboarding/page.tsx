@@ -69,7 +69,11 @@ export default async function OnboardingPage({ searchParams }: Props) {
                 name="handle"
                 required
                 autoFocus
-                placeholder="gosia"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="yourname"
                 pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
                 minLength={2}
                 maxLength={32}
@@ -85,7 +89,9 @@ export default async function OnboardingPage({ searchParams }: Props) {
                 name="displayName"
                 required
                 maxLength={80}
-                placeholder="Gosia Tymczak"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="How your friends know you"
               />
             </label>
 

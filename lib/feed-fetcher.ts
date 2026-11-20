@@ -77,6 +77,15 @@ export async function refreshSource(
     return { status: "not-modified", sourceId: id, added: 0, notModified: true };
   }
 
+  // 410 = the friend revoked our key (PROTOCOL.md §5). Final, unlike 404:
+  // drop their posts *and* the friend, so they vanish from the reader and
+  // the friends list on the same refresh.
+  if (res.status === 410) {
+    await feedEntryStore.deleteBySource(userId, id);
+    await sourceStore.delete(userId, id);
+    return { status: "error", sourceId: id, error: "HTTP 410 — no longer shared" };
+  }
+
   // 404 = source is gone. Could be the friend deleted their tenant, or
   // (slice 36) flipped their site to `private` — either way we should
   // purge cached entries so the reader doesn't keep showing stale posts

@@ -5,6 +5,7 @@ import { isVisibility, type Visibility } from "@/schemas/visibility";
 import { getSession } from "@/lib/auth";
 import { userStore } from "@/lib/user-store";
 import { tenantBase } from "@/lib/tenant-domains";
+import { announceNew } from "@/lib/sharing";
 
 const TITLE_MAX = 200;
 const BODY_MAX = 50_000;
@@ -97,6 +98,9 @@ export async function POST(request: Request) {
   });
 
   const user = await userStore.getById(session.userId);
+  // Ring everyone you share with (PROTOCOL.md §6). Private posts are in
+  // no feed, so there's nothing to announce.
+  if (user?.handle && visibility !== "private") announceNew(user);
   const handle = user?.handle ?? "";
   revalidatePath(`/${handle}`);
   revalidatePath(`/${handle}/library`);

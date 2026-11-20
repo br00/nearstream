@@ -7,6 +7,11 @@ import { Kicker } from "@/app/_components/kicker";
 import { buttonClasses } from "@/app/_components/button";
 import { INVENTORY_STATUSES } from "@/schemas/inventory";
 import {
+  VISIBILITY_DESCRIPTIONS,
+  VISIBILITY_LEVELS,
+  type Visibility,
+} from "@/schemas/visibility";
+import {
   generateThumbnail,
   putWithProgress,
 } from "@/app/_components/upload-helpers";
@@ -42,7 +47,7 @@ export function InventoryUploadForm() {
   const [edition, setEdition] = useState("");
   const [status, setStatus] = useState<string>("");
   const [price, setPrice] = useState("");
-  const [visibility, setVisibility] = useState<"public" | "private">("public");
+  const [visibility, setVisibility] = useState<Visibility>("public");
   const [state, setState] = useState<FlowState>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -468,7 +473,7 @@ export function InventoryUploadForm() {
           <Kicker>Visibility</Kicker>
         </legend>
         <div className="flex flex-col gap-2">
-          {(["public", "private"] as const).map((level) => (
+          {VISIBILITY_LEVELS.map((level) => (
             <label
               key={level}
               className="flex items-baseline gap-3 cursor-pointer border border-border p-3 transition-colors hover:border-foreground/60 has-[:checked]:border-foreground has-[:checked]:bg-foreground/5"
@@ -487,9 +492,7 @@ export function InventoryUploadForm() {
                   {level}
                 </span>
                 <span className="text-[12px] text-muted-soft">
-                  {level === "public"
-                    ? "Anyone with the URL."
-                    : "Only you. Hidden from the public site and your RSS feed."}
+                  {VISIBILITY_DESCRIPTIONS[level]}
                 </span>
               </span>
             </label>

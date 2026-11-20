@@ -6,7 +6,7 @@ import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { checkTenantVisibility, resolveSitePrivacy } from "@/lib/tenant-visibility";
 import { tenantBase } from "@/lib/tenant-domains";
-import { visibilityOf } from "@/schemas/visibility";
+import { isPublic } from "@/schemas/visibility";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { DeleteButton } from "@/app/_components/delete-button";
@@ -66,7 +66,7 @@ export async function generateMetadata({ params }: Props) {
   // private essays are still excluded below.
   const indexable =
     resolveSitePrivacy(user) === "public" &&
-    visibilityOf(essay) === "public";
+    isPublic(essay);
 
   return {
     title,
@@ -107,8 +107,8 @@ export default async function EssayPage({ params }: Props) {
   }
   if (!essay) notFound();
   const isOwner = session?.userId === user.id;
-  // Private essays 404 for non-owners — don't even leak that the slug exists.
-  if (visibilityOf(essay) === "private" && !isOwner) notFound();
+  // Non-public essays 404 for non-owners — don't even leak that the slug exists.
+  if (!isPublic(essay) && !isOwner) notFound();
 
   const html = await marked.parse(essay.body, { async: true });
 

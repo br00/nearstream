@@ -8,7 +8,7 @@ import { normalizeVoiceViz } from "@/lib/voice-viz-variants";
 import { getSession } from "@/lib/auth";
 import { checkTenantVisibility } from "@/lib/tenant-visibility";
 import { tenantBase } from "@/lib/tenant-domains";
-import { visibilityOf } from "@/schemas/visibility";
+import { isPublic, restrictionLabel } from "@/schemas/visibility";
 import { AudioPlayer } from "@/app/_components/audio-player";
 import { linkHref, type LibraryLink } from "@/schemas/stream";
 import { PageShell } from "@/app/_components/page-shell";
@@ -67,7 +67,7 @@ export default async function StreamArchive({ params }: Props) {
   const isOwner = session?.userId === user.id;
   const entries = isOwner
     ? allEntries
-    : allEntries.filter((e) => visibilityOf(e) === "public");
+    : allEntries.filter((e) => isPublic(e));
 
   const essayTitles = new Map(essays.map((e) => [e.slug, e.title]));
   const inventoryTitles = new Map(inventoryItems.map((i) => [i.slug, i.title]));
@@ -130,9 +130,9 @@ export default async function StreamArchive({ params }: Props) {
                       {formatRelative(entry.publishedAt)}
                     </time>
                     <TagChip>{entry.tag}</TagChip>
-                    {visibilityOf(entry) === "private" && (
+                    {restrictionLabel(entry) && (
                       <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground/70">
-                        Private
+                        {restrictionLabel(entry)}
                       </span>
                     )}
                     {isOwner && (

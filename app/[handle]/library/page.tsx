@@ -9,7 +9,7 @@ import { formatTrackDuration } from "@/schemas/music";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
 import { tenantBase } from "@/lib/tenant-domains";
-import { visibilityOf } from "@/schemas/visibility";
+import { isPublic, restrictionLabel } from "@/schemas/visibility";
 import { PageShell } from "@/app/_components/page-shell";
 import { Kicker } from "@/app/_components/kicker";
 import { DeleteButton } from "@/app/_components/delete-button";
@@ -39,7 +39,8 @@ type LibraryEntry =
       title: string;
       href: string;
       publishedAt: string;
-      isPrivate: boolean;
+      /** Owner-only badge ("Friends" / "Private"); null when public. */
+      badge: string | null;
     }
   | {
       type: "music";
@@ -52,7 +53,8 @@ type LibraryEntry =
       imageKey?: string;
       /** "0:00" or "" — rendered next to the type chip. */
       durationLabel: string;
-      isPrivate: boolean;
+      /** Owner-only badge ("Friends" / "Private"); null when public. */
+      badge: string | null;
     }
   | {
       type: "inventory";
@@ -65,7 +67,8 @@ type LibraryEntry =
       /** Count of images in the inventory item — drives the "· N" badge
        *  on the cover thumb when > 1. */
       imageCount: number;
-      isPrivate: boolean;
+      /** Owner-only badge ("Friends" / "Private"); null when public. */
+      badge: string | null;
     };
 
 function formatDate(iso: string): string {
@@ -98,13 +101,13 @@ export default async function LibraryPage({ params }: Props) {
   const isOwner = session?.userId === user.id;
   const essays = isOwner
     ? allEssays
-    : allEssays.filter((e) => visibilityOf(e) === "public");
+    : allEssays.filter((e) => isPublic(e));
   const items = isOwner
     ? allItems
-    : allItems.filter((i) => visibilityOf(i) === "public");
+    : allItems.filter((i) => isPublic(i));
   const tracks = isOwner
     ? allTracks
-    : allTracks.filter((t) => visibilityOf(t) === "public");
+    : allTracks.filter((t) => isPublic(t));
   const base = tenantBase(handle);
 
   const entries: LibraryEntry[] = [
@@ -116,7 +119,7 @@ export default async function LibraryPage({ params }: Props) {
         title: e.title,
         href: `${base}/library/${e.slug}`,
         publishedAt: e.publishedAt,
-        isPrivate: visibilityOf(e) === "private",
+        badge: restrictionLabel(e),
       }),
     ),
     ...tracks.map(
@@ -129,7 +132,7 @@ export default async function LibraryPage({ params }: Props) {
         publishedAt: t.publishedAt,
         imageKey: t.cover?.thumbKey ?? t.cover?.key,
         durationLabel: formatTrackDuration(t.audio.durationMs),
-        isPrivate: visibilityOf(t) === "private",
+        badge: restrictionLabel(t),
       }),
     ),
     ...items
@@ -146,7 +149,7 @@ export default async function LibraryPage({ params }: Props) {
           publishedAt: i.publishedAt,
           imageKey: cover.thumbKey ?? cover.key,
           imageCount: all.length,
-          isPrivate: visibilityOf(i) === "private",
+          badge: restrictionLabel(i),
         };
       })
       .filter((e): e is LibraryEntry => e !== null),
@@ -256,9 +259,9 @@ export default async function LibraryPage({ params }: Props) {
                             {entry.durationLabel}
                           </span>
                         )}
-                        {entry.isPrivate && (
+                        {entry.badge && (
                           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground/70">
-                            Private
+                            {entry.badge}
                           </span>
                         )}
                       </div>

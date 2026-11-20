@@ -17,6 +17,8 @@ import { MonoSubmitButton } from "@/app/_components/mono-submit-button";
 import { Input } from "@/app/_components/input";
 import { Kicker } from "@/app/_components/kicker";
 import { timeAgo } from "@/lib/time-ago";
+import { shareStore } from "@/lib/share-store";
+import { addressOf } from "@/lib/protocol";
 
 export const dynamic = "force-dynamic";
 
@@ -25,19 +27,38 @@ export const metadata = {
 };
 
 type Props = {
-  searchParams: Promise<{ "friend-error"?: string }>;
+  searchParams: Promise<{
+    "friend-error"?: string;
+    "share-error"?: string;
+    share?: string;
+  }>;
+};
+
+// One line of confirmation per sharing action (PROTOCOL.md §8).
+const SHARE_STATUS: Record<string, string> = {
+  sent: "Shared. They’ll see it once they accept.",
+  accepted: "Accepted. Their posts are in your reader.",
+  ignored: "Ignored.",
+  revoked: "Stopped sharing. They no longer see your friends-only posts.",
 };
 
 export default async function FriendsPage({ searchParams }: Props) {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [sources, user] = await Promise.all([
+  const [sources, user, keys, pending] = await Promise.all([
     sourceStore.list(session.userId),
     userStore.getById(session.userId),
+    shareStore.liveKeys(session.userId),
+    shareStore.listPending(session.userId),
   ]);
   const handle = user?.handle ?? "";
-  const { "friend-error": friendError } = await searchParams;
+  const myAddress = user?.handle ? addressOf(user) : null;
+  const {
+    "friend-error": friendError,
+    "share-error": shareError,
+    share: shareStatus,
+  } = await searchParams;
 
   const navLinkClasses =
     "font-mono text-[11px] uppercase tracking-[0.2em] text-muted transition-colors hover:text-foreground";
@@ -83,6 +104,52 @@ export default async function FriendsPage({ searchParams }: Props) {
             </div>
           )}
 
+          {shareError && (
+            <div
+              role="alert"
+              className="mt-8 border-l-2 border-foreground/50 pl-4 py-2"
+            >
+              <Kicker>Could not share</Kicker>
+              <p className="mt-1 text-sm text-muted">{shareError}</p>
+            </div>
+          )}
+
+          {shareStatus && SHARE_STATUS[shareStatus] && (
+            <div role="status" className="mt-8 border-l-2 border-border pl-4 py-2">
+              <p className="text-sm text-muted">{SHARE_STATUS[shareStatus]}</p>
+            </div>
+          )}
+
+          {pending.length > 0 && (
+            <ul className="mt-12 flex flex-col gap-4">
+              {pending.map((p) => (
+                <li key={p.id} className="border border-border p-4">
+                  <p className="text-sm text-foreground">
+                    {p.fromName} wants to share with you.
+                  </p>
+                  <p className="mt-1 font-mono text-[11px] text-muted-soft">
+                    {p.fromAddress}
+                  </p>
+                  <div className="mt-4 flex items-center gap-6">
+                    <form action={`/api/pending-shares/${p.id}/accept`} method="POST">
+                      <MonoSubmitButton pendingLabel="Accepting…">
+                        Accept
+                      </MonoSubmitButton>
+                    </form>
+                    <form action={`/api/pending-shares/${p.id}/ignore`} method="POST">
+                      <button
+                        type="submit"
+                        className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
+                      >
+                        Ignore
+                      </button>
+                    </form>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
           {sources.length > 0 && (
             <ul className="mt-12 flex flex-col">
               {sources.map((source) => (
@@ -105,8 +172,9 @@ export default async function FriendsPage({ searchParams }: Props) {
                         {source.name}
                       </div>
                     )}
+                    {/* A key URL is a credential — show the address, never the key. */}
                     <div className="mt-1 truncate font-mono text-[11px] text-muted-soft">
-                      {source.feedUrl}
+                      {source.address ?? source.feedUrl}
                     </div>
                     {source.lastError ? (
                       <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-foreground/80">
@@ -151,7 +219,75 @@ export default async function FriendsPage({ searchParams }: Props) {
           <hr className="mt-16 border-border" />
 
           <div className="mt-12">
-            <Kicker>Add a friend</Kicker>
+            <Kicker>Share with someone</Kicker>
+            <p className="mt-2 text-sm leading-relaxed text-muted-soft">
+              They&rsquo;ll see your friends-only posts once they accept.
+              {myAddress && (
+                <>
+                  {" "}Your address is{" "}
+                  <code className="font-mono text-foreground">{myAddress}</code>{" "}
+                  — give it to people you want to hear from.
+                </>
+              )}
+            </p>
+            <form
+              action="/api/shares"
+              method="POST"
+              className="mt-8 flex flex-col gap-8"
+            >
+              <label className="flex flex-col gap-2">
+                <Kicker>Their address</Kicker>
+                <Input
+                  name="address"
+                  required
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="nearstream.app/their-handle"
+                />
+              </label>
+              <SubmitButton pendingLabel="Sharing…" className="self-start">
+                Share
+              </SubmitButton>
+            </form>
+
+            {keys.length > 0 && (
+              <>
+                <div className="mt-12">
+                  <Kicker>You share with</Kicker>
+                </div>
+                <ul className="mt-4 flex flex-col">
+                  {keys.map((k) => (
+                    <li
+                      key={k.token}
+                      className="flex items-start justify-between gap-4 border-t border-border py-4 first:border-t-0"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-foreground">{k.friendName}</div>
+                        <div className="mt-1 truncate font-mono text-[11px] text-muted-soft">
+                          {k.friendAddress}
+                        </div>
+                      </div>
+                      <form action={`/api/shares/${k.token}/revoke`} method="POST">
+                        <button
+                          type="submit"
+                          className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-soft transition-colors hover:text-foreground"
+                        >
+                          Stop sharing
+                        </button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+
+          <hr className="mt-16 border-border" />
+
+          <div className="mt-12">
+            <Kicker>Add a feed by hand</Kicker>
             <p className="mt-2 text-sm leading-relaxed text-muted-soft">
               You need their RSS feed URL — usually something like{" "}
               <code className="font-mono">site.com/rss.xml</code>. If they
@@ -171,7 +307,9 @@ export default async function FriendsPage({ searchParams }: Props) {
                   name="name"
                   required
                   maxLength={80}
-                  placeholder="Marco"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="What you call them"
                 />
               </label>
 
@@ -181,7 +319,8 @@ export default async function FriendsPage({ searchParams }: Props) {
                   name="feedUrl"
                   type="url"
                   required
-                  placeholder="https://marco.xyz/rss.xml"
+                  autoComplete="off"
+                  placeholder="https://example.com/rss.xml"
                 />
               </label>
 
@@ -190,7 +329,8 @@ export default async function FriendsPage({ searchParams }: Props) {
                 <Input
                   name="siteUrl"
                   type="url"
-                  placeholder="https://marco.xyz"
+                  autoComplete="off"
+                  placeholder="https://example.com"
                 />
               </label>
 

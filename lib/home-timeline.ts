@@ -26,7 +26,7 @@ import type { Essay } from "@/schemas/essay";
 import type { InventoryItem } from "@/schemas/inventory";
 import type { MusicTrack } from "@/schemas/music";
 import { imagesOf } from "@/schemas/inventory";
-import { visibilityOf } from "@/schemas/visibility";
+import { isPublic } from "@/schemas/visibility";
 import { formatTrackDuration } from "@/schemas/music";
 
 export type HomeEntryKind =
@@ -106,7 +106,7 @@ export function buildHomeTimeline({
   const drafts: Draft[] = [];
 
   for (const e of entries) {
-    const sealed = visibilityOf(e) === "private";
+    const sealed = !isPublic(e);
     if (sealed && !isOwner) continue;
     if (e.audio) {
       drafts.push({
@@ -136,7 +136,7 @@ export function buildHomeTimeline({
   }
 
   for (const i of inventory) {
-    const sealed = visibilityOf(i) === "private";
+    const sealed = !isPublic(i);
     if (sealed && !isOwner) continue;
     const images = imagesOf(i);
     const cover = images[0];
@@ -157,7 +157,7 @@ export function buildHomeTimeline({
   }
 
   for (const t of tracks) {
-    const sealed = visibilityOf(t) === "private";
+    const sealed = !isPublic(t);
     if (sealed && !isOwner) continue;
     drafts.push({
       id: t.id,
@@ -176,7 +176,7 @@ export function buildHomeTimeline({
   }
 
   for (const e of essays) {
-    const sealed = visibilityOf(e) === "private";
+    const sealed = !isPublic(e);
     if (sealed && !isOwner) continue;
     drafts.push({
       id: e.id,

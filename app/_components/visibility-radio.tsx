@@ -1,10 +1,9 @@
 import { Kicker } from "./kicker";
-import { VISIBILITY_LEVELS, type Visibility } from "@/schemas/visibility";
-
-const DESCRIPTIONS: Record<Visibility, string> = {
-  public: "Anyone with the URL.",
-  private: "Only you. Hidden from the public site and from your RSS feed.",
-};
+import {
+  VISIBILITY_DESCRIPTIONS as DESCRIPTIONS,
+  VISIBILITY_LEVELS,
+  type Visibility,
+} from "@/schemas/visibility";
 
 interface Props {
   /** Form field name. Default "visibility". */
