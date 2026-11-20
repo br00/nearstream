@@ -1,6 +1,11 @@
 import { cookies } from "next/headers";
 
-const SESSION_COOKIE = "nearstream_session";
+// Overridable so two instances on one machine can't overwrite each other's
+// session: browsers key cookies by hostname and ignore the port, so
+// `localhost:3001` and `localhost:3000` share one cookie jar. The protocol
+// lab gives each instance its own name. Unset everywhere else.
+const SESSION_COOKIE =
+  process.env.NEARSTREAM_SESSION_COOKIE || "nearstream_session";
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const MAGIC_LINK_TTL_SECONDS = 15 * 60;
 
