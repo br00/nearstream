@@ -240,10 +240,11 @@ export default async function FriendsPage({ searchParams }: Props) {
                 <Input
                   name="address"
                   required
+                  autoComplete="off"
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  placeholder="nearstream.app/gosia"
+                  placeholder="nearstream.app/their-handle"
                 />
               </label>
               <SubmitButton pendingLabel="Sharing…" className="self-start">
@@ -306,7 +307,9 @@ export default async function FriendsPage({ searchParams }: Props) {
                   name="name"
                   required
                   maxLength={80}
-                  placeholder="Marco"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="What you call them"
                 />
               </label>
 
@@ -316,7 +319,8 @@ export default async function FriendsPage({ searchParams }: Props) {
                   name="feedUrl"
                   type="url"
                   required
-                  placeholder="https://marco.xyz/rss.xml"
+                  autoComplete="off"
+                  placeholder="https://example.com/rss.xml"
                 />
               </label>
 
@@ -325,7 +329,8 @@ export default async function FriendsPage({ searchParams }: Props) {
                 <Input
                   name="siteUrl"
                   type="url"
-                  placeholder="https://marco.xyz"
+                  autoComplete="off"
+                  placeholder="https://example.com"
                 />
               </label>
 
