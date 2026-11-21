@@ -39,6 +39,7 @@ export class R2Store implements Store {
       visibility: input.visibility ?? "public",
       ...(input.link ? { link: input.link } : {}),
       ...(input.audio ? { audio: input.audio } : {}),
+      ...(input.clientId ? { clientId: input.clientId } : {}),
     };
     const body = JSON.stringify(entry);
     const res = await this.client.fetch(

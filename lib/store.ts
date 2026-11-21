@@ -40,6 +40,7 @@ class InMemoryStore implements Store {
       visibility: input.visibility ?? "public",
       ...(input.link ? { link: input.link } : {}),
       ...(input.audio ? { audio: input.audio } : {}),
+      ...(input.clientId ? { clientId: input.clientId } : {}),
     };
     this.bucket(userId).push(entry);
     return entry;

@@ -41,6 +41,40 @@ export async function sendMagicLink(to: string, url: string): Promise<void> {
   });
 }
 
+/** Sign-in email for the native app (docs/app/API.md §2). Carries both the
+ *  `nearstream://` link (tapped on the phone) and the code typed out (for
+ *  when the email is open on a laptop). Either is worthless without the
+ *  verifier the app holds in memory. */
+export async function sendAppSignIn(
+  to: string,
+  { link, code }: { link: string; code: string },
+): Promise<void> {
+  const spaced = `${code.slice(0, 4)} ${code.slice(4)}`;
+  await sendEmail({
+    to,
+    subject: "Your Nearstream sign-in code",
+    text: [
+      "Sign in to the Nearstream app",
+      "",
+      "On your phone, tap this link:",
+      "",
+      link,
+      "",
+      `Or type this code into the app: ${spaced}`,
+      "",
+      "The code expires in 15 minutes. If you didn't ask for it, ignore this email.",
+    ].join("\n"),
+    html: renderEmail({
+      title: "Sign in to the Nearstream app",
+      lead: `On your phone, tap the button. Or type this code into the app:<br><br><span style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:22px;letter-spacing:4px;color:#e4e4e7;">${escapeHtml(spaced)}</span>`,
+      buttonLabel: "Open the app",
+      url: link,
+      footer:
+        "The code expires in 15 minutes. If you didn&rsquo;t ask for it, you can ignore this email.",
+    }),
+  });
+}
+
 /** Welcome email — used when the host approves an access request. Same
  *  magic-link mechanics under the hood; different framing so the new
  *  friend knows they're being welcomed rather than getting a routine
@@ -115,6 +149,15 @@ async function sendEmail(params: {
     console.log(
       `[nearstream] email: dev mode (no RESEND_API_KEY/RESEND_FROM) — would send to ${params.to}:\n  subject: ${params.subject}\n  ${params.text.split("\n").find((l) => l.startsWith("http")) ?? ""}`,
     );
+    // Protocol lab only (scripts/lab/config.mjs sets it): print the whole
+    // text body so `npm run lab:test` can read an app sign-in code the way
+    // a person reads the email. Never set where real email goes out — and
+    // it can't matter there, because this branch only runs without Resend.
+    if (process.env.NEARSTREAM_LAB_EMAIL_LOG === "1") {
+      console.log(
+        `[nearstream-lab-email] to=${params.to}\n${params.text}\n[/nearstream-lab-email]`,
+      );
+    }
     return;
   }
 

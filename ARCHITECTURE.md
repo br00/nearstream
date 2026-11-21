@@ -126,6 +126,35 @@ The contract is [`PROTOCOL.md`](./PROTOCOL.md); this is where it lives in the co
 
 Storage: `users/{id}/keys/{token}.json` (keys you issued) and `users/{id}/pending-shares/{id}.json` (shares waiting for you), both via `lib/json-collection.ts`.
 
+## The app API (v1)
+
+The contract is [`docs/app/API.md`](./docs/app/API.md): what the native app talks to. It is a thin layer over the same stores and protocol functions the web routes use. Only the auth is new.
+
+```
+  app/api/v1/
+    auth/start   POST  email + PKCE challenge → 202 always; after(): allowlist? → code + email
+    auth/token   POST  code + verifier → nst_ token + me
+    me · devices · devices/[id]
+    reader · reader/refresh            feedEntryStore / refreshAllSources
+    lines · lines/[id]                 store + announceNew (lib/app-lines.ts)
+    friends · sharing · sharing/[id]   sourceStore / shareStore / shareWith / revoke
+    pending/[id]/accept|ignore         acceptShare / ignoreShare
+
+  lib/api-v1.ts        requireUser(request) (bearer), error envelope, v1() wrapper,
+                       prefixed opaque ids, cursor paging, in-memory RateLimit
+  lib/api-v1-views.ts  every response shape, built here and only here
+  lib/app-auth.ts      codes + device tokens (SHA-256 only, constant-time PKCE check)
+  lib/app-lines.ts     clientId idempotency for POST /lines
+  lib/sign-in.ts       findOrCreateUser(), shared with /auth/callback
+```
+
+- **Two auth paths, one allowlist.** The web keeps signed session cookies (`lib/auth.ts`); the app sends `Authorization: Bearer nst_…`. Both check `isEmailAllowed()` and create users through `findOrCreateUser()`. Nothing in v1 reads the cookie, and no web route reads the bearer token.
+- **Storage** (all `lib/json-collection.ts`): `auth-codes/{sha256(code)}` (15 min, single use, deleted after 5 wrong verifiers), `device-tokens/{sha256(token)}` → user (the bearer lookup), `users/{id}/devices/{sha256(token)}` (the row `/devices` lists; `lastUsedAt` written at most once a minute), `users/{id}/line-clients/{clientId}` → Line id. Codes and tokens are never stored or logged in the clear.
+- **No key ever leaves.** Response shapes live in `lib/api-v1-views.ts`, which never reads `Source.feedUrl` (a key URL for key friends) and derives `sharing[].id` as an HMAC of the key token. The lab checks every v1 body for `/feed/k_`. Known gap: media URLs *inside* friends' key feeds carry the key, and `/reader` passes them through (API.md §10.7).
+- **Reader visibility.** `FeedEntry.visibility` (`"friends"` or absent) is parsed from `<nearstream:visibility>`, so the app can mark friends-only items.
+- **Discovery** gains `api: {instance}/api/v1` in `.well-known/nearstream`.
+- **Lab.** `npm run lab:test` signs Alice and Bob in through `/auth/start` + `/auth/token`. It reads the code from the instance log, which prints whole emails only under `NEARSTREAM_LAB_EMAIL_LOG=1` with Resend unset. Then it runs Lines with clientId retries, the reader, sharing / accept / stop-sharing, device revocation and the key-leak scan over v1, for 59 checks in total. `LAB_PORT_A` / `LAB_PORT_B` move the lab off 3001/3002 when those are busy.
+
 ## The auth flow (slice 3)
 
 ```

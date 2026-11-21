@@ -173,7 +173,7 @@ Revocation needs no ring of its own: revoke the key, ring `new`, the friend's ne
 
 ## 7 — Client ↔ home server
 
-**Partly built.** The web app's sharing routes exist (`/api/shares`, `/api/shares/{token}/revoke`, `/api/pending-shares/{id}/accept|ignore`, and the share UI on `/reader/friends`). The versioned `/api/v1` for native apps, with token sign-in, is **proposed** and belongs in the app design doc.
+**Partly built.** The web app's sharing routes exist (`/api/shares`, `/api/shares/{token}/revoke`, `/api/pending-shares/{id}/accept|ignore`, and the share UI on `/reader/friends`). The versioned `/api/v1` for native apps, with token sign-in, is **built** and specified in [`docs/app/API.md`](./docs/app/API.md).
 
 An app only ever talks to its own home server. Servers talk to each other (§6). The app needs to:
 - sign in (magic link → token)
@@ -204,7 +204,7 @@ Alessandro (`alessandroborelli.it`) and Gosia (`nearstream.app/gosia`):
 
 If Gosia wants to share back, she runs steps 1–5 the other way.
 
-**Run it.** `npm run lab:test` acts this story out between two real instances on your laptop: Alice and Carol on `localhost:3001`, Bob on `127.0.0.1:3002`. It covers sharing across instances and within one, friends-only and private posts, a forged share, junk rings, and revocation, with 23 checks. `npm run lab` starts the same two instances and leaves them running, so you can do it by hand in two browser windows. Both use in-memory storage only.
+**Run it.** `npm run lab:test` acts this story out between two real instances on your laptop: Alice and Carol on `localhost:3001`, Bob on `127.0.0.1:3002`. It covers sharing across instances and within one, friends-only and private posts, a forged share, junk rings, and revocation, with 23 checks, then the app API on top (36 more). `npm run lab` starts the same two instances and leaves them running, so you can do it by hand in two browser windows. Both use in-memory storage only.
 
 ## 9 — Not in v0.1
 
