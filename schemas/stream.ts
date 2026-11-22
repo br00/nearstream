@@ -50,11 +50,15 @@ export type StreamEntry = {
   /** Voice-note attachment. When present, `text` may be empty — it's the
    *  optional caption, not the primary content. */
   audio?: StreamAudio;
+  /** Set by the native app (docs/app/API.md §5): the app's own id for the
+   *  Line, so a retried POST returns the first one instead of a copy.
+   *  Absent for Lines posted on the web. */
+  clientId?: string;
 };
 
 export type NewStreamEntry = Pick<
   StreamEntry,
-  "text" | "tag" | "link" | "visibility" | "audio"
+  "text" | "tag" | "link" | "visibility" | "audio" | "clientId"
 >;
 
 /** Hard cap on voice-note length. WhatsApp does 120s; Nearstream's slower

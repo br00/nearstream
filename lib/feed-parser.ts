@@ -91,6 +91,9 @@ function parseRssChannel(channel: any, sourceId: string): ParseResult {
       image,
       images: images.length > 0 ? images : undefined,
       audio,
+      ...(textOf(item["nearstream:visibility"]) === "friends"
+        ? { visibility: "friends" as const }
+        : {}),
     });
   }
 

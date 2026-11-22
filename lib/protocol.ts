@@ -21,6 +21,8 @@ export type DiscoveryDoc = {
   feed: string;
   doorbell: string;
   keys: string;
+  /** App API base (docs/app/API.md §1). Optional; servers don't parse it. */
+  api?: string;
 };
 
 /** Doorbell rings (§6). Content-free by design. */

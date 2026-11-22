@@ -99,6 +99,10 @@ export type FeedEntry = {
   /** Voice-note attachment (slice 39). Present when `type === "voice"`,
    *  populated from `<nearstream:audio>` or a fallback audio `<enclosure>`. */
   audio?: FeedEntryAudio;
+  /** `friends` when the item came marked
+   *  `<nearstream:visibility>friends</nearstream:visibility>` — only ever in
+   *  a key feed (PROTOCOL.md §5). Absent means public. */
+  visibility?: "friends";
   /** When our reader first saw this entry. */
   fetchedAt: string;
 };

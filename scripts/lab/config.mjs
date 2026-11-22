@@ -11,11 +11,17 @@
 // Everything is in memory. The secrets below are lab-only and protect
 // nothing — a restart wipes both instances.
 
+// Ports can be moved (LAB_PORT_A / LAB_PORT_B) when a lab is already
+// running on the defaults and you want a second one — e.g. a test run
+// alongside a hand-driven `npm run lab`.
+const PORT_A = Number(process.env.LAB_PORT_A || 3001);
+const PORT_B = Number(process.env.LAB_PORT_B || 3002);
+
 export const INSTANCES = {
   a: {
     name: "A",
-    port: 3001,
-    url: "http://localhost:3001",
+    port: PORT_A,
+    url: `http://localhost:${PORT_A}`,
     distDir: ".next-lab-a",
     authSecret: "lab-instance-a-secret-not-for-production-use",
     people: [
@@ -25,8 +31,8 @@ export const INSTANCES = {
   },
   b: {
     name: "B",
-    port: 3002,
-    url: "http://127.0.0.1:3002",
+    port: PORT_B,
+    url: `http://127.0.0.1:${PORT_B}`,
     distDir: ".next-lab-b",
     authSecret: "lab-instance-b-secret-not-for-production-use",
     people: [{ email: "bob@lab.test", handle: "bob", name: "Bob" }],
@@ -67,6 +73,10 @@ export function envFor(instance) {
     // Own cookie per instance, so nothing else on localhost (the other lab
     // instance, a normal `npm run dev` on :3000) can replace this session.
     NEARSTREAM_SESSION_COOKIE: sessionCookieFor(instance),
+    // Print whole email bodies to the instance log (lib/email.ts, only when
+    // Resend is unset — which BLANKED guarantees here), so lab:test can
+    // read an app sign-in code the way a person reads the email.
+    NEARSTREAM_LAB_EMAIL_LOG: "1",
   };
 }
 

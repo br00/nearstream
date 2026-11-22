@@ -13,6 +13,7 @@ import { normalizeProfileMark } from "@/lib/profile-mark-variants";
 import {
   PROTOCOL_VERSION,
   addressOf,
+  instanceUrl,
   siteUrlFor,
   type DiscoveryDoc,
 } from "@/lib/protocol";
@@ -39,6 +40,10 @@ export async function GET(_request: Request, { params }: Props) {
     feed: `${site}/rss.xml`,
     doorbell: `${site}/doorbell`,
     keys: `${site}/feed/`,
+    // Where the native app talks to this person's home server
+    // (docs/app/API.md §1). Always the instance, even on a custom domain:
+    // /api/* is instance-level.
+    api: `${instanceUrl()}/api/v1`,
   };
 
   return Response.json(doc, {
