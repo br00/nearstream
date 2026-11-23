@@ -12,6 +12,7 @@ import type { Source } from "@/schemas/source";
 import type { StreamEntry } from "@/schemas/stream";
 import type { User } from "@/schemas/user";
 import type { PendingShare, ShareKey } from "@/lib/share-store";
+import { namesakeOf } from "@/lib/sharing";
 import { visibilityOf } from "@/schemas/visibility";
 
 // ─── me ──────────────────────────────────────────────────────────────
@@ -94,8 +95,17 @@ export function sharingView(key: ShareKey) {
   };
 }
 
-export function pendingView(p: PendingShare) {
-  return { id: toId("pd", p.id), name: p.fromName, address: p.fromAddress, receivedAt: p.receivedAt };
+/** `namesake`: a friend you already read under this name at another
+ *  address (lib/sharing.ts `namesakeOf`), or null. The app shows it as a
+ *  warning on the share. */
+export function pendingView(p: PendingShare, sources: Source[]) {
+  return {
+    id: toId("pd", p.id),
+    name: p.fromName,
+    address: p.fromAddress,
+    receivedAt: p.receivedAt,
+    namesake: namesakeOf(p, sources),
+  };
 }
 
 // ─── reader ──────────────────────────────────────────────────────────

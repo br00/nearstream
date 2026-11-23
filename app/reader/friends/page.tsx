@@ -19,6 +19,7 @@ import { Kicker } from "@/app/_components/kicker";
 import { timeAgo } from "@/lib/time-ago";
 import { shareStore } from "@/lib/share-store";
 import { addressOf } from "@/lib/protocol";
+import { namesakeOf } from "@/lib/sharing";
 
 export const dynamic = "force-dynamic";
 
@@ -122,14 +123,37 @@ export default async function FriendsPage({ searchParams }: Props) {
 
           {pending.length > 0 && (
             <ul className="mt-12 flex flex-col gap-4">
-              {pending.map((p) => (
+              {pending.map((p) => {
+                const namesake = namesakeOf(p, sources);
+                return (
                 <li key={p.id} className="border border-border p-4">
+                  {/* The address is who they are; the name is only what
+                      they call themselves, so the address leads. */}
                   <p className="text-sm text-foreground">
-                    {p.fromName} wants to share with you.
+                    <span className="font-mono">{p.fromAddress}</span> wants
+                    to share with you.
                   </p>
-                  <p className="mt-1 font-mono text-[11px] text-muted-soft">
-                    {p.fromAddress}
+                  <p className="mt-1 text-xs text-muted-soft">
+                    Calls themselves {p.fromName}
                   </p>
+                  {namesake && (
+                    <div
+                      role="alert"
+                      className="mt-3 border-l-2 border-foreground/50 pl-3 py-1"
+                    >
+                      <p className="text-sm text-muted">
+                        You already read a {namesake.name}
+                        {namesake.address ? (
+                          <>
+                            {" "}at{" "}
+                            <span className="font-mono">{namesake.address}</span>
+                          </>
+                        ) : null}
+                        . This is a different address, so check it&rsquo;s
+                        really them before you accept.
+                      </p>
+                    </div>
+                  )}
                   <div className="mt-4 flex items-center gap-6">
                     <form action={`/api/pending-shares/${p.id}/accept`} method="POST">
                       <MonoSubmitButton pendingLabel="Accepting…">
@@ -146,7 +170,8 @@ export default async function FriendsPage({ searchParams }: Props) {
                     </form>
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
 

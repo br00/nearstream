@@ -4,13 +4,15 @@
 
 import { after } from "next/server";
 import type { User } from "@/schemas/user";
-import { shareStore, newToken, type ShareKey } from "@/lib/share-store";
+import { shareStore, newToken, type PendingShare, type ShareKey } from "@/lib/share-store";
+import type { Source } from "@/schemas/source";
 import { sourceStore } from "@/lib/source-store";
 import { feedEntryStore } from "@/lib/feed-entry-store";
 import { refreshSource } from "@/lib/feed-fetcher";
 import {
   addressOf,
   discover,
+  isKeyFrom,
   isProtocolUrl,
   keyAnswers,
   normalizeAddress,
@@ -88,6 +90,32 @@ export function announceNew(owner: User): void {
 
 // ─── Inbound ──────────────────────────────────────────────────────────
 
+export type Namesake = { name: string; address: string | null };
+
+/** A friend you already read under the same name as this pending share,
+ *  at a different address. Names are self-chosen, so this is the one
+ *  impersonation no protocol check can catch ("Alessandro Borelli" at
+ *  someone else's address). Shown next to the share, so the person decides
+ *  with both addresses in front of them. Exact match after normalising
+ *  case, spacing and Unicode forms; looser matching would fire on every
+ *  "Marco". `address` is null for a feed added by hand without a site. */
+export function namesakeOf(
+  share: Pick<PendingShare, "fromName" | "fromAddress">,
+  sources: Source[],
+): Namesake | null {
+  const norm = (n: string) => n.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+  const wanted = norm(share.fromName);
+  if (!wanted) return null;
+  for (const s of sources) {
+    if (norm(s.name) !== wanted) continue;
+    // Never the feed URL: for a shared friend it's their key.
+    const address = s.address ?? (s.siteUrl ? normalizeAddress(s.siteUrl) : null);
+    if (address === share.fromAddress) continue;
+    return { name: s.name, address };
+  }
+  return null;
+}
+
 /** §6 `share`: verify, then hold it as a pending share. Silent on failure —
  *  the doorbell answers 202 regardless, so it can't be used to probe. */
 export async function receiveShare(
@@ -103,9 +131,9 @@ export async function receiveShare(
   // 1. Fetch the sender's discovery document.
   const doc = await discover(from);
   if (!doc) return;
-  // 2. The key must live under the sender's own key prefix — so it can
-  //    only have come from them.
-  if (!rawKey.startsWith(doc.keys)) return;
+  // 2. The key must be one the sender issued: under `{from}/feed/`, worked
+  //    out from the address rather than read from their document.
+  if (!isKeyFrom(from, rawKey)) return;
   // 3. The key must answer with a feed.
   if (!(await keyAnswers(rawKey))) return;
 

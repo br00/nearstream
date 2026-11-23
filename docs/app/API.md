@@ -254,7 +254,7 @@ GET /friends
 → {
   "friends": [ { id, name, address? } ],             // people you read
   "sharing": [ { id, name, address, since } ],       // people who read you
-  "pending": [ { id, name, address, receivedAt } ]   // want to share with you
+  "pending": [ { id, name, address, receivedAt, namesake } ]   // want to share with you
 }
 
 POST   /sharing               { "address": "nearstream.app/bob" }  → 201 { id, name, address, since, rung }
@@ -263,6 +263,12 @@ POST   /pending/{id}/accept   → 200 { "friend": { id, name, address? } }
 POST   /pending/{id}/ignore   → 204
 ```
 
+- **`name` is whatever the sender calls themselves; `address` is who they
+  are.** Show the address first. `namesake` is `{ name, address }` when you
+  already read a friend with the same name at a *different* address (address
+  is null for a feed added by hand without a site), else `null`. Show it as
+  a warning on the share: it's how someone would pretend to be a friend, and
+  no server check can catch it.
 - **Decision:** `POST /sharing` to someone you already share with is **200**
   (not 409) with the same `id`: the server rings them again with the same
   key (PROTOCOL.md §6 — one friend, one key). That's "send it again" if they
