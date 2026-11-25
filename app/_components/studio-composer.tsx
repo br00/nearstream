@@ -397,6 +397,7 @@ function EssayForm({ error }: { error?: string }) {
           <MarkdownField
             name="body"
             required
+            images
             rows={14}
             placeholder="## A heading&#10;&#10;Markdown body. Links, *italics*, **bold**, lists, code, blockquotes — all supported."
           />

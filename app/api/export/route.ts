@@ -4,7 +4,7 @@
 //   - nearstream-export.json: profile + Now + Stream + Essays + Inventory +
 //     Music metadata + Reader sources
 //   - media/{key}: every blob you own — inventory images (originals AND
-//     extras, not just the cover), voice-note audio, music audio and cover
+//     extras, not just the cover), essay images, voice-note audio, music audio and cover
 //     art — as actual bytes, so the export is self-contained if R2 ever
 //     goes away
 //
@@ -110,6 +110,11 @@ export async function GET() {
       if (entry.audio?.key) keys.add(entry.audio.key);
     }
 
+    // Images uploaded inside essays.
+    for (const essay of essays) {
+      for (const key of essay.images ?? []) keys.add(key);
+    }
+
     // Music: the track itself, plus cover art and its thumbnail.
     for (const track of music) {
       keys.add(track.audio.key);
@@ -146,7 +151,7 @@ export async function GET() {
         "",
         "Files:",
         "  nearstream-export.json — profile + Now + Stream + Essays + Inventory + Music metadata + Reader sources",
-        "  media/                  — every blob: inventory images (all of them, plus thumbnails), voice-note audio, music audio and cover art. Filenames match the `key` fields in the JSON.",
+        "  media/                  — every blob: inventory images (all of them, plus thumbnails), essay images, voice-note audio, music audio and cover art. Filenames match the `key` fields in the JSON.",
         "",
         "Re-importing into another Nearstream instance is a Phase 6 follow-up.",
         "For now this is a complete snapshot of everything you posted — yours forever.",

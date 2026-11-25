@@ -24,6 +24,10 @@ import { visibilityOf, type Visibility } from "@/schemas/visibility";
 import type { InventoryItem, InventoryImage } from "@/schemas/inventory";
 import { imagesOf } from "@/schemas/inventory";
 import type { User } from "@/schemas/user";
+import { rewriteEssayMedia } from "@/lib/essay-images";
+
+const INSTANCE_URL =
+  process.env.NEARSTREAM_SITE_URL ?? "http://localhost:3000";
 
 export type FeedOptions = {
   user: User;
@@ -255,6 +259,13 @@ export async function buildFeedXml(opts: FeedOptions): Promise<string> {
     });
   }
 
+  // Essay bodies point at images with a relative `/api/media/{key}`, which
+  // means nothing inside a reader. Only worked out when some essay has one,
+  // since it lists every store again.
+  const essayMedia = essays.some((e) => e.body.includes("/api/media/"))
+    ? await mediaKeysFor(user, include)
+    : new Set<string>();
+
   for (const essay of essays) {
     const v = visibilityOf(essay);
     const permalink = `${siteUrl}/library/${essay.slug}`;
@@ -263,7 +274,12 @@ export async function buildFeedXml(opts: FeedOptions): Promise<string> {
       v === "public"
         ? `<guid isPermaLink="true">${escapeXml(permalink)}</guid>`
         : `<guid isPermaLink="false">${escapeXml(essay.id)}</guid>`;
-    const html = await marked.parse(essay.body, { async: true });
+    const html = await rewriteEssayMedia(
+      await marked.parse(essay.body, { async: true }),
+      essayMedia,
+      mediaUrl,
+      INSTANCE_URL,
+    );
     feedItems.push({
       publishedAt: essay.publishedAt,
       toXml: () => `    <item>
@@ -417,13 +433,18 @@ export async function mediaKeysFor(
   include: FeedOptions["include"],
 ): Promise<Set<string>> {
   const ok = (v: Visibility) => (include as readonly Visibility[]).includes(v);
-  const [entries, items, tracks] = await Promise.all([
+  const [entries, items, tracks, essays] = await Promise.all([
     store.list(user.id),
     inventoryStore.list(user.id),
     musicStore.list(user.id),
+    essayStore.list(user.id),
   ]);
   const keys = new Set<string>();
   for (const e of entries) if (ok(visibilityOf(e)) && e.audio) keys.add(e.audio.key);
+  for (const e of essays) {
+    if (!ok(visibilityOf(e))) continue;
+    for (const key of e.images ?? []) keys.add(key);
+  }
   for (const i of items) {
     if (!ok(visibilityOf(i))) continue;
     for (const img of imagesOf(i)) {

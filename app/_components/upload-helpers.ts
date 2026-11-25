@@ -1,6 +1,7 @@
 "use client";
 
-// Browser-side upload plumbing shared by the inventory and music forms.
+// Browser-side upload plumbing shared by the inventory, music and essay
+// (image button) forms.
 // Extracted in slice 40 — both flows presign, PUT with progress, and (for
 // images) decode a thumbnail client-side, and none of that is worth having
 // twice.
@@ -79,6 +80,60 @@ export async function generateThumbnail(
   bitmap.close?.();
 
   return { thumb: blob, width: fullWidth, height: fullHeight };
+}
+
+/** Long edge an essay image is scaled down to: twice the ~34rem column, so
+ *  it stays sharp on a retina screen without shipping a 12MP original. */
+const ESSAY_IMAGE_MAX_DIM = 2400;
+const ESSAY_IMAGE_QUALITY = 0.86;
+
+/**
+ * Get a picked file ready to go inside an essay. Photos (JPEG / WebP)
+ * larger than ESSAY_IMAGE_MAX_DIM are re-encoded down to it, because a
+ * phone original is several MB for a picture read at column width. PNG
+ * and GIF go up untouched: PNG is usually a diagram or screenshot, where
+ * JPEG would smear the text, and re-encoding a GIF would drop its
+ * animation.
+ */
+export async function prepareEssayImage(
+  file: File,
+): Promise<{ blob: Blob; contentType: string }> {
+  if (file.type !== "image/jpeg" && file.type !== "image/webp") {
+    return { blob: file, contentType: file.type };
+  }
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    // Can't decode it here; let it go up as-is rather than refuse it.
+    return { blob: file, contentType: file.type };
+  }
+  const ratio = Math.min(
+    ESSAY_IMAGE_MAX_DIM / bitmap.width,
+    ESSAY_IMAGE_MAX_DIM / bitmap.height,
+  );
+  if (ratio >= 1) {
+    bitmap.close?.();
+    return { blob: file, contentType: file.type };
+  }
+  const w = Math.round(bitmap.width * ratio);
+  const h = Math.round(bitmap.height * ratio);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close?.();
+    return { blob: file, contentType: file.type };
+  }
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close?.();
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", ESSAY_IMAGE_QUALITY),
+  );
+  return blob
+    ? { blob, contentType: "image/jpeg" }
+    : { blob: file, contentType: file.type };
 }
 
 /**
