@@ -1,5 +1,11 @@
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { essayStore } from "@/lib/essay-store";
+import {
+  deleteEssayImages,
+  settleEssayImages,
+  verifyEssayImageTokens,
+} from "@/lib/essay-images";
 import { slugify } from "@/schemas/essay";
 import { isVisibility, type Visibility } from "@/schemas/visibility";
 import { getSession } from "@/lib/auth";
@@ -31,17 +37,20 @@ export async function POST(request: Request) {
   let title: unknown;
   let body: unknown;
   let rawVisibility: unknown;
+  let imageTokens: unknown[] = [];
 
   if (isJson) {
     const json = await request.json();
     title = json?.title;
     body = json?.body;
     rawVisibility = json?.visibility;
+    if (Array.isArray(json?.imageTokens)) imageTokens = json.imageTokens;
   } else {
     const form = await request.formData();
     title = form.get("title");
     body = form.get("body");
     rawVisibility = form.get("visibility");
+    imageTokens = form.getAll("imageTokens");
   }
 
   const visibility: Visibility = isVisibility(rawVisibility)
@@ -91,11 +100,19 @@ export async function POST(request: Request) {
     );
   }
 
+  const trimmedBody = body.trim();
+  // Images uploaded in the editor but taken out again before publishing
+  // are deleted now rather than left in R2 with nothing pointing at them.
+  const uploaded = await verifyEssayImageTokens(session.userId, imageTokens);
+  const images = settleEssayImages([], uploaded, trimmedBody);
+
   const essay = await essayStore.add(session.userId, {
     title: trimmedTitle,
-    body: body.trim(),
+    body: trimmedBody,
     visibility,
+    images: images.keep,
   });
+  after(() => deleteEssayImages(images.drop));
 
   const user = await userStore.getById(session.userId);
   // Ring everyone you share with (PROTOCOL.md §6). Private posts are in

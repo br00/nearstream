@@ -6,7 +6,8 @@ export interface EssayStore {
   list(userId: string): Promise<Essay[]>;
   add(userId: string, input: NewEssay): Promise<Essay>;
   getBySlug(userId: string, slug: string): Promise<Essay | null>;
-  /** Updates title + body. Slug stays — the URL is permanent at publish. */
+  /** Updates title + body (+ images when given). Slug stays — the URL is
+   *  permanent at publish. */
   updateBySlug(
     userId: string,
     slug: string,
@@ -40,6 +41,7 @@ class InMemoryEssayStore implements EssayStore {
       body: input.body,
       publishedAt: new Date().toISOString(),
       visibility: input.visibility ?? "public",
+      ...(input.images?.length ? { images: input.images } : {}),
     };
     this.bucket(userId).push(essay);
     return essay;
@@ -57,12 +59,15 @@ class InMemoryEssayStore implements EssayStore {
     const b = this.bucket(userId);
     const i = b.findIndex((e) => e.slug === slug);
     if (i === -1) return null;
-    b[i] = {
-      ...b[i],
-      title: patch.title,
-      body: patch.body,
-      visibility: patch.visibility ?? b[i].visibility ?? "public",
-    };
+    b[i] = withImages(
+      {
+        ...b[i],
+        title: patch.title,
+        body: patch.body,
+        visibility: patch.visibility ?? b[i].visibility ?? "public",
+      },
+      patch.images,
+    );
     return b[i];
   }
 
@@ -110,6 +115,7 @@ class R2EssayStore implements EssayStore {
       body: input.body,
       publishedAt: new Date().toISOString(),
       visibility: input.visibility ?? "public",
+      ...(input.images?.length ? { images: input.images } : {}),
     };
     const res = await this.client.fetch(
       `${this.base}/${this.key(userId, essay.id)}`,
@@ -167,12 +173,15 @@ class R2EssayStore implements EssayStore {
   ): Promise<Essay | null> {
     const target = await this.getBySlug(userId, slug);
     if (!target) return null;
-    const updated: Essay = {
-      ...target,
-      title: patch.title,
-      body: patch.body,
-      visibility: patch.visibility ?? target.visibility ?? "public",
-    };
+    const updated = withImages(
+      {
+        ...target,
+        title: patch.title,
+        body: patch.body,
+        visibility: patch.visibility ?? target.visibility ?? "public",
+      },
+      patch.images,
+    );
     const res = await this.client.fetch(
       `${this.base}/${this.key(userId, target.id)}`,
       {
@@ -204,6 +213,15 @@ class R2EssayStore implements EssayStore {
       `R2 DELETE failed (${res.status} ${res.statusText}): ${await res.text()}`,
     );
   }
+}
+
+/** `images` undefined in a patch keeps what the essay had; an array
+ *  replaces it, and an empty one removes the field. */
+function withImages(essay: Essay, images: string[] | undefined): Essay {
+  if (images === undefined) return essay;
+  const { images: _old, ...rest } = essay;
+  void _old;
+  return images.length ? { ...rest, images } : rest;
 }
 
 function parseListKeys(xml: string): string[] {
