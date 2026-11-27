@@ -1,6 +1,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { essayStore } from "@/lib/essay-store";
+import {
+  deleteEssayImages,
+  settleEssayImages,
+  verifyEssayImageTokens,
+} from "@/lib/essay-images";
 import { isVisibility, type Visibility } from "@/schemas/visibility";
 import { userStore } from "@/lib/user-store";
 import { getSession } from "@/lib/auth";
@@ -50,12 +56,31 @@ export async function POST(request: Request, { params }: Props) {
   }
 
   try {
+    const existing = await essayStore.getBySlug(session.userId, slug);
+    if (!existing) return errorRedirect(request, slug, "essay not found");
+
+    // The essay owns what it owned before plus anything uploaded in this
+    // edit, as long as the body still uses it. Whatever the edit took out
+    // is deleted — after the save, so a failed save never loses an image.
+    const trimmedBody = body.trim();
+    const uploaded = await verifyEssayImageTokens(
+      session.userId,
+      form.getAll("imageTokens"),
+    );
+    const images = settleEssayImages(
+      existing.images ?? [],
+      uploaded,
+      trimmedBody,
+    );
+
     const updated = await essayStore.updateBySlug(session.userId, slug, {
       title: title.trim(),
-      body: body.trim(),
+      body: trimmedBody,
       visibility,
+      images: images.keep,
     });
     if (!updated) return errorRedirect(request, slug, "essay not found");
+    after(() => deleteEssayImages(images.drop));
 
     const user = await userStore.getById(session.userId);
     const handle = user?.handle ?? "";

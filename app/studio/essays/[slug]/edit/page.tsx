@@ -89,6 +89,7 @@ export default async function EditEssay({ params, searchParams }: Props) {
               <MarkdownField
                 name="body"
                 required
+                images
                 rows={14}
                 defaultValue={essay.body}
               />

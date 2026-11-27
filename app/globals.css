@@ -98,6 +98,16 @@ body {
   padding: 0;
   font-size: 1em;
 }
+/* Essay images (the editor's "+ Image"). Column width at most — Tailwind's
+   preflight already caps max-width — centred, with more air than a
+   paragraph so a figure reads as a pause in the text. */
+.prose-essay img {
+  display: block;
+  margin: 2em auto;
+}
+.prose-essay p:has(> img:only-child) {
+  margin-top: 0;
+}
 .prose-essay hr {
   border: none;
   border-top: 1px solid var(--border);
