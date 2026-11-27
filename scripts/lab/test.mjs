@@ -5,6 +5,7 @@
 
 import { INSTANCES, startInstance, stopAll, waitReady } from "./instances.mjs";
 import { sessionCookieFor } from "./config.mjs";
+import { createServer } from "node:http";
 
 const A = INSTANCES.a;
 const B = INSTANCES.b;
@@ -25,6 +26,32 @@ async function eventually(fn, timeoutMs = 20_000) {
     if (Date.now() > deadline) return false;
     await new Promise((r) => setTimeout(r, 400));
   }
+}
+
+// A stranger's server: a .well-known whose fields she chose, and one key
+// of her own (`/feed/{STRANGER_TOKEN}`) that answers with a feed. Listens
+// on 127.0.0.1 (not "localhost") so Node can't pick ::1 instead.
+const STRANGER_TOKEN = `k_${"m".repeat(32)}`;
+function startStranger(makeDoc) {
+  return new Promise((resolve) => {
+    const server = createServer((req, res) => {
+      if (req.url === "/.well-known/nearstream") {
+        res.writeHead(200, { "content-type": "application/json" });
+        return res.end(JSON.stringify(makeDoc(address)));
+      }
+      if (req.url === `/feed/${STRANGER_TOKEN}`) {
+        res.writeHead(200, { "content-type": "application/rss+xml" });
+        return res.end(`<?xml version="1.0"?><rss version="2.0"><channel><title>Alice</title></channel></rss>`);
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    let address = "";
+    server.listen(0, "127.0.0.1", () => {
+      address = `127.0.0.1:${server.address().port}`;
+      resolve({ address, close: () => server.close() });
+    });
+  });
 }
 
 // ─── sign-in, the same way a person does ──────────────────────────────
@@ -348,6 +375,47 @@ try {
   const carolPending = (await shares(carol)).pending.find((p) => p.fromAddress === alice.address);
   await post(carol, `/api/pending-shares/${carolPending?.id}/accept`);
   check("Carol, on Alice's own instance, reads her friends-only Line", (await readerHtml(carol)).includes(friendsText));
+
+  console.log("\n§6 A stranger forwards a key Alice gave someone else");
+  const carolKey = (await shares(alice)).keys.find((k) => k.friendAddress === carol.address);
+  const mallory = await startStranger((address) => ({
+    protocol: "nearstream/0.1",
+    address,
+    name: "Alice",
+    feed: `http://${address}/rss.xml`,
+    doorbell: `http://${address}/doorbell`,
+    // Her own document, so she can claim Alice's key prefix as hers.
+    keys: `${A.url}/alice/feed/`,
+  }));
+  const relabel = await fetch(`${B.url}/bob/doorbell`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ring: "share", from: mallory.address, key: carolKey.keyUrl }),
+  });
+  await new Promise((r) => setTimeout(r, 4_000));
+  check(
+    "Mallory can't pass Carol's key off as her own share",
+    relabel.status === 202 && !(await shares(bob)).pending.some((p) => p.fromAddress === mallory.address),
+  );
+  // With a real key of her own the share goes through (the protocol can't
+  // know "Alice" isn't her name), so Bob is warned instead.
+  await fetch(`${B.url}/bob/doorbell`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ring: "share", from: mallory.address, key: `http://${mallory.address}/feed/${STRANGER_TOKEN}` }),
+  });
+  const namesakePending = await eventually(async () =>
+    (await shares(bob)).pending.some((p) => p.fromAddress === mallory.address),
+  );
+  check("…but a key of her own still arrives as a share", namesakePending);
+  const friendsHtml = await (await api(bob, "/reader/friends")).text();
+  check(
+    "…with a warning that Bob already reads an Alice at another address",
+    friendsHtml.includes("You already read a") && friendsHtml.includes(mallory.address),
+  );
+  const malloryPending = (await shares(bob)).pending.find((p) => p.fromAddress === mallory.address);
+  await post(bob, `/api/pending-shares/${malloryPending?.id}/ignore`);
+  mallory.close();
 
   console.log("\n§8 step 9 — Alice stops sharing with Bob");
   await post(alice, `/api/shares/${bobKey.token}/revoke`);

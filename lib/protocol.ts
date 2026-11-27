@@ -103,9 +103,77 @@ export function isProtocolUrl(url: string): boolean {
   }
 }
 
+/** True when `keyUrl` is a key that `address` issued: exactly one token
+ *  under `{address}/feed/`, compared as parsed URLs.
+ *
+ *  The prefix comes from the address, never from the sender's own
+ *  `.well-known` — a document can claim any `keys` prefix, so trusting it
+ *  let a stranger pass on a key someone else gave them and have it show up
+ *  under their name. A plain `startsWith` is also not enough: friends on one
+ *  instance share a host (`nearstream.app/gosia`, `nearstream.app/mallory`),
+ *  and `https://a.com` is a string prefix of `https://a.com.evil.com`. */
+export function isKeyFrom(address: string, keyUrl: string): boolean {
+  if (!isProtocolUrl(keyUrl)) return false;
+  let key: URL;
+  let prefix: URL;
+  try {
+    key = new URL(keyUrl);
+    prefix = new URL(urlForAddress(address, "/feed/"));
+  } catch {
+    return false;
+  }
+  if (key.username || key.password || key.search || key.hash) return false;
+  if (key.protocol !== prefix.protocol) return false;
+  // Same normalisation as addresses: case-insensitive, `www.` optional.
+  const host = (u: URL) => u.host.toLowerCase().replace(/^www\./, "");
+  if (host(key) !== host(prefix)) return false;
+  if (!key.pathname.startsWith(prefix.pathname)) return false;
+  return KEY_TOKEN.test(key.pathname.slice(prefix.pathname.length));
+}
+
+/** One path segment of base64url — what `newToken()` mints, with room for
+ *  other servers' token formats. No slashes, so no `media/…` or `../`. */
+const KEY_TOKEN = /^[A-Za-z0-9_-]{16,128}$/;
+
 // ─── Talking to other servers ─────────────────────────────────────────
 
 const FETCH_TIMEOUT_MS = 8_000;
+
+/** Response size caps. A stranger's server chooses what it sends back, so
+ *  nothing it returns is read without a limit. */
+export const MAX_DISCOVERY_BYTES = 64 * 1024;
+export const MAX_FEED_BYTES = 5 * 1024 * 1024;
+
+/** `res.text()` with a ceiling: null once the body passes `maxBytes`, and
+ *  the rest is never downloaded. */
+export async function readTextCapped(res: Response, maxBytes: number): Promise<string | null> {
+  const declared = Number(res.headers.get("content-length"));
+  if (declared > maxBytes) {
+    await res.body?.cancel();
+    return null;
+  }
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    all.set(c, offset);
+    offset += c.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
 
 function protocolFetch(url: string, init: RequestInit = {}): Promise<Response> {
   return fetch(url, {
@@ -130,7 +198,9 @@ export async function discover(address: string): Promise<DiscoveryDoc | null> {
   if (!res.ok) return null;
   let doc: unknown;
   try {
-    doc = await res.json();
+    const text = await readTextCapped(res, MAX_DISCOVERY_BYTES);
+    if (text === null) return null;
+    doc = JSON.parse(text);
   } catch {
     return null;
   }
@@ -181,8 +251,8 @@ export async function keyAnswers(keyUrl: string): Promise<boolean> {
       headers: { accept: "application/rss+xml" },
     });
     if (!res.ok) return false;
-    const body = await res.text();
-    return body.includes("<rss") && body.includes("<channel>");
+    const body = await readTextCapped(res, MAX_FEED_BYTES);
+    return body !== null && body.includes("<rss") && body.includes("<channel>");
   } catch {
     return false;
   }

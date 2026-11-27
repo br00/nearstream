@@ -69,7 +69,7 @@ which returns:
 | `mark` | no | Profile-mark variant, as a string index into `PROFILE_MARK_VARIANTS` (`lib/profile-mark-variants.ts`). Readers that don't know the variant fall back to a default. |
 | `feed` | yes | The public feed. May 404 if the site is `friends`-only (§5). |
 | `doorbell` | yes | Where to ring (§6). |
-| `keys` | yes | URL prefix every key this person issues starts with. Used to verify a share is real (§6). |
+| `keys` | yes | `{address}/feed/`, the prefix every key this person issues starts with. Informational: receivers check keys against the address itself, never against this field (§6). |
 
 Rules:
 - The document must name the address it was fetched for; a server can't answer for someone else. `feed`, `doorbell` and `keys` must be `https` URLs.
@@ -117,7 +117,7 @@ Only `public` posts appear in the public feed; `friends` posts appear only in ke
 https://alessandroborelli.it/feed/k_9fQ2…Xa
 ```
 
-- It must start with the `keys` prefix in your `.well-known` (§3).
+- It must sit directly under `{address}/feed/`: one token, no further path, no query. Keys anywhere else are refused (§6).
 - Its response is the same RSS format as §4, with `public` **and** `friends` posts. Friends-only items add `<nearstream:visibility>friends</nearstream:visibility>` so a reader can mark them.
 - **Revoked → `410 Gone`.** A reader that gets 410 drops that friend's posts, the key, and the friend. (`404` is treated as temporary; `410` is final.) A `private` site answers `404` on every key, because the owner can switch back.
 - Friends-only items link to the site home and use their id as the guid: their own page 404s for everyone but the owner, so a permalink would be a dead link in the friend's reader.
@@ -145,10 +145,12 @@ https://alessandroborelli.it/feed/k_9fQ2…Xa/media/{ref}
 
 The receiving server verifies before anything reaches a person:
 1. Fetch `https://{from}/.well-known/nearstream`.
-2. Check `key` starts with that document's `keys` prefix — so the key lives on the sender's own server and can only have come from them.
+2. Check `key` is one token directly under `{from}/feed/`, compared as parsed URLs (scheme, host ignoring case and `www.`, path), not as strings. The prefix comes from `from`, **never from the document**: the sender writes their own `.well-known`, so a `keys` field pointing at someone else's server would let them pass on a key that person gave them and have it arrive under their name. A string prefix isn't enough either: friends on one instance share a host, and `https://a.com` is a prefix of `https://a.com.evil.com`.
 3. Fetch `key`; it must return a valid feed.
 
-If all three pass, the share becomes a **pending friend** on the receiver's side: *"Alessandro wants to share with you — accept / ignore."* Accept stores the key as a friend's feed. Ignore discards it. Nothing else is kept.
+If all three pass, the share becomes a **pending friend** on the receiver's side: *"alessandroborelli.it wants to share with you — accept / ignore."* Accept stores the key as a friend's feed. Ignore discards it. Nothing else is kept.
+
+- **The address is who they are; `name` is only what they call themselves.** No check can stop someone at another address calling themselves "Alessandro Borelli". So a pending share shows the address first, and warns when the name matches a friend you already read at a different address.
 
 - A second share from the same sender replaces the first; shares don't pile up.
 - If you were already reading the sender's public feed, accepting upgrades that friend to the key rather than adding them twice.
@@ -224,7 +226,7 @@ Leaving something out is a decision. These stay out until a real need forces the
 - **Reader cache.** Readers keep a copy of what they've fetched so the app works offline and loads fast. Is that "copying"? Proposed rule: a cache is allowed, but it must **mirror** the feed — anything absent from the latest fetch, or behind a `410`, is purged. (Today's reader already purges on 404.) Does the feed include all posts, or only recent ones? If only recent, how does a reader tell "deleted" from "too old"?
 - **Polling interval.** Today: refresh on open if older than 5 minutes, plus the daily digest. With a doorbell, is hourly background polling enough?
 - ~~**Same-instance friends.** Use real keys inside one instance too, or keep a shortcut?~~ **Answered: real keys, one code path.** The lab test shares Alice → Carol on the same instance through the same doorbell. The old shared-secret header is still there for friends added before keys existed; it can go once those have been re-shared.
-- **Server-side requests to strangers.** A `share` ring makes the receiver fetch the sender's `.well-known` and key, so anyone can make a server fetch a URL of their choosing. Mitigated (https only, no redirects, 8s timeout, 4 KB rings, work after the response), not solved: a server on a private network should also refuse private IP ranges.
+- **Server-side requests to strangers.** A `share` ring makes the receiver fetch the sender's `.well-known` and key, so anyone can make a server fetch a URL of their choosing. Mitigated (https only, no redirects, 8s timeout, 4 KB rings, response caps of 64 KB for `.well-known` and 5 MB for feeds, work after the response), not solved: a server on a private network (a home box) must also resolve DNS once, refuse loopback, private and link-local ranges (IPv4 and IPv6, including `169.254.169.254` and IPv4-mapped IPv6), and connect to the address it checked, so DNS rebinding can't swap it.
 - **Rate limiting across processes.** The doorbell's once-a-minute rule is counted per process; on serverless that's per warm instance. Good enough to blunt a flood; not a guarantee.
 - **Mutual shares.** If both sides share, accept automatically, or always ask?
 - **Moving server.** Keys are URLs on the old server. Is moving = re-share with everyone, or can the old server answer `301` to the new address for a while?

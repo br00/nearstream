@@ -17,6 +17,6 @@ export const GET = v1(async (request: Request) => {
   return ok({
     friends: sources.map(friendView),
     sharing: keys.map(sharingView),
-    pending: pending.map(pendingView),
+    pending: pending.map((p) => pendingView(p, sources)),
   });
 });

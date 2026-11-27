@@ -13,6 +13,7 @@ import { sourceStore } from "@/lib/source-store";
 import { feedEntryStore } from "@/lib/feed-entry-store";
 import { parseFeed } from "@/lib/feed-parser";
 import { sameInstanceHost } from "@/lib/tenant-domains";
+import { MAX_FEED_BYTES, readTextCapped } from "@/lib/protocol";
 
 const USER_AGENT = "Nearstream/0.1 (+https://nearstream.app)";
 
@@ -59,7 +60,7 @@ export async function refreshSource(
 
   let res: Response;
   try {
-    res = await fetch(source.feedUrl, { headers });
+    res = await fetchFeed(source.feedUrl, headers, instanceUrl);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await sourceStore.update(userId, id, {
@@ -115,7 +116,25 @@ export async function refreshSource(
     return { status: "error", sourceId: id, error: message };
   }
 
-  const xml = await res.text();
+  let xml: string | null;
+  try {
+    xml = await readTextCapped(res, MAX_FEED_BYTES);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await sourceStore.update(userId, id, {
+      lastFetchedAt: new Date().toISOString(),
+      lastError: `fetch failed: ${message}`,
+    });
+    return { status: "error", sourceId: id, error: `fetch failed: ${message}` };
+  }
+  if (xml === null) {
+    const message = `feed is larger than ${MAX_FEED_BYTES / (1024 * 1024)} MB`;
+    await sourceStore.update(userId, id, {
+      lastFetchedAt: new Date().toISOString(),
+      lastError: message,
+    });
+    return { status: "error", sourceId: id, error: message };
+  }
   let parsed;
   try {
     parsed = parseFeed(xml, source.id);
@@ -153,6 +172,40 @@ export async function refreshSource(
   });
 
   return { status: "ok", sourceId: id, added, notModified: false };
+}
+
+const FEED_TIMEOUT_MS = 10_000;
+const MAX_REDIRECTS = 3;
+
+/** GET a feed with a deadline that covers the body too, and redirects
+ *  followed by hand. Plain RSS feeds do redirect (http → https, a moved
+ *  blog), so they can't be refused outright; but each hop must stay
+ *  http(s), there are at most three, and the internal-secret header is
+ *  dropped the moment a hop leaves this instance. */
+async function fetchFeed(
+  url: string,
+  headers: Record<string, string>,
+  instanceUrl: string | undefined,
+): Promise<Response> {
+  const signal = AbortSignal.timeout(FEED_TIMEOUT_MS);
+  let current = url;
+  let hopHeaders = headers;
+  for (let hop = 0; ; hop++) {
+    const res = await fetch(current, { headers: hopHeaders, redirect: "manual", signal });
+    const location = res.headers.get("location");
+    if (res.status < 300 || res.status >= 400 || res.status === 304 || !location) return res;
+    await res.body?.cancel();
+    if (hop >= MAX_REDIRECTS) throw new Error("too many redirects");
+    const next = new URL(location, current);
+    if (next.protocol !== "https:" && next.protocol !== "http:") {
+      throw new Error(`redirect to ${next.protocol} refused`);
+    }
+    if (INTERNAL_HEADER in hopHeaders && !(instanceUrl && sameInstanceHost(next.toString(), instanceUrl))) {
+      hopHeaders = { ...hopHeaders };
+      delete hopHeaders[INTERNAL_HEADER];
+    }
+    current = next.toString();
+  }
 }
 
 /** Read this in the RSS route to decide whether to bypass the tenant
