@@ -1,9 +1,5 @@
-// npm run lab — start both instances and leave them running, to act out
-// PROTOCOL.md §8 by hand in two browser windows. Ctrl-C stops both.
-//
-// Magic links print in this terminal (no Resend in the lab).
-
 import { INSTANCES, startInstance, stopAll, waitReady } from "./instances.mjs";
+import { seed } from "./seed.mjs";
 
 const children = Object.values(INSTANCES).map((i) => startInstance(i, { echo: true }));
 process.on("SIGINT", () => {
@@ -12,13 +8,20 @@ process.on("SIGINT", () => {
 });
 
 await Promise.all(Object.values(INSTANCES).map(waitReady));
+const people = await seed(children);
+
 console.log(`
-Protocol lab is up.
+Lab is up and seeded.
 
   Instance A  ${INSTANCES.a.url}/login   alice@lab.test · carol@lab.test
   Instance B  ${INSTANCES.b.url}/login   bob@lab.test
 
-Sign in with one of those emails; the magic link prints above.
-Pick the matching handle (alice / carol / bob) during onboarding.
-Addresses:  localhost:3001/alice · localhost:3001/carol · 127.0.0.1:3002/bob
+  Alice  ${people.alice.address}  12 Lines, a Now, shares with Bob
+  Bob    ${people.bob.address}  8 Lines, a Now, shares with Alice
+  Carol  ${people.carol.address}  nothing yet
+
+App tokens (Authorization: Bearer …):
+  Alice  ${people.alice.token}
+  Bob    ${people.bob.token}
+  Carol  ${people.carol.token}
 `);

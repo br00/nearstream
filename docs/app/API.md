@@ -150,6 +150,38 @@ GET /me
 too, usually) — in v1 the app sends the person to the web for that (one less
 screen to build).
 
+## 3a. Your Site
+
+The first endpoints of the redesigned v1 (the app's `docs/SYSTEM_DESIGN.md`
+§3). They replace `/lines` once the Studio slice lands.
+
+```
+GET /sites/me
+→ 200 {
+  "person": { "id": "u_…", "handle", "name", "address", "siteUrl", "mark": 0–9 },
+  "now":    { "body", "updatedAt" }          // omitted when there is no Now
+}
+
+GET /sites/me/posts?limit=30&before={cursor}
+→ 200 { "items": [ Post ], "next": "cursor-or-null" }
+```
+
+```
+Post (kind "line") {
+  id           "po_…"
+  kind         "line"
+  group        "stream"
+  author       { id, name, address, mark }
+  publishedAt  ISO 8601
+  visibility   public | friends | private     // the owner sees all three
+  mode         making | taking in | being
+  text
+}
+```
+
+Only Lines for now; other kinds arrive with their own slices, and the app
+skips any `kind` it doesn't know. Paging and errors as in §4 and §7.
+
 ## 4. Reader
 
 Your friends' posts, newest first — the same items `/reader` shows. Your own

@@ -4,12 +4,21 @@
 // stops both. Exit code 0 = the protocol works.
 
 import { INSTANCES, startInstance, stopAll, waitReady } from "./instances.mjs";
-import { sessionCookieFor } from "./config.mjs";
+import {
+  appSignIn,
+  b64url,
+  emailFor,
+  eventually,
+  pkce,
+  requestAppToken,
+  signIn,
+  webApi as api,
+  webPost as post,
+} from "./people.mjs";
 import { createServer } from "node:http";
 
 const A = INSTANCES.a;
 const B = INSTANCES.b;
-const addr = (instance, handle) => `${new URL(instance.url).host}/${handle}`;
 const run = Math.random().toString(36).slice(2, 8);
 
 // ─── tiny harness ─────────────────────────────────────────────────────
@@ -18,14 +27,6 @@ const results = [];
 function check(name, ok, detail = "") {
   results.push({ name, ok });
   console.log(`${ok ? "  ✓" : "  ✗"} ${name}${!ok && detail ? `\n      ${detail}` : ""}`);
-}
-async function eventually(fn, timeoutMs = 20_000) {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    if (await fn()) return true;
-    if (Date.now() > deadline) return false;
-    await new Promise((r) => setTimeout(r, 400));
-  }
 }
 
 // A stranger's server: a .well-known whose fields she chose, and one key
@@ -54,59 +55,6 @@ function startStranger(makeDoc) {
   });
 }
 
-// ─── sign-in, the same way a person does ──────────────────────────────
-
-// Mints a magic-link token exactly like lib/auth.ts does (HMAC-SHA256 over
-// base64url JSON) with the lab instance's secret — the stand-in for
-// clicking the link in the email.
-function b64url(bytes) {
-  return Buffer.from(bytes).toString("base64url");
-}
-async function magicToken(instance, email) {
-  const body = b64url(
-    new TextEncoder().encode(
-      JSON.stringify({ email, exp: Math.floor(Date.now() / 1000) + 900, purpose: "magic" }),
-    ),
-  );
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(instance.authSecret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
-  return `${body}.${b64url(new Uint8Array(sig))}`;
-}
-
-async function signIn(instance, person) {
-  const token = await magicToken(instance, person.email);
-  const cb = await fetch(`${instance.url}/auth/callback?token=${encodeURIComponent(token)}`, {
-    redirect: "manual",
-  });
-  const cookie = (cb.headers.getSetCookie?.() ?? [])
-    .map((c) => c.split(";")[0])
-    .find((c) => c.startsWith(`${sessionCookieFor(instance)}=`));
-  if (!cookie) throw new Error(`sign-in failed for ${person.email} (${cb.status})`);
-  const form = new FormData();
-  form.set("handle", person.handle);
-  form.set("displayName", person.name);
-  await fetch(`${instance.url}/api/onboarding`, {
-    method: "POST",
-    body: form,
-    headers: { cookie },
-    redirect: "manual",
-  });
-  return { ...person, instance, cookie, address: addr(instance, person.handle) };
-}
-
-const api = (who, path, init = {}) =>
-  fetch(`${who.instance.url}${path}`, {
-    ...init,
-    redirect: "manual",
-    headers: { cookie: who.cookie, "content-type": "application/json", ...(init.headers ?? {}) },
-  });
-const post = (who, path, body) => api(who, path, { method: "POST", body: JSON.stringify(body ?? {}) });
 const shares = async (who) => (await api(who, "/api/shares")).json();
 const readerHtml = async (who) => (await api(who, "/reader")).text();
 const sources = async (who) => (await (await api(who, "/api/sources")).json()).sources ?? [];
@@ -137,38 +85,8 @@ async function v1(who, path, { method = "GET", body, token = who.token } = {}) {
   return { status: res.status, json, text };
 }
 
-function pkce() {
-  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
-  return { verifier, challengeOf: async (v) => b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v)))) };
-}
 
-/** The app's sign-in email, read from the instance's lab-only email log. */
-async function emailFor(child, email, sinceLength) {
-  let found = null;
-  await eventually(async () => {
-    const log = child.logText().slice(sinceLength);
-    const start = log.indexOf(`[nearstream-lab-email] to=${email}`);
-    if (start === -1) return false;
-    const end = log.indexOf("[/nearstream-lab-email]", start);
-    if (end === -1) return false;
-    found = log.slice(start, end);
-    return true;
-  }, 10_000);
-  return found;
-}
-
-async function appSignIn(who, child, { device = "Lab phone" } = {}) {
-  const { verifier, challengeOf } = pkce();
-  const challenge = await challengeOf(verifier);
-  const since = child.logText().length;
-  const start = await v1(who, "/auth/start", { method: "POST", body: { email: who.email, challenge, device } });
-  const mail = await emailFor(child, who.email, since);
-  const code = mail?.match(/type this code into the app: ([A-Z2-9]{4}) ([A-Z2-9]{4})/);
-  const link = mail?.match(/nearstream:\/\/auth\?server=[^&\s]+&code=([A-Z2-9]{8})/);
-  return { start, mail, code: code ? code[1] + code[2] : null, linkCode: link?.[1] ?? null, verifier };
-}
-
-async function appApiChecks({ alice, bob, childA, childB }) {
+async function appApiChecks({ alice, bob, carol, childA, childB }) {
   console.log("\nApp API v1 — discovery and sign-in");
   const wk = await fetch(`${A.url}/alice/.well-known/nearstream`).then((r) => r.json());
   check("Discovery names the app API", wk.api === `${A.url}/api/v1`, JSON.stringify(wk));
@@ -208,6 +126,43 @@ async function appApiChecks({ alice, bob, childA, childB }) {
   const btok = await v1({ instance: B }, "/auth/token", { method: "POST", body: { code: bs.code, verifier: bs.verifier } });
   bob.token = btok.json?.token;
   check("Bob signs in on his own server", btok.status === 200 && !!bob.token, btok.text);
+
+  console.log("\nApp API v1 — your Site");
+  const nowBody = `lab now ${run}`;
+  await post(alice, "/api/letter", { body: nowBody });
+  const site = await v1(alice, "/sites/me");
+  check(
+    "/sites/me is Alice's person, with her mark and Now",
+    site.status === 200 &&
+      site.json?.person?.handle === "alice" &&
+      site.json?.person?.address === alice.address &&
+      site.json?.person?.mark === alice.mark &&
+      site.json?.now?.body === nowBody &&
+      !!site.json?.now?.updatedAt,
+    site.text,
+  );
+  carol.token = await requestAppToken(carol, childA);
+  const carolSite = await v1(carol, "/sites/me");
+  check("A Site without a Now leaves `now` out", carolSite.status === 200 && !("now" in (carolSite.json ?? {})) && carolSite.json?.person?.mark === carol.mark, carolSite.text);
+  check("/sites/me without a token → 401", (await v1(alice, "/sites/me", { token: null })).status === 401);
+
+  const siteTexts = ["public", "friends", "private"].map((visibility) => ({ visibility, text: `site ${visibility} line ${run}` }));
+  for (const { visibility, text } of siteTexts) {
+    await post(alice, "/api/stream", { text, tag: "making", visibility });
+  }
+  const sitePosts = await v1(alice, "/sites/me/posts?limit=100");
+  const siteItems = sitePosts.json?.items ?? [];
+  const seen = siteTexts.map(({ visibility, text }) => siteItems.find((p) => p.text === text && p.visibility === visibility));
+  check("/sites/me/posts shows the owner every visibility", sitePosts.status === 200 && seen.every(Boolean), sitePosts.text);
+  check(
+    "…each one a Line post by Alice",
+    seen.every((p) => p?.id?.startsWith("po_") && p.kind === "line" && p.group === "stream" && p.mode === "making" && p.author?.address === alice.address && p.author?.mark === alice.mark),
+    JSON.stringify(seen),
+  );
+  check("…newest first", siteItems.findIndex((p) => p.text === siteTexts[2].text) < siteItems.findIndex((p) => p.text === siteTexts[0].text));
+  const firstPage = await v1(alice, "/sites/me/posts?limit=1");
+  const secondPage = firstPage.json?.next ? await v1(alice, `/sites/me/posts?limit=1&before=${encodeURIComponent(firstPage.json.next)}`) : null;
+  check("…and pages with an opaque cursor", firstPage.json?.items?.length === 1 && !!secondPage && secondPage.json?.items?.[0]?.id !== firstPage.json.items[0].id, firstPage.text);
 
   console.log("\nApp API v1 — sharing over v1");
   const share = await v1(alice, "/sharing", { method: "POST", body: { address: bob.address } });

@@ -117,7 +117,7 @@ export async function requireUser(
 // a person reading logs) can tell them apart. The part after the prefix
 // is the store's own id; the app must still treat the whole thing as an
 // opaque string.
-export type IdPrefix = "u" | "ln" | "fe" | "fr" | "pd" | "sh";
+export type IdPrefix = "u" | "ln" | "po" | "fe" | "fr" | "pd" | "sh";
 
 export const toId = (prefix: IdPrefix, raw: string) => `${prefix}_${raw}`;
 

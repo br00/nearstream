@@ -14,6 +14,8 @@ import type { User } from "@/schemas/user";
 import type { PendingShare, ShareKey } from "@/lib/share-store";
 import { namesakeOf } from "@/lib/sharing";
 import { visibilityOf } from "@/schemas/visibility";
+import type { Letter } from "@/schemas/letter";
+import { normalizeProfileMark } from "@/lib/profile-mark-variants";
 
 // ─── me ──────────────────────────────────────────────────────────────
 
@@ -57,6 +59,56 @@ export function lineView(entry: StreamEntry): LineView {
     tag: entry.tag,
     visibility: visibilityOf(entry),
     publishedAt: entry.publishedAt,
+  };
+}
+
+// ─── sites ───────────────────────────────────────────────────────────
+
+export type PersonView = {
+  id: string;
+  handle: string;
+  name: string;
+  address: string;
+  siteUrl: string;
+  mark: number;
+};
+
+export function personView(user: User): PersonView {
+  return {
+    id: toId("u", user.id),
+    handle: user.handle,
+    name: user.displayName || user.handle,
+    address: addressOf(user),
+    siteUrl: siteUrlFor(user),
+    mark: normalizeProfileMark(user.profileMark),
+  };
+}
+
+export type AuthorView = Pick<PersonView, "id" | "name" | "address" | "mark">;
+
+export function authorView(user: User): AuthorView {
+  const { id, name, address, mark } = personView(user);
+  return { id, name, address, mark };
+}
+
+export function nowView(letter: Letter) {
+  return { body: letter.body, updatedAt: letter.updatedAt };
+}
+
+export function isLine(entry: StreamEntry): boolean {
+  return !entry.audio && entry.text.trim().length > 0;
+}
+
+export function linePostView(entry: StreamEntry, author: AuthorView) {
+  return {
+    id: toId("po", entry.id),
+    kind: "line",
+    group: "stream",
+    author,
+    publishedAt: entry.publishedAt,
+    visibility: visibilityOf(entry),
+    mode: entry.tag,
+    text: entry.text.trim(),
   };
 }
 
