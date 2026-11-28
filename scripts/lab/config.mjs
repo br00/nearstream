@@ -25,8 +25,8 @@ export const INSTANCES = {
     distDir: ".next-lab-a",
     authSecret: "lab-instance-a-secret-not-for-production-use",
     people: [
-      { email: "alice@lab.test", handle: "alice", name: "Alice" },
-      { email: "carol@lab.test", handle: "carol", name: "Carol" },
+      { email: "alice@lab.test", handle: "alice", name: "Alice", mark: 2 },
+      { email: "carol@lab.test", handle: "carol", name: "Carol", mark: 4 },
     ],
   },
   b: {
@@ -35,7 +35,7 @@ export const INSTANCES = {
     url: `http://127.0.0.1:${PORT_B}`,
     distDir: ".next-lab-b",
     authSecret: "lab-instance-b-secret-not-for-production-use",
-    people: [{ email: "bob@lab.test", handle: "bob", name: "Bob" }],
+    people: [{ email: "bob@lab.test", handle: "bob", name: "Bob", mark: 7 }],
   },
 };
 
